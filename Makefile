@@ -47,8 +47,8 @@ SRC32FLAT=$(SRCBOTH) post.c e820map.c malloc.c romfile.c optionroms.c \
     fw/acpi.c fw/mptable.c fw/pirtable.c fw/smbios.c fw/romfile_loader.c \
     hw/virtio-ring.c hw/virtio-pci.c hw/virtio-blk.c hw/virtio-scsi.c \
     hw/tpm_drivers.c hw/nvme.c \
-    version.c hw/parisc.c
-DIRS=src src/hw src/fw vgasrc
+    version.c parisc/parisc.c
+DIRS=src src/hw src/fw vgasrc src/parisc
 
 # Default compiler flags
 cc-option=$(shell if test -z "`$(1) $(2) -S -o /dev/null -xc /dev/null 2>&1`" \
@@ -134,7 +134,7 @@ $(OUT)%.lds: %.lds.S
 	@echo "  Precompiling $@"
 	$(Q)$(CPP) $(CPPFLAGS) -D__ASSEMBLY__ $< -o $@
 
-$(OUT)head.o: src/hw/head.S
+$(OUT)head.o: src/parisc/head.S
 	@echo "  Compile checking $@"
 	$(Q)$(CC) $(CFLAGS32FLAT) -c $< -o $@
 
@@ -154,7 +154,7 @@ $(OUT)autoversion.h:
 
 $(OUT)bios.bin: $(OUT)head.o $(OUT)ccode32flat.o src/version.c
 	@echo "  Linking $@"
-	$(Q)$(CPP) $(CPPFLAGS) -I. -D__ASSEMBLY__ src/hw/pafirmware.lds.S -o $(OUT)pafirmware.lds
+	$(Q)$(CPP) $(CPPFLAGS) -Isrc -D__ASSEMBLY__ src/parisc/pafirmware.lds.S -o $(OUT)pafirmware.lds
 	$(Q)$(CC) $(CFLAGS32FLAT) -c src/version.c -o $(OUT)version.o
 	$(Q)$(LD) -N -T $(OUT)pafirmware.lds $(OUT)head.o $(OUT)version.o -X -o $@ -e startup --as-needed $(OUT)ccode32flat.o $(LIBGCC)
 
