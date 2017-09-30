@@ -28,26 +28,45 @@ int on_extra_stack(void);
 struct bregs;
 void farcall16(struct bregs *callregs);
 void farcall16big(struct bregs *callregs);
+#if CONFIG_PARISC
+#define call16_int(nr, callregs) do {} while(0)
+#else
 void __call16_int(struct bregs *callregs, u16 offset);
 #define call16_int(nr, callregs) do {                           \
         extern void irq_trampoline_ ##nr (void);                \
         __call16_int((callregs), (u32)&irq_trampoline_ ##nr );  \
     } while (0)
+#endif
 void reset(void);
 extern struct thread_info MainThread;
 struct thread_info *getCurThread(void);
-void yield(void);
 void yield_toirq(void);
+int threads_during_optionroms_check(void);
+#define threads_during_optionroms() \
+	(CONFIG_THREADS && CONFIG_RTC_TIMER && threads_during_optionroms_check())
+#if CONFIG_THREADS
+void yield(void);
 void thread_setup(void);
-int threads_during_optionroms(void);
 void run_thread(void (*func)(void*), void *data);
 void wait_threads(void);
+#else
+#define yield() while (0)
+#define thread_setup() while (0)
+#define run_thread(func,data) func(data)
+#define wait_threads() while (0)
+#endif
 struct mutex_s { u32 isLocked; };
 void mutex_lock(struct mutex_s *mutex);
 void mutex_unlock(struct mutex_s *mutex);
+#if CONFIG_THREADS
 void start_preempt(void);
 void finish_preempt(void);
 int wait_preempt(void);
+#else
+static inline void start_preempt(void) { return; }
+static inline void finish_preempt(void) { return; }
+static inline int wait_preempt(void) { return 0; }
+#endif
 void check_preempt(void);
 u32 __call32_params(void *func, u32 eax, u32 edx, u32 ecx, u32 errret);
 #define call32_params(func, eax, edx, ecx, errret) ({                   \

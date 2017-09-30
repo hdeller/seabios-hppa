@@ -7,6 +7,7 @@ menu "VGA ROM"
 
         config NO_VGABIOS
             bool "None"
+	    default y if PARISC
             help
                 Do not build a VGA BIOS.
 

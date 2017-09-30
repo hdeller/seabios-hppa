@@ -23,6 +23,7 @@
 #include "string.h" // memset
 #include "util.h" // kbd_init
 #include "tcgbios.h" // tpm_*
+#include "stacks.h" // wait_threads
 
 
 /****************************************************************

@@ -136,7 +136,7 @@ DECL_SEGFUNCS(SS)
 #define MAKE_FLATPTR(seg,off) ((void*)(((u32)(seg)<<4)+(u32)(off)))
 
 
-#if MODESEGMENT == 1
+#if (MODESEGMENT == 1) && !defined(CONFIG_PARISC)
 
 // Definitions when using segmented mode.
 #define GET_FARVAR(seg, var) __GET_FARVAR((seg), (var))

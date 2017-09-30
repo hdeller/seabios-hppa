@@ -17,14 +17,12 @@
  ****************************************************************/
 
 #define GET_IVT(vector)                                         \
-    GET_FARVAR(SEG_IVT, ((struct rmode_IVT *)0)->ivec[vector])
-#define SET_IVT(vector, segoff)                                         \
-    SET_FARVAR(SEG_IVT, ((struct rmode_IVT *)0)->ivec[vector], segoff)
+    SEGOFF(0,0)
+#define SET_IVT(vector, segoff)                                 \
+    while (0 && (vector))
 
 #define FUNC16(func) ({                                 \
-        ASSERT32FLAT();                                 \
-        extern void func (void);                        \
-        SEGOFF(SEG_BIOS, (u32)func - BUILD_BIOS_ADDR);  \
+        SEGOFF(0,0);  \
     })
 
 

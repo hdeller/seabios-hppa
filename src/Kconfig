@@ -27,6 +27,12 @@ choice
 
 endchoice
 
+    config PARISC
+        bool "Build for parisc architecture" if QEMU
+        default y
+        help
+            Build PARISC-BIOS.
+
     config QEMU_HARDWARE
         bool "Support hardware found on emulators (QEMU/Xen/KVM/Bochs)" if !QEMU
         default n
@@ -35,7 +41,7 @@ endchoice
             running on an emulator.
 
     config XEN
-        depends on QEMU
+        depends on QEMU &&& !PARISC
         bool "Support Xen HVM"
         default y
         help
@@ -43,6 +49,7 @@ endchoice
 
     config THREADS
         bool "Parallelize hardware init"
+        depends on !PARISC
         default y
         help
             Support running hardware initialization in parallel.
@@ -161,7 +168,7 @@ menu "Hardware support"
         help
             Support for AHCI disk code.
     config SDCARD
-        depends on DRIVES
+        depends on DRIVES && !PARISC
         bool "SD controllers"
         default y
         help
@@ -215,20 +222,20 @@ menu "Hardware support"
         help
             Support boot from LSI MPT Fusion scsi storage.
     config FLOPPY
-        depends on DRIVES && HARDWARE_IRQ
+        depends on DRIVES && HARDWARE_IRQ && !PARISC
         bool "Floppy controller"
         default y
         help
             Support floppy drive access.
     config FLASH_FLOPPY
-        depends on DRIVES
+        depends on DRIVES && !PARISC
         bool "Floppy images from CBFS or fw_cfg"
         default y
         help
             Support floppy images stored in coreboot flash or from
             QEMU fw_cfg.
     config NVME
-        depends on DRIVES
+        depends on DRIVES && !PARISC
         bool "NVMe controllers"
         default y
         help
@@ -265,7 +272,7 @@ menu "Hardware support"
         help
             Support USB EHCI controllers.
     config USB_XHCI
-        depends on USB
+        depends on USB && !PARISC
         bool "USB XHCI controllers"
         default y
         help
@@ -318,7 +325,7 @@ menu "Hardware support"
             Support parallel ports. This also enables int 17 parallel port calls.
     config RTC_TIMER
         bool "Real Time Clock (RTC) scheduling"
-        depends on HARDWARE_IRQ
+        depends on HARDWARE_IRQ && !PARISC
         default y
         help
             Support MC146818 Real Time Clock chip timer
@@ -329,6 +336,7 @@ menu "Hardware support"
 
     config HARDWARE_IRQ
         bool "Hardware interrupts"
+        depends on !PARISC
         default y
         help
             Program and support hardware interrupts using the i8259
@@ -338,7 +346,7 @@ menu "Hardware support"
             not to support irq routing.
 
     config USE_SMM
-        depends on QEMU
+        depends on QEMU && !PARISC
         bool "System Management Mode (SMM)"
         default y
         help
@@ -348,7 +356,7 @@ menu "Hardware support"
         depends on USE_SMM
         default y
     config MTRR_INIT
-        depends on QEMU
+        depends on QEMU && !PARISC
         bool "Initialize MTRRs"
         default y
         help
@@ -474,7 +482,7 @@ menu "BIOS interfaces"
 endmenu
 
 menu "BIOS Tables"
-    depends on QEMU
+    depends on QEMU && !PARISC
     config PIRTABLE
         bool "PIR table"
         default y

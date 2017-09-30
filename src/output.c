@@ -74,6 +74,8 @@ static struct putcinfo debuginfo = { debug_putc };
 static void
 screenc(char c)
 {
+#ifndef CONFIG_PARISC
+#else
     struct bregs br;
     memset(&br, 0, sizeof(br));
     br.flags = F_IF;
@@ -81,6 +83,7 @@ screenc(char c)
     br.al = c;
     br.bl = 0x07;
     call16_int(0x10, &br);
+#endif
 }
 
 // Handle a character from a printf request.

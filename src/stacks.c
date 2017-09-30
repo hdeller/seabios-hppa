@@ -511,9 +511,9 @@ thread_setup(void)
 
 // Should hardware initialization threads run during optionrom execution.
 int
-threads_during_optionroms(void)
+threads_during_optionroms_check(void)
 {
-    return CONFIG_THREADS && CONFIG_RTC_TIMER && ThreadControl == 2 && in_post();
+    return ThreadControl == 2 && in_post();
 }
 
 // Switch to next thread stack.

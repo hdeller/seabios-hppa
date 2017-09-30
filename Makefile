@@ -13,9 +13,10 @@ export CONFIG_SHELL       := sh
 export KCONFIG_AUTOHEADER := autoconf.h
 export KCONFIG_CONFIG     := $(CURDIR)/.config
 export LC_ALL             := C
-CROSS_PREFIX=
+CROSS_PREFIX=hppa-linux-gnu-
 ifneq ($(CROSS_PREFIX),)
 CC=$(CROSS_PREFIX)gcc
+LIBGCC = $(shell $(CC) $(KBUILD_CFLAGS) -print-libgcc-file-name)
 endif
 AS=$(CROSS_PREFIX)as
 LD=$(CROSS_PREFIX)ld
@@ -25,27 +26,28 @@ STRIP=$(CROSS_PREFIX)strip
 PYTHON=python
 CPP=cpp
 IASL:=iasl
-LD32BIT_FLAG:=-melf_i386
+LD32BIT_FLAG:=
 
 # Source files
-SRCBOTH=misc.c stacks.c output.c string.c block.c cdrom.c disk.c mouse.c kbd.c \
-    system.c serial.c sercon.c clock.c resume.c pnpbios.c vgahooks.c pcibios.c \
+# misc.c stacks.c system.c resume.c pcibios.c
+SRCBOTH=output.c string.c block.c cdrom.c disk.c mouse.c kbd.c \
+    serial.c sercon.c clock.c pnpbios.c vgahooks.c \
     apm.c cp437.c \
     hw/pci.c hw/timer.c hw/rtc.c hw/dma.c hw/pic.c hw/ps2port.c hw/serialio.c \
     hw/usb.c hw/usb-uhci.c hw/usb-ohci.c hw/usb-ehci.c \
     hw/usb-hid.c hw/usb-msc.c hw/usb-uas.c \
     hw/blockcmd.c hw/floppy.c hw/ata.c hw/ramdisk.c \
     hw/lsi-scsi.c hw/esp-scsi.c hw/megasas.c hw/mpt-scsi.c
-SRC16=$(SRCBOTH)
-SRC32FLAT=$(SRCBOTH) post.c e820map.c malloc.c romfile.c x86.c optionroms.c \
+# x86.c fw/smp.c fw/mttr.c
+SRC32FLAT=$(SRCBOTH) post.c e820map.c malloc.c romfile.c optionroms.c \
     pmm.c font.c boot.c bootsplash.c jpeg.c bmp.c tcgbios.c sha1.c \
     hw/pcidevice.c hw/ahci.c hw/pvscsi.c hw/usb-xhci.c hw/usb-hub.c hw/sdcard.c \
     fw/coreboot.c fw/lzmadecode.c fw/multiboot.c fw/csm.c fw/biostables.c \
-    fw/paravirt.c fw/shadow.c fw/pciinit.c fw/smm.c fw/smp.c fw/mtrr.c fw/xen.c \
+    fw/paravirt.c fw/shadow.c fw/pciinit.c fw/smm.c fw/xen.c \
     fw/acpi.c fw/mptable.c fw/pirtable.c fw/smbios.c fw/romfile_loader.c \
     hw/virtio-ring.c hw/virtio-pci.c hw/virtio-blk.c hw/virtio-scsi.c \
-    hw/tpm_drivers.c hw/nvme.c
-SRC32SEG=string.c output.c pcibios.c apm.c stacks.c hw/pci.c hw/serialio.c
+    hw/tpm_drivers.c hw/nvme.c \
+    version.c hw/parisc.c
 DIRS=src src/hw src/fw vgasrc
 
 # Default compiler flags
@@ -59,8 +61,7 @@ CPPFLAGS = -P -MD -MT $@
 COMMONCFLAGS := -I$(OUT) -Isrc -Os -MD -g \
     -Wall -Wno-strict-aliasing -Wold-style-definition \
     $(call cc-option,$(CC),-Wtype-limits,) \
-    -m32 -march=i386 -mregparm=3 -mpreferred-stack-boundary=2 \
-    -minline-all-stringops -fomit-frame-pointer \
+    -fomit-frame-pointer \
     -freg-struct-return -ffreestanding -fno-delete-null-pointer-checks \
     -ffunction-sections -fdata-sections -fno-common -fno-merge-constants
 COMMONCFLAGS += $(call cc-option,$(CC),-nopie,)
@@ -68,16 +69,10 @@ COMMONCFLAGS += $(call cc-option,$(CC),-fno-pie,)
 COMMONCFLAGS += $(call cc-option,$(CC),-fno-stack-protector,)
 COMMONCFLAGS += $(call cc-option,$(CC),-fno-stack-protector-all,)
 COMMONCFLAGS += $(call cc-option,$(CC),-fstack-check=no,)
+COMMONCFLAGS += $(call cc-option,$(CC),-mfast-indirect-calls,)
 COMMA := ,
 
 CFLAGS32FLAT := $(COMMONCFLAGS) -DMODE16=0 -DMODESEGMENT=0
-CFLAGSSEG := $(COMMONCFLAGS) -DMODESEGMENT=1 -fno-defer-pop \
-    $(call cc-option,$(CC),-fno-jump-tables,-DMANUAL_NO_JUMP_TABLE) \
-    $(call cc-option,$(CC),-fno-tree-switch-conversion,)
-CFLAGS32SEG := $(CFLAGSSEG) -DMODE16=0
-CFLAGS16 := $(CFLAGSSEG) -DMODE16=1 \
-    $(call cc-option,$(CC),-m16,-Wa$(COMMA)src/code16gcc.s) \
-    $(call cc-option,$(CC),--param large-stack-frame=4,-fno-inline)
 
 # Run with "make V=1" to see the actual compile commands
 ifdef V
@@ -139,6 +134,10 @@ $(OUT)%.lds: %.lds.S
 	@echo "  Precompiling $@"
 	$(Q)$(CPP) $(CPPFLAGS) -D__ASSEMBLY__ $< -o $@
 
+$(OUT)head.o: src/hw/head.S
+	@echo "  Compile checking $@"
+	$(Q)$(CC) $(CFLAGS32FLAT) -c $< -o $@
+
 
 ################ Main BIOS build rules
 
@@ -148,62 +147,16 @@ $(OUT)asm-offsets.h: $(OUT)src/asm-offsets.s
 	@echo "  Generating offset file $@"
 	$(Q)./scripts/gen-offsets.sh $< $@
 
-$(OUT)ccode16.o: $(OUT)autoconf.h $(patsubst %.c, $(OUT)src/%.o,$(SRC16)) ; $(call whole-compile, $(CFLAGS16), $(addprefix src/, $(SRC16)),$@)
+$(OUT)ccode32flat.o: $(OUT)autoversion.h $(OUT)autoconf.h $(patsubst %.c, $(OUT)src/%.o,$(SRC32FLAT)) ; $(call whole-compile, $(CFLAGS32FLAT), $(addprefix src/, $(SRC32FLAT)),$@)
 
-$(OUT)code32seg.o: $(OUT)autoconf.h $(patsubst %.c, $(OUT)src/%.o,$(SRC32SEG)) ; $(call whole-compile, $(CFLAGS32SEG), $(addprefix src/, $(SRC32SEG)),$@)
-
-$(OUT)ccode32flat.o: $(OUT)autoconf.h $(patsubst %.c, $(OUT)src/%.o,$(SRC32FLAT)) ; $(call whole-compile, $(CFLAGS32FLAT), $(addprefix src/, $(SRC32FLAT)),$@)
-
-$(OUT)romlayout.o: src/romlayout.S $(OUT)autoconf.h $(OUT)asm-offsets.h
-	@echo "  Compiling (16bit) $@"
-	$(Q)$(CC) $(CFLAGS16) -c -D__ASSEMBLY__ $< -o $@
-
-$(OUT)romlayout16.lds: $(OUT)ccode32flat.o $(OUT)code32seg.o $(OUT)ccode16.o $(OUT)romlayout.o src/version.c scripts/layoutrom.py scripts/buildversion.py
-	@echo "  Building ld scripts"
+$(OUT)autoversion.h:
 	$(Q)$(PYTHON) ./scripts/buildversion.py -e "$(EXTRAVERSION)" -t "$(CC);$(AS);$(LD);$(OBJCOPY);$(OBJDUMP);$(STRIP)" $(OUT)autoversion.h
+
+$(OUT)bios.bin: $(OUT)head.o $(OUT)ccode32flat.o src/version.c
+	@echo "  Linking $@"
+	$(Q)$(CPP) $(CPPFLAGS) -I. -D__ASSEMBLY__ src/hw/pafirmware.lds.S -o $(OUT)pafirmware.lds
 	$(Q)$(CC) $(CFLAGS32FLAT) -c src/version.c -o $(OUT)version.o
-	$(Q)$(LD) $(LD32BIT_FLAG) -r $(OUT)ccode32flat.o $(OUT)version.o -o $(OUT)code32flat.o
-	$(Q)$(LD) $(LD32BIT_FLAG) -r $(OUT)ccode16.o $(OUT)romlayout.o -o $(OUT)code16.o
-	$(Q)$(OBJDUMP) -thr $(OUT)code32flat.o > $(OUT)code32flat.o.objdump
-	$(Q)$(OBJDUMP) -thr $(OUT)code32seg.o > $(OUT)code32seg.o.objdump
-	$(Q)$(OBJDUMP) -thr $(OUT)code16.o > $(OUT)code16.o.objdump
-	$(Q)$(PYTHON) ./scripts/layoutrom.py $(OUT)code16.o.objdump $(OUT)code32seg.o.objdump $(OUT)code32flat.o.objdump $(OUT)$(KCONFIG_AUTOHEADER) $(OUT)romlayout16.lds $(OUT)romlayout32seg.lds $(OUT)romlayout32flat.lds
-
-# These are actually built by scripts/layoutrom.py above, but by pulling them
-# into an extra rule we prevent make -j from spawning layoutrom.py 4 times.
-$(OUT)romlayout32seg.lds $(OUT)romlayout32flat.lds $(OUT)code32flat.o $(OUT)code16.o: $(OUT)romlayout16.lds
-
-$(OUT)rom16.o: $(OUT)code16.o $(OUT)romlayout16.lds
-	@echo "  Linking $@"
-	$(Q)$(LD) -T $(OUT)romlayout16.lds $< -o $@
-
-$(OUT)rom32seg.o: $(OUT)code32seg.o $(OUT)romlayout32seg.lds
-	@echo "  Linking $@"
-	$(Q)$(LD) -T $(OUT)romlayout32seg.lds $< -o $@
-
-$(OUT)rom.o: $(OUT)rom16.strip.o $(OUT)rom32seg.strip.o $(OUT)code32flat.o $(OUT)romlayout32flat.lds
-	@echo "  Linking $@"
-	$(Q)$(LD) -N -T $(OUT)romlayout32flat.lds $(OUT)rom16.strip.o $(OUT)rom32seg.strip.o $(OUT)code32flat.o -o $@
-
-$(OUT)bios.bin.prep: $(OUT)rom.o scripts/checkrom.py
-	@echo "  Prepping $@"
-	$(Q)rm -f $(OUT)bios.bin $(OUT)Csm16.bin $(OUT)bios.bin.elf
-	$(Q)$(OBJDUMP) -thr $< > $<.objdump
-	$(Q)$(OBJCOPY) -O binary $< $(OUT)bios.bin.raw
-	$(Q)$(PYTHON) ./scripts/checkrom.py $<.objdump $(CONFIG_ROM_SIZE) $(OUT)bios.bin.raw $(OUT)bios.bin.prep
-
-$(OUT)bios.bin: $(OUT)bios.bin.prep
-	@echo "  Creating $@"
-	$(Q)cp $< $@
-
-$(OUT)Csm16.bin: $(OUT)bios.bin.prep
-	@echo "  Creating $@"
-	$(Q)cp $< $@
-
-$(OUT)bios.bin.elf: $(OUT)rom.o $(OUT)bios.bin.prep
-	@echo "  Creating $@"
-	$(Q)$(STRIP) -R .comment $< -o $(OUT)bios.bin.elf
-
+	$(Q)$(LD) -N -T $(OUT)pafirmware.lds $(OUT)head.o $(OUT)version.o -X -o $@ -e startup --as-needed $(OUT)ccode32flat.o $(LIBGCC)
 
 ################ VGA build rules
 

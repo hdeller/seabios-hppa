@@ -537,7 +537,7 @@ void sercon_setup(void)
     SET_IVT(0x10, FUNC16(entry_sercon));
     SET_LOW(sercon_port, addr);
     outb(0x03, addr + SEROFF_LCR); // 8N1
-    outb(0x01, addr + 0x02);       // enable fifo
+    outb(0x01, addr + SEROFF_IIR); // enable fifo
 }
 
 /****************************************************************

@@ -198,5 +198,9 @@ qemu_reboot(void)
     outb(0x06, PORT_PCI_REBOOT);
 
     // Next try triple faulting the CPU to force a reset
+#ifdef CONFIG_PARISC
+	// FIXME PARISC 
+#else
     asm volatile("int3");
+#endif
 }

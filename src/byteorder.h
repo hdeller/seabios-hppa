@@ -12,9 +12,14 @@ static inline u32 __swab32_constant(u32 val) {
 static inline u64 __swab64_constant(u64 val) {
     return ((u64)__swab32_constant(val) << 32) | __swab32_constant(val>>32);
 }
-static inline u32 __swab32(u32 val) {
-    asm("bswapl %0" : "+r"(val));
-    return val;
+static inline u32 __swab32(u32 x) {
+	unsigned int temp;
+	__asm__("shd %0, %0, 16, %1\n\t"	/* shift abcdabcd -> cdab */
+		"dep %1, 15, 8, %1\n\t"		/* deposit cdab -> cbab */
+		"shd %0, %1, 8, %0"		/* shift abcdcbab -> dcba */
+		: "=r" (x), "=&r" (temp)
+		: "0" (x));
+	return x;
 }
 static inline u64 __swab64(u64 val) {
     union u64_u32_u i, o;
@@ -30,7 +35,7 @@ static inline u64 __swab64(u64 val) {
 #define swab64(x) (__builtin_constant_p((u64)(x)) \
                    ? __swab64_constant(x) : __swab64(x))
 
-static inline u16 cpu_to_le16(u16 x) {
+static inline u16 cpu_to_le16(u16 x) {  // TODO !!!!!!
     return x;
 }
 static inline u32 cpu_to_le32(u32 x) {
