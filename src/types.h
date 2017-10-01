@@ -21,6 +21,12 @@ union u64_u32_u {
     u64 val;
 };
 
+#if MODE16 == 1
+typedef u16 portaddr_t;
+#else
+typedef unsigned long portaddr_t;
+#endif
+
 // Definition for common 16bit segment/offset pointers.
 struct segoff_s {
     union {

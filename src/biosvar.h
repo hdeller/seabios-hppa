@@ -95,9 +95,14 @@ static inline u32 __attribute_const get_global_offset(void) {
 static inline u16 get_global_seg(void) {
     return GET_SEG(GLOBAL_SEGREG);
 }
+#if !CONFIG_PARISC
 #define GET_GLOBAL(var)                                                 \
     GET_VAR(GLOBAL_SEGREG, *(typeof(&(var)))((void*)&(var)              \
                                              + get_global_offset()))
+#else
+#define GET_GLOBAL(var) (var)
+#endif
+
 #if MODESEGMENT
 #define GLOBALFLAT2GLOBAL(var) ((typeof(var))((void*)(var) - BUILD_BIOS_ADDR))
 #else

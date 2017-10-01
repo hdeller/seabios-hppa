@@ -4,6 +4,8 @@
  *   (C) 2017 Helge Deller <deller@gmx.de>
  */
 
+#include "parisc/parisc.h"
+
 	/* load 32-bit 'value' into 'reg' compensating for the ldil
 	 * sign-extension when running in wide mode.
 	 * WARNING!! neither 'value' nor 'reg' can be expressions
@@ -63,23 +65,26 @@ name:
 #endif
 
 	.import	$global$
-
 	.section ".head.text","ax"
-
-ENTRY(startup)
 	 .level 1.1
 
+ENTRY(startup)
+
 #if 0
-	#define DINO_UART_BASE 0xfff83800
 	ldi	65, %r1
 	load32  DINO_UART_BASE, %r3
 L1:	stb	%r1, 0(%r3)
 	b,n	L1
 	nop
-#else
-	// load32	BOOTADDR(_ebss),%r4
-	load32  0x60000,%r4
+#endif
+
+#if 1
+	load32	BOOTADDR(_ebss),%r4
+	// load32  0x60000,%r4
 	ldo	FRAME_SIZE(%r4),%sp	/* stack at end of bss */
+
+	/* Initialize the global data pointer */
+	loadgp
 
 	load32	BOOTADDR(start_parisc_firmware), %r2
 	bv,n	0(%r2)
@@ -145,3 +150,8 @@ startup_continue:
 
 	bv,n	0(%ret0)
 END(startup)
+
+
+ENTRY(pdc_entry)
+	.word	0xffffffff		/* HLT */
+END(pdc_entry)

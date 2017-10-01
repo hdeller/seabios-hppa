@@ -88,7 +88,7 @@ static inline void nop(void)
 
 static inline void hlt(void)
 {
-    asm volatile("b,n .": : :"memory");
+    asm volatile("\t.word 0xffffffff": : :"memory");
 }
 
 static inline void wbinvd(void)
@@ -257,47 +257,47 @@ static inline u32 rol(u32 val, u16 rol) {
     return res;
 }
 
-static inline void outb(u8 value, unsigned long port) {
-    *(u8 *)(port) = value;
+static inline void outb(u8 value, portaddr_t port) {
+    *(volatile u8 *)(port) = value;
 }
-static inline void outw(u16 value, unsigned long port) {
-    *(u16 *)(port) = value;
+static inline void outw(u16 value, portaddr_t port) {
+    *(volatile u16 *)(port) = value;
 }
-static inline void outl(u32 value, unsigned long port) {
-    *(u32 *)(port) = value;
+static inline void outl(u32 value, portaddr_t port) {
+    *(volatile u32 *)(port) = value;
 }
-static inline u8 inb(unsigned long port) {
-    return *(u8 *)(port);
+static inline u8 inb(portaddr_t port) {
+    return *(volatile u8 *)(port);
 }
-static inline u16 inw(unsigned long port) {
-    return *(u16 *)(port);
+static inline u16 inw(portaddr_t port) {
+    return *(volatile u16 *)(port);
 }
-static inline u32 inl(unsigned long port) {
-    return *(u32 *)(port);
+static inline u32 inl(portaddr_t port) {
+    return *(volatile u32 *)(port);
 }
 
-static inline void insb(unsigned long port, u8 *data, u32 count) {
+static inline void insb(portaddr_t port, u8 *data, u32 count) {
     while (count--)
 	*data++ = inb(port);
 }
-static inline void insw(unsigned long port, u16 *data, u32 count) {
+static inline void insw(portaddr_t port, u16 *data, u32 count) {
     while (count--)
 	*data++ = inw(port);
 }
-static inline void insl(unsigned long port, u32 *data, u32 count) {
+static inline void insl(portaddr_t port, u32 *data, u32 count) {
     while (count--)
 	*data++ = inl(port);
 }
 // XXX - outs not limited to es segment
-static inline void outsb(unsigned long port, u8 *data, u32 count) {
+static inline void outsb(portaddr_t port, u8 *data, u32 count) {
     while (count--)
 	outb(*data++, port);
 }
-static inline void outsw(unsigned long port, u16 *data, u32 count) {
+static inline void outsw(portaddr_t port, u16 *data, u32 count) {
     while (count--)
 	outw(*data++, port);
 }
-static inline void outsl(unsigned long port, u32 *data, u32 count) {
+static inline void outsl(portaddr_t port, u32 *data, u32 count) {
     while (count--)
 	outl(*data++, port);
 }

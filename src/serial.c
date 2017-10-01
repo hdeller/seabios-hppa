@@ -19,11 +19,13 @@
  ****************************************************************/
 
 static u16
-detect_serial(u16 port, u8 timeout, u8 count)
+detect_serial(portaddr_t port, u8 timeout, u8 count)
 {
     if (CONFIG_DEBUG_SERIAL && port == CONFIG_DEBUG_SERIAL_PORT
         && !romfile_loadint("etc/advertise-serial-debug-port", 1))
         return 0;
+    if (!port)
+	return 0;
     outb(0x02, port+SEROFF_IER);
     u8 ier = inb(port+SEROFF_IER);
     if (ier != 0x02)
