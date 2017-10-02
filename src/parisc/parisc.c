@@ -14,6 +14,7 @@
 #include "malloc.h" // malloc
 #include "hw/serialio.h" // qemu_debug_port
 #include "fw/paravirt.h" // PlatformRunningOn
+#include "parisc/parisc.h" // DINO_UART_BASE
 #include "parisc/pdc.h"
 
 int HaveRunPost;
@@ -40,6 +41,19 @@ void cpuid(u32 index, u32 *eax, u32 *ebx, u32 *ecx, u32 *edx)
 
 void wrmsr_smp(u32 index, u64 val) { }
 
+static int mem_cons_serial_out_char(void)
+{
+	dprintf(0, "SERIAL CONSOLE IODC called.\n");
+	return PDC_OK;
+}
+
+static const struct pz_device mem_cons_boot = {
+	.hpa = DINO_UART_BASE, /* minus noch */
+	.iodc_io = (unsigned long) &mem_cons_serial_out_char,
+	.cl_class = CL_DUPLEX,
+};
+
+
 #define PAGE0 ((volatile struct zeropage *) 0UL)
 
 extern char pdc_entry;
@@ -58,6 +72,7 @@ void __VISIBLE start_parisc_firmware(unsigned long ram_size,
 	PAGE0->mem_pdc = (unsigned long) &pdc_entry;
 	PAGE0->mem_10msec = 1024; /* FIXME */
 	PAGE0->imm_max_mem = ram_size;
+	memcpy((void*)&(PAGE0->mem_cons), &mem_cons_boot, sizeof(mem_cons_boot));
 
 	// while (1) outb('X', GET_GLOBAL(DebugOutputPort));
 	// PlatformRunningOn = PF_QEMU;  // emulate runningOnQEMU()
