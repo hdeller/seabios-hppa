@@ -41,22 +41,94 @@ void cpuid(u32 index, u32 *eax, u32 *ebx, u32 *ecx, u32 *edx)
 
 void wrmsr_smp(u32 index, u64 val) { }
 
-static int mem_cons_serial_out_char(void)
+#define ARG0 arg[7-0]
+#define ARG1 arg[7-1]
+#define ARG2 arg[7-2]
+#define ARG3 arg[7-3]
+#define ARG4 arg[7-4]
+#define ARG5 arg[7-5]
+#define ARG6 arg[7-6]
+#define ARG7 arg[7-7]
+
+/*********** IODC ******/
+
+int __VISIBLE parisc_iodc_entry(unsigned int *arg)
 {
-	dprintf(0, "SERIAL CONSOLE IODC called.\n");
-	return PDC_OK;
+	unsigned long hpa = ARG0;
+	unsigned long option = ARG1;
+	unsigned long spa = ARG2;
+	unsigned long layers = ARG3;
+	unsigned long *result = (unsigned long *)ARG4;
+	
+	/* search for hpa */
+
+	switch (option) {
+	case ENTRY_IO_COUT: /* console output */
+		dprintf(0, (char*)ARG6);
+		result[0] = ARG7;
+		return PDC_OK;
+	}
+
+	dprintf(0, "IODC option #%lx called: hpa=%lx spa=%lx layers=%lx ", option, hpa, spa, layers);
+	dprintf(0, "result=%p %x %x %x\n", result, ARG5, ARG6, ARG7);
+
+	hlt();
+	return PDC_BAD_OPTION;
 }
+
+/*********** PDC *******/
+
+int __VISIBLE parisc_pdc_entry(unsigned int *arg)
+{
+	//unsigned long hpa = ARG0;
+//	unsigned long option = ARG1;
+	//unsigned long spa = ARG2;
+	//unsigned long layers = ARG3;
+//	unsigned long *result = (unsigned long *)ARG4;
+	
+#if 0
+	switch (option) {
+	case ENTRY_IO_COUT: /* console output */
+		dprintf(0, (char*)ARG6);
+		result[0] = ARG7;
+		return PDC_OK;
+	}
+#endif
+	dprintf(0, "PDC called %x %x %x %x ", ARG0, ARG1, ARG2, ARG3);
+	dprintf(0, "%x %x %x %x\n", ARG4, ARG5, ARG6, ARG7);
+
+	hlt();
+	return PDC_BAD_OPTION;
+}
+
+
+
+/*********** MAIN *******/
+
+extern char pdc_entry;
+extern char iodc_entry;
 
 static const struct pz_device mem_cons_boot = {
 	.hpa = DINO_UART_BASE, /* minus noch */
-	.iodc_io = (unsigned long) &mem_cons_serial_out_char,
+	.iodc_io = (unsigned long) &iodc_entry,
 	.cl_class = CL_DUPLEX,
+};
+
+static const struct pz_device mem_boot_boot = {
+	.hpa = 0x11111, /* minus noch */
+	.iodc_io = (unsigned long) &iodc_entry,
+	.cl_class = CL_RANDOM,
+};
+
+static const struct pz_device mem_kbd_boot = {
+	.hpa = 0x11111, /* minus noch */
+	.iodc_io = (unsigned long) &iodc_entry,
+	.cl_class = CL_KEYBD,
 };
 
 
 #define PAGE0 ((volatile struct zeropage *) 0UL)
 
-extern char pdc_entry;
 
 void __VISIBLE start_parisc_firmware(unsigned long ram_size,
 	unsigned long linux_kernel_entry,
@@ -73,6 +145,8 @@ void __VISIBLE start_parisc_firmware(unsigned long ram_size,
 	PAGE0->mem_10msec = 1024; /* FIXME */
 	PAGE0->imm_max_mem = ram_size;
 	memcpy((void*)&(PAGE0->mem_cons), &mem_cons_boot, sizeof(mem_cons_boot));
+	memcpy((void*)&(PAGE0->mem_boot), &mem_boot_boot, sizeof(mem_boot_boot));
+	memcpy((void*)&(PAGE0->mem_kbd),  &mem_kbd_boot, sizeof(mem_kbd_boot));
 
 	// while (1) outb('X', GET_GLOBAL(DebugOutputPort));
 	// PlatformRunningOn = PF_QEMU;  // emulate runningOnQEMU()

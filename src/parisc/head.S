@@ -153,5 +153,40 @@ END(startup)
 
 
 ENTRY(pdc_entry)
-	.word	0xffffffff		/* HLT */
+	stw %rp,-20(%sp)
+	stw %r27,-32(%sp)
+	stw %arg0,-36(%sp)
+	stw %arg1,-40(%sp)
+	stw %arg2,-44(%sp)
+	stw %arg3,-48(%sp)
+	ldo -FRAME_SIZE(%sp),%arg0
+
+	loadgp
+	b,l parisc_pdc_entry, %rp
+	ldo FRAME_SIZE(%sp),%sp
+
+	ldo -FRAME_SIZE(%sp),%sp
+	ldw -20(%sp),%rp
+	bv %r0(%rp)
+	ldw -32(%sp),%r27
 END(pdc_entry)
+
+ENTRY(iodc_entry)
+	.import parisc_iodc_entry
+	stw %rp,-20(%sp)
+	stw %r27,-32(%sp)
+	stw %arg0,-36(%sp)
+	stw %arg1,-40(%sp)
+	stw %arg2,-44(%sp)
+	stw %arg3,-48(%sp)
+	ldo -FRAME_SIZE(%sp),%arg0
+
+	loadgp
+	b,l parisc_iodc_entry, %rp
+	ldo FRAME_SIZE(%sp),%sp
+
+	ldo -FRAME_SIZE(%sp),%sp
+	ldw -20(%sp),%rp
+	bv %r0(%rp)
+	ldw -32(%sp),%r27
+END(iodc_entry)
