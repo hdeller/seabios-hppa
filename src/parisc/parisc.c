@@ -153,7 +153,7 @@ void __VISIBLE start_parisc_firmware(unsigned long ram_size,
 	// qemu_debug_putc('A');
 
 	dprintf(0, "\n");
-	dprintf(0, "PARISC Firmware started, %lu MB RAM.\n", ram_size/1024/1024);
+	dprintf(0, "PARISC SeaBIOS Firmware started, %lu MB RAM.\n", ram_size/1024/1024);
 	// handle_post();
 	serial_debug_preinit();
 	debug_banner();

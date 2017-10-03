@@ -85,11 +85,8 @@ ENTRY(startup)
 
 	;! nuke the W bit, saving original value
 	.level 2.0
-	rsm	PSW_W_SM, %r1
-
+	rsm	PSW_W_SM, %r0
 	.level 1.1
-	extrw,u	%r1, PSW_W_BIT-32, 1, %r1
-	copy	%r1, %arg0
 
 	/* Clear BSS */
 
@@ -106,32 +103,9 @@ $bss_loop:
 	/* Initialize the global data pointer */
 	loadgp
 
-	/* arg0..arg4 were set by palo. */
-	copy	%arg1, %r6		/* command line */
-	copy	%arg2, %r7		/* rd-start */
-	copy	%arg3, %r8		/* rd-end */
 	load32	BOOTADDR(start_parisc_firmware),%r3
-
-#ifdef CONFIG_64BIT
-	.level LEVEL
-	ssm	PSW_W_SM, %r0		/* set W-bit */
-	depdi	0, 31, 32, %r3
-#endif
-	load32	BOOTADDR(startup_continue), %r2
-	bv,n	0(%r3)
-
-startup_continue:
-#ifdef CONFIG_64BIT
-	.level LEVEL
-	rsm	PSW_W_SM, %r0		/* clear W-bit */
-#endif
-
-	load32	0 /*XXXX*/, %arg0 /* free mem */
-	copy	%r6, %arg1		/* command line */
-	copy	%r7, %arg2		/* rd-start */
-	copy	%r8, %arg3		/* rd-end */
-
-	bv,n	0(%ret0)
+	bv	0(%r3)
+	copy	%r0,%r2
 END(startup)
 
 
