@@ -70,26 +70,15 @@ name:
 
 ENTRY(startup)
 
-#if 0
-	ldi	65, %r1
-	load32  DINO_UART_BASE, %r3
-L1:	stb	%r1, 0(%r3)
-	b,n	L1
-	nop
-#endif
-
-#if 1
-	load32	BOOTADDR(_ebss),%r4
-	// load32  0x60000,%r4
-	ldo	FRAME_SIZE(%r4),%sp	/* stack at end of bss */
-
-	/* Initialize the global data pointer */
-	loadgp
-
-	load32	BOOTADDR(start_parisc_firmware), %r2
-	bv,n	0(%r2)
-	nop
-#endif
+	/* Make sure space registers are set to zero */
+	mtsp    %r0,%sr0
+	mtsp    %r0,%sr1
+	mtsp    %r0,%sr2
+	mtsp    %r0,%sr3
+	mtsp    %r0,%sr4
+	mtsp    %r0,%sr5
+	mtsp    %r0,%sr6
+	mtsp    %r0,%sr7
 
 #define PSW_W_SM	0x200
 #define PSW_W_BIT       36
@@ -101,12 +90,6 @@ L1:	stb	%r1, 0(%r3)
 	.level 1.1
 	extrw,u	%r1, PSW_W_BIT-32, 1, %r1
 	copy	%r1, %arg0
-
-	/* Make sure sr4-sr7 are set to zero for the kernel address space */
-	mtsp    %r0,%sr4
-	mtsp    %r0,%sr5
-	mtsp    %r0,%sr6
-	mtsp    %r0,%sr7
 
 	/* Clear BSS */
 
