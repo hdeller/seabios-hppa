@@ -40,8 +40,8 @@ clock_setup(void)
     u32 seconds = bcd2bin(rtc_read(CMOS_RTC_SECONDS));
     u32 minutes = bcd2bin(rtc_read(CMOS_RTC_MINUTES));
     u32 hours = bcd2bin(rtc_read(CMOS_RTC_HOURS));
-    u32 ticks = ticks_from_ms(((hours * 60 + minutes) * 60 + seconds) * 1000);
-    SET_BDA(timer_counter, ticks % TICKS_PER_DAY);
+    // u32 ticks = ticks_from_ms(((hours * 60 + minutes) * 60 + seconds) * 1000);
+    // SET_BDA(timer_counter, ticks % TICKS_PER_DAY);
 
     // Setup Century storage
     if (CONFIG_QEMU) {
@@ -347,13 +347,14 @@ irqtimer_calc(u32 msecs)
 {
     if (!msecs)
         return GET_BDA(timer_counter);
-    return irqtimer_calc_ticks(ticks_from_ms(msecs));
+    return 0; // irqtimer_calc_ticks(ticks_from_ms(msecs));
 }
 
 // Check if the given timer value has passed.
 int
 irqtimer_check(u32 end)
 {
+	return 0;
     return (((GET_BDA(timer_counter) + TICKS_PER_DAY - end) % TICKS_PER_DAY)
             < (TICKS_PER_DAY/2));
 }

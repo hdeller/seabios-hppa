@@ -24,6 +24,9 @@
 
 #define IDE_HPA		0xf9000000
 
+#define CPU_CLOCK_MHZ	250	/* emulate a 250 MHz CPU */
+
+
 #if 0
 [    2.160168] 1. Phantom PseudoBC GSC+ Port at 0xffc00000 [8] { 7, 0x0, 0x504, 0x00000 }
 [    2.260162] 2. Dino PCI Bridge at 0xfff80000 [8/0] { 13, 0x3, 0x680, 0x0000a }

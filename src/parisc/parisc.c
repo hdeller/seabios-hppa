@@ -133,20 +133,22 @@ static const struct pz_device mem_kbd_boot = {
 
 #define PAGE0 ((volatile struct zeropage *) 0UL)
 
-
 void __VISIBLE start_parisc_firmware(unsigned long ram_size,
 	unsigned long linux_kernel_entry,
 	unsigned long cmdline,
 	unsigned long initrd_start,
 	unsigned long initrd_end)
 {
+	unsigned int cpu_hz;
+
 	/* Initialize PAGE0 */
 	PAGE0->memc_cont = ram_size;
 	PAGE0->memc_phsize = ram_size;
 	PAGE0->mem_free = 4*4096; // 16k ??
 	PAGE0->mem_hpa = 0; // /* HPA of the boot-CPU */
 	PAGE0->mem_pdc = (unsigned long) &pdc_entry;
-	PAGE0->mem_10msec = 1024; /* FIXME */
+	PAGE0->mem_10msec = CPU_CLOCK_MHZ*(1000000ULL/100);
+
 	PAGE0->imm_max_mem = ram_size;
 	memcpy((void*)&(PAGE0->mem_cons), &mem_cons_boot, sizeof(mem_cons_boot));
 	memcpy((void*)&(PAGE0->mem_boot), &mem_boot_boot, sizeof(mem_boot_boot));
@@ -157,10 +159,16 @@ void __VISIBLE start_parisc_firmware(unsigned long ram_size,
 	// set Qemu serial debug port
 	DebugOutputPort = PORT_SERIAL1;
 	// PlatformRunningOn = PF_QEMU;  // emulate runningOnQEMU()
-	// qemu_debug_putc('A');
 
 	dprintf(0, "\n");
 	dprintf(0, "PARISC SeaBIOS Firmware started, %lu MB RAM.\n", ram_size/1024/1024);
+
+	cpu_hz = 100 * PAGE0->mem_10msec; /* Hz of this PARISC */
+	dprintf(0, "1 CPU at %d.%06d MHz\n",
+			cpu_hz / 1000000, cpu_hz % 1000000 );
+
+	// mdelay(1000); // test: "wait 1 second"
+
 	// handle_post();
 	serial_debug_preinit();
 	debug_banner();
@@ -169,7 +177,7 @@ void __VISIBLE start_parisc_firmware(unsigned long ram_size,
 	// coreboot_preinit();
 
 	serial_setup();
-//	ata_setup();
+	ata_setup();
 
 	if (linux_kernel_entry) {
 		void (*start_kernel)(unsigned long mem_free, unsigned long cmdline,
