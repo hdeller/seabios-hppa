@@ -11,13 +11,13 @@
 #define PORT_SERIAL3           0x03e8
 #define PORT_SERIAL1           0x03f8
 #else
-#include "parisc/parisc.h"
+#include "parisc/hppa_hardware.h"
 #define PORT_LPT2              0
 #define PORT_SERIAL4           0
-#define PORT_SERIAL2           DINO_UART_HPA+0x800
+#define PORT_SERIAL2           (LASI_UART_HPA+0x800)
 #define PORT_LPT1              0
 #define PORT_SERIAL3           0
-#define PORT_SERIAL1           LASI_RS232_HPA+0x800
+#define PORT_SERIAL1           (DINO_UART_HPA+0x800)
 #endif
 
 // Serial port offsets

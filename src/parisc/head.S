@@ -4,7 +4,7 @@
  *   (C) 2017 Helge Deller <deller@gmx.de>
  */
 
-#include "parisc/parisc.h"
+#include "parisc/hppa_hardware.h"
 
 	/* load 32-bit 'value' into 'reg' compensating for the ldil
 	 * sign-extension when running in wide mode.

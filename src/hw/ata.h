@@ -30,7 +30,7 @@ int ata_atapi_process_op(struct disk_op_s *op);
 void ata_setup(void);
 
 #if defined(CONFIG_PARISC)
-#include "parisc/parisc.h"
+#include "parisc/hppa_hardware.h"
 #define PORT_ATA2_CMD_BASE     (IDE_HPA+0x0170)
 #define PORT_ATA1_CMD_BASE     (IDE_HPA+0x01f0)
 #define PORT_ATA2_CTRL_BASE    (IDE_HPA+0x0374)

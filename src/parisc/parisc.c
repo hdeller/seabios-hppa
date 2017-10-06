@@ -14,12 +14,13 @@
 #include "malloc.h" // malloc
 #include "hw/serialio.h" // qemu_debug_port
 #include "fw/paravirt.h" // PlatformRunningOn
-#include "parisc/parisc.h" // DINO_UART_BASE
+#include "parisc/hppa_hardware.h" // DINO_UART_BASE
 #include "parisc/pdc.h"
 
 int HaveRunPost;
 u8 ExtraStack[BUILD_EXTRA_STACK_SIZE+1] __aligned(8);
 u8 *StackPos;
+u8 __VISIBLE parisc_stack[16*1024] __aligned(64);
 
 u8 BiosChecksum;
 
@@ -148,7 +149,8 @@ void __VISIBLE start_parisc_firmware(unsigned long ram_size,
 	memcpy((void*)&(PAGE0->mem_boot), &mem_boot_boot, sizeof(mem_boot_boot));
 	memcpy((void*)&(PAGE0->mem_kbd),  &mem_kbd_boot, sizeof(mem_kbd_boot));
 
-	// while (1) outb('X', GET_GLOBAL(DebugOutputPort));
+	// set Qemu serial debug port
+	DebugOutputPort = PORT_SERIAL1;
 	// PlatformRunningOn = PF_QEMU;  // emulate runningOnQEMU()
 	// qemu_debug_putc('A');
 

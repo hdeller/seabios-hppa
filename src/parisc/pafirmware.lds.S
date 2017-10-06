@@ -1,11 +1,11 @@
-#include "parisc/parisc.h"
+#include "parisc/hppa_hardware.h"
 
 OUTPUT_FORMAT("elf32-hppa-linux")
 OUTPUT_ARCH(hppa)
 ENTRY(startup)
 SECTIONS
 {
-	. = PARISC_FIRMWARE_START;
+	. = FIRMWARE_START;
 
 	/* keep __gp below 0x1000000 */
 
