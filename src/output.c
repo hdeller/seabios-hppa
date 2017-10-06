@@ -41,10 +41,13 @@ debug_putc(struct putcinfo *action, char c)
 {
     if (! CONFIG_DEBUG_LEVEL)
         return;
+#if 1
     qemu_debug_putc(c);
     if (!MODESEGMENT)
         coreboot_debug_putc(c);
+#else
     serial_debug_putc(c);
+#endif
 }
 
 // Flush any pending output to debug port(s).
@@ -145,7 +148,7 @@ puts_cs(struct putcinfo *action, const char *s)
 static void
 putuint(struct putcinfo *action, u32 val)
 {
-    char buf[12];
+    char buf[40];
     char *d = &buf[sizeof(buf) - 1];
     *d-- = '\0';
     for (;;) {

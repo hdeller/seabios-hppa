@@ -469,6 +469,7 @@ fill_ata_edd(struct segoff_s edd, struct drive_s *drive_gf)
 int noinline
 fill_edd(struct segoff_s edd, struct drive_s *drive_fl)
 {
+#if 0
     switch (GET_FLATPTR(drive_fl->type)) {
     case DTYPE_ATA:
     case DTYPE_ATA_ATAPI:
@@ -481,6 +482,8 @@ fill_edd(struct segoff_s edd, struct drive_s *drive_fl)
     default:
         return fill_generic_edd(edd, drive_fl, 0, 0, 0, 0);
     }
+#endif
+  return 0;
 }
 
 
@@ -491,8 +494,11 @@ fill_edd(struct segoff_s edd, struct drive_s *drive_fl)
 void
 block_setup(void)
 {
+dprintf(0, "block_setup\n");
     floppy_setup();
+dprintf(0, "block_setup\n");
     ata_setup();
+dprintf(0, "block_setup\n");
     ahci_setup();
     sdcard_setup();
     ramdisk_setup();

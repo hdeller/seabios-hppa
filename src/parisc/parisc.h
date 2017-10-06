@@ -4,8 +4,27 @@
 // #define PARISC_FIRMWARE_START     0x60000
 #define PARISC_FIRMWARE_START   0xf0000000
 
-/* serial port of DINO */
-#define DINO_UART_BASE 0xfff83800
+#define DEVICE_HPA_LEN  0x00100000
+
+#define GSC_HPA         0xffc00000
+#define DINO_HPA        0xfff80000
+#define DINO_UART_HPA   0xfff83000
+#define  DINO_UART_BASE 0xfff83800
+#define DINO_SCSI_HPA   0xfff8c000
+#define LASI_HPA        0xffd00000
+#define LASI_RS232_HPA  0xffd05000
+#define LASI_SCSI_HPA   0xffd06000
+#define LASI_LAN_HPA    0xffd07000
+#define LASI_LPT_HPA    0xffd02000
+#define LASI_AUDIO_HPA  0xffd04000
+#define LASI_PS2KBD_HPA 0xffd08000
+#define LASI_PS2MOU_HPA 0xffd08100
+#define LASI_GFX_HPA    0xf8000000
+#define CPU_HPA         0xfffbe000
+#define MEMORY_HPA      0xfffbf000
+
+#define IDE_HPA         0xf9000000
+
 
 #if 0
 [    2.160168] 1. Phantom PseudoBC GSC+ Port at 0xffc00000 [8] { 7, 0x0, 0x504, 0x00000 }

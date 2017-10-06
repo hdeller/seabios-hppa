@@ -95,10 +95,13 @@ ENTRY(startup)
 
 	load32	BOOTADDR(_bss),%r3
 	load32	BOOTADDR(_ebss),%r4
-	ldo	FRAME_SIZE(%r4),%sp	/* stack at end of bss */
 $bss_loop:
 	cmpb,<<,n %r3,%r4,$bss_loop
 	stw,ma	%r0,4(%r3)
+
+	/* Initialize stack pointer */
+	load32	BOOTADDR(parisc_stack),%r1
+	ldo	FRAME_SIZE(%r1),%sp
 
 	/* Initialize the global data pointer */
 	loadgp

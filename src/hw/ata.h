@@ -6,9 +6,9 @@
 #include "types.h" // u8
 
 struct ata_channel_s {
-    u16 iobase1;
-    u16 iobase2;
-    u16 iomaster;
+    unsigned long iobase1;
+    unsigned long iobase2;
+    unsigned long iomaster;
     u8  irq;
     u8  chanid;
     u8  ataid;
@@ -29,10 +29,18 @@ int ata_process_op(struct disk_op_s *op);
 int ata_atapi_process_op(struct disk_op_s *op);
 void ata_setup(void);
 
+#if defined(CONFIG_PARISC)
+#include "parisc/parisc.h"
+#define PORT_ATA2_CMD_BASE     (IDE_HPA+0x0170)
+#define PORT_ATA1_CMD_BASE     (IDE_HPA+0x01f0)
+#define PORT_ATA2_CTRL_BASE    (IDE_HPA+0x0374)
+#define PORT_ATA1_CTRL_BASE    (IDE_HPA+0x03f4)
+#else
 #define PORT_ATA2_CMD_BASE     0x0170
 #define PORT_ATA1_CMD_BASE     0x01f0
 #define PORT_ATA2_CTRL_BASE    0x0374
 #define PORT_ATA1_CTRL_BASE    0x03f4
+#endif
 
 // Global defines -- ATA register and register bits.
 // command block & control block regs

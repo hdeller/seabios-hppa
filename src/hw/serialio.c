@@ -104,7 +104,8 @@ serial_debug_flush(void)
 #if !CONFIG_PARISC
 portaddr_t DebugOutputPort VARFSEG = 0x402;
 #else
-portaddr_t DebugOutputPort = 0xfff83800; /* DINO_UART_BASE */
+#include "parisc/parisc.h"
+portaddr_t DebugOutputPort = LASI_RS232_HPA+0x800;
 #endif
 
 // Write a character to the special debugging port.

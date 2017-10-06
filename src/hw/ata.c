@@ -32,7 +32,7 @@
 
 // Wait for the specified ide state
 static inline int
-await_ide(u8 mask, u8 flags, u16 base, u16 timeout)
+await_ide(u8 mask, u8 flags, portaddr_t base, u16 timeout)
 {
     u32 end = timer_calc(timeout);
     for (;;) {
@@ -49,21 +49,21 @@ await_ide(u8 mask, u8 flags, u16 base, u16 timeout)
 
 // Wait for the device to be not-busy.
 static int
-await_not_bsy(u16 base)
+await_not_bsy(portaddr_t base)
 {
     return await_ide(ATA_CB_STAT_BSY, 0, base, IDE_TIMEOUT);
 }
 
 // Wait for the device to be ready.
 static int
-await_rdy(u16 base)
+await_rdy(portaddr_t base)
 {
     return await_ide(ATA_CB_STAT_RDY, ATA_CB_STAT_RDY, base, IDE_TIMEOUT);
 }
 
 // Wait for ide state - pauses for one ata cycle first.
 static inline int
-pause_await_not_bsy(u16 iobase1, u16 iobase2)
+pause_await_not_bsy(portaddr_t iobase1, portaddr_t iobase2)
 {
     // Wait one PIO transfer cycle.
     inb(iobase2 + ATA_CB_ASTAT);
@@ -73,7 +73,7 @@ pause_await_not_bsy(u16 iobase1, u16 iobase2)
 
 // Wait for ide state - pause for 400ns first.
 static inline int
-ndelay_await_not_bsy(u16 iobase1)
+ndelay_await_not_bsy(portaddr_t iobase1)
 {
     ndelay(400);
     return await_not_bsy(iobase1);
@@ -85,8 +85,8 @@ ata_reset(struct atadrive_s *adrive_gf)
 {
     struct ata_channel_s *chan_gf = GET_GLOBALFLAT(adrive_gf->chan_gf);
     u8 slave = GET_GLOBALFLAT(adrive_gf->slave);
-    u16 iobase1 = GET_GLOBALFLAT(chan_gf->iobase1);
-    u16 iobase2 = GET_GLOBALFLAT(chan_gf->iobase2);
+    portaddr_t iobase1 = GET_GLOBALFLAT(chan_gf->iobase1);
+    portaddr_t iobase2 = GET_GLOBALFLAT(chan_gf->iobase2);
 
     dprintf(6, "ata_reset drive=%p\n", &adrive_gf->drive);
     // Pulse SRST
@@ -138,7 +138,7 @@ isready(struct atadrive_s *adrive_gf)
 {
     // Read the status from controller
     struct ata_channel_s *chan_gf = GET_GLOBALFLAT(adrive_gf->chan_gf);
-    u16 iobase1 = GET_GLOBALFLAT(chan_gf->iobase1);
+    portaddr_t iobase1 = GET_GLOBALFLAT(chan_gf->iobase1);
     u8 status = inb(iobase1 + ATA_CB_STAT);
     if ((status & (ATA_CB_STAT_BSY|ATA_CB_STAT_RDY)) == ATA_CB_STAT_RDY)
         return DISK_RET_SUCCESS;
@@ -172,7 +172,7 @@ send_cmd(struct atadrive_s *adrive_gf, struct ata_pio_command *cmd)
 {
     struct ata_channel_s *chan_gf = GET_GLOBALFLAT(adrive_gf->chan_gf);
     u8 slave = GET_GLOBALFLAT(adrive_gf->slave);
-    u16 iobase1 = GET_GLOBALFLAT(chan_gf->iobase1);
+    portaddr_t iobase1 = GET_GLOBALFLAT(chan_gf->iobase1);
 
     // Select device
     int status = await_not_bsy(iobase1);
@@ -209,7 +209,7 @@ send_cmd(struct atadrive_s *adrive_gf, struct ata_pio_command *cmd)
 
 // Wait for data after calling 'send_cmd'.
 static int
-ata_wait_data(u16 iobase1)
+ata_wait_data(portaddr_t iobase1)
 {
     int status = ndelay_await_not_bsy(iobase1);
     if (status < 0)
@@ -233,8 +233,8 @@ int
 ata_cmd_nondata(struct atadrive_s *adrive_gf, struct ata_pio_command *cmd)
 {
     struct ata_channel_s *chan_gf = GET_GLOBALFLAT(adrive_gf->chan_gf);
-    u16 iobase1 = GET_GLOBALFLAT(chan_gf->iobase1);
-    u16 iobase2 = GET_GLOBALFLAT(chan_gf->iobase2);
+    portaddr_t iobase1 = GET_GLOBALFLAT(chan_gf->iobase1);
+    portaddr_t iobase2 = GET_GLOBALFLAT(chan_gf->iobase2);
 
     // Disable interrupts
     outb(ATA_CB_DC_HD15 | ATA_CB_DC_NIEN, iobase2 + ATA_CB_DC);
@@ -281,8 +281,8 @@ ata_pio_transfer(struct disk_op_s *op, int iswrite, int blocksize)
     struct atadrive_s *adrive_gf = container_of(
         op->drive_fl, struct atadrive_s, drive);
     struct ata_channel_s *chan_gf = GET_GLOBALFLAT(adrive_gf->chan_gf);
-    u16 iobase1 = GET_GLOBALFLAT(chan_gf->iobase1);
-    u16 iobase2 = GET_GLOBALFLAT(chan_gf->iobase2);
+    portaddr_t iobase1 = GET_GLOBALFLAT(chan_gf->iobase1);
+    portaddr_t iobase2 = GET_GLOBALFLAT(chan_gf->iobase2);
     int count = op->count;
     void *buf_fl = op->buf_fl;
     int status;
@@ -368,7 +368,7 @@ ata_try_dma(struct disk_op_s *op, int iswrite, int blocksize)
     struct atadrive_s *adrive_gf = container_of(
         op->drive_fl, struct atadrive_s, drive);
     struct ata_channel_s *chan_gf = GET_GLOBALFLAT(adrive_gf->chan_gf);
-    u16 iomaster = GET_GLOBALFLAT(chan_gf->iomaster);
+    portaddr_t iomaster = GET_GLOBALFLAT(chan_gf->iomaster);
     if (! iomaster)
         return -1;
     u32 bytes = op->count * blocksize;
@@ -418,7 +418,7 @@ ata_dma_transfer(struct disk_op_s *op)
     struct atadrive_s *adrive_gf = container_of(
         op->drive_fl, struct atadrive_s, drive);
     struct ata_channel_s *chan_gf = GET_GLOBALFLAT(adrive_gf->chan_gf);
-    u16 iomaster = GET_GLOBALFLAT(chan_gf->iomaster);
+    portaddr_t iomaster = GET_GLOBALFLAT(chan_gf->iomaster);
 
     // Start bus-master controller.
     u8 oldcmd = inb(iomaster + BM_CMD);
@@ -440,8 +440,8 @@ ata_dma_transfer(struct disk_op_s *op)
     }
     outb(oldcmd & ~BM_CMD_START, iomaster + BM_CMD);
 
-    u16 iobase1 = GET_GLOBALFLAT(chan_gf->iobase1);
-    u16 iobase2 = GET_GLOBALFLAT(chan_gf->iobase2);
+    portaddr_t iobase1 = GET_GLOBALFLAT(chan_gf->iobase1);
+    portaddr_t iobase2 = GET_GLOBALFLAT(chan_gf->iobase2);
     int idestatus = pause_await_not_bsy(iobase1, iobase2);
 
     if ((status & (BM_STATUS_IRQ|BM_STATUS_ACTIVE)) == BM_STATUS_IRQ
@@ -468,8 +468,8 @@ ata_pio_cmd_data(struct disk_op_s *op, int iswrite, struct ata_pio_command *cmd)
     struct atadrive_s *adrive_gf = container_of(
         op->drive_fl, struct atadrive_s, drive);
     struct ata_channel_s *chan_gf = GET_GLOBALFLAT(adrive_gf->chan_gf);
-    u16 iobase1 = GET_GLOBALFLAT(chan_gf->iobase1);
-    u16 iobase2 = GET_GLOBALFLAT(chan_gf->iobase2);
+    portaddr_t iobase1 = GET_GLOBALFLAT(chan_gf->iobase1);
+    portaddr_t iobase2 = GET_GLOBALFLAT(chan_gf->iobase2);
 
     // Disable interrupts
     outb(ATA_CB_DC_HD15 | ATA_CB_DC_NIEN, iobase2 + ATA_CB_DC);
@@ -599,8 +599,8 @@ ata_atapi_process_op(struct disk_op_s *op)
     struct atadrive_s *adrive_gf = container_of(
         op->drive_fl, struct atadrive_s, drive);
     struct ata_channel_s *chan_gf = GET_GLOBALFLAT(adrive_gf->chan_gf);
-    u16 iobase1 = GET_GLOBALFLAT(chan_gf->iobase1);
-    u16 iobase2 = GET_GLOBALFLAT(chan_gf->iobase2);
+    portaddr_t iobase1 = GET_GLOBALFLAT(chan_gf->iobase1);
+    portaddr_t iobase2 = GET_GLOBALFLAT(chan_gf->iobase2);
 
     struct ata_pio_command cmd;
     memset(&cmd, 0, sizeof(cmd));
@@ -815,7 +815,7 @@ static u32 SpinupEnd;
 
 // Wait for non-busy status and check for "floating bus" condition.
 static int
-powerup_await_non_bsy(u16 base)
+powerup_await_non_bsy(portaddr_t base)
 {
     u8 orstatus = 0;
     u8 status;
@@ -834,7 +834,7 @@ powerup_await_non_bsy(u16 base)
         }
         yield();
     }
-    dprintf(6, "powerup iobase=%x st=%x\n", base, status);
+    dprintf(6, "powerup iobase=%lx st=%x\n", base, status);
     return status;
 }
 
@@ -851,7 +851,7 @@ ata_detect(void *data)
     u8 slave;
     for (slave=0; slave<=1; slave++) {
         // Wait for not-bsy.
-        u16 iobase1 = chan_gf->iobase1;
+        portaddr_t iobase1 = chan_gf->iobase1;
         int status = powerup_await_non_bsy(iobase1);
         if (status < 0)
             continue;
@@ -1035,7 +1035,7 @@ ata_setup(void)
     if (!CONFIG_ATA)
         return;
 
-    dprintf(3, "init hard drives\n");
+    dprintf(0, "init hard drives\n");
 
     SpinupEnd = timer_calc(IDE_TIMEOUT);
     ata_scan();

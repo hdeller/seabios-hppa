@@ -38,8 +38,8 @@ SRCBOTH=output.c string.c block.c cdrom.c disk.c mouse.c kbd.c \
     hw/usb-hid.c hw/usb-msc.c hw/usb-uas.c \
     hw/blockcmd.c hw/floppy.c hw/ata.c hw/ramdisk.c \
     hw/lsi-scsi.c hw/esp-scsi.c hw/megasas.c hw/mpt-scsi.c
-# x86.c fw/smp.c fw/mttr.c
-SRC32FLAT=$(SRCBOTH) post.c e820map.c malloc.c romfile.c optionroms.c \
+# x86.c fw/smp.c fw/mttr.c malloc.c
+SRC32FLAT=$(SRCBOTH) post.c e820map.c romfile.c optionroms.c \
     pmm.c font.c boot.c bootsplash.c jpeg.c bmp.c tcgbios.c sha1.c \
     hw/pcidevice.c hw/ahci.c hw/pvscsi.c hw/usb-xhci.c hw/usb-hub.c hw/sdcard.c \
     fw/coreboot.c fw/lzmadecode.c fw/multiboot.c fw/csm.c fw/biostables.c \
@@ -47,7 +47,7 @@ SRC32FLAT=$(SRCBOTH) post.c e820map.c malloc.c romfile.c optionroms.c \
     fw/acpi.c fw/mptable.c fw/pirtable.c fw/smbios.c fw/romfile_loader.c \
     hw/virtio-ring.c hw/virtio-pci.c hw/virtio-blk.c hw/virtio-scsi.c \
     hw/tpm_drivers.c hw/nvme.c \
-    version.c parisc/parisc.c
+    version.c parisc/malloc.c parisc/parisc.c
 DIRS=src src/hw src/fw vgasrc src/parisc
 
 # Default compiler flags
@@ -63,7 +63,7 @@ COMMONCFLAGS := -I$(OUT) -Isrc -Os -MD -g \
     $(call cc-option,$(CC),-Wtype-limits,) \
     -fomit-frame-pointer \
     -freg-struct-return -ffreestanding -fno-delete-null-pointer-checks \
-    -ffunction-sections -fdata-sections -fno-common -fno-merge-constants
+    -ffunction-sections -fdata-sections -fno-common -fno-merge-constants -mdisable-fpregs
 COMMONCFLAGS += $(call cc-option,$(CC),-nopie,)
 COMMONCFLAGS += $(call cc-option,$(CC),-fno-pie,)
 COMMONCFLAGS += $(call cc-option,$(CC),-fno-stack-protector,)

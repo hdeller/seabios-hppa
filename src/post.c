@@ -171,7 +171,7 @@ prepareboot(void)
     cdrom_prepboot();
     pmm_prepboot();
     malloc_prepboot();
-    e820_prepboot();
+    // e820_prepboot();
 
     HaveRunPost = 2;
 
