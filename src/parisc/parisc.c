@@ -13,6 +13,7 @@
 #include "util.h" // serial_setup
 #include "malloc.h" // malloc
 #include "hw/serialio.h" // qemu_debug_port
+#include "hw/ata.h"
 #include "fw/paravirt.h" // PlatformRunningOn
 #include "parisc/hppa_hardware.h" // DINO_UART_BASE
 #include "parisc/pdc.h"
@@ -63,6 +64,7 @@ int __VISIBLE parisc_iodc_entry(unsigned int *arg)
 	
 	/* search for hpa */
 
+	if (hpa == DINO_UART_HPA || hpa == LASI_UART_HPA)
 	switch (option) {
 	case ENTRY_IO_COUT: /* console output */
 		dprintf(0, (char*)ARG6);
@@ -70,7 +72,7 @@ int __VISIBLE parisc_iodc_entry(unsigned int *arg)
 		return PDC_OK;
 	}
 
-	dprintf(0, "IODC option #%lx called: hpa=%lx spa=%lx layers=%lx ", option, hpa, spa, layers);
+	dprintf(0, "\nIODC option #%lx called: hpa=%lx spa=%lx layers=%lx ", option, hpa, spa, layers);
 	dprintf(0, "result=%p %x %x %x\n", result, ARG5, ARG6, ARG7);
 
 	hlt();
@@ -95,7 +97,7 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 		return PDC_OK;
 	}
 #endif
-	dprintf(0, "PDC called %x %x %x %x ", ARG0, ARG1, ARG2, ARG3);
+	dprintf(0, "\nPDC called %x %x %x %x ", ARG0, ARG1, ARG2, ARG3);
 	dprintf(0, "%x %x %x %x\n", ARG4, ARG5, ARG6, ARG7);
 
 	hlt();
@@ -110,21 +112,22 @@ extern char pdc_entry;
 extern char iodc_entry;
 
 static const struct pz_device mem_cons_boot = {
-	.hpa = DINO_UART_BASE, /* minus noch */
+	.hpa = DINO_UART_HPA,
 	.iodc_io = (unsigned long) &iodc_entry,
 	.cl_class = CL_DUPLEX,
 };
 
 static const struct pz_device mem_boot_boot = {
-	.hpa = 0x11111, /* minus noch */
+	.hpa = IDE_HPA,
 	.iodc_io = (unsigned long) &iodc_entry,
 	.cl_class = CL_RANDOM,
 };
 
 static const struct pz_device mem_kbd_boot = {
-	.hpa = 0x11111, /* minus noch */
+	.hpa = DINO_UART_HPA,
 	.iodc_io = (unsigned long) &iodc_entry,
-	.cl_class = CL_KEYBD,
+	.cl_class = CL_DUPLEX,
+	// .cl_class = CL_KEYBD,
 };
 
 
@@ -149,6 +152,8 @@ void __VISIBLE start_parisc_firmware(unsigned long ram_size,
 	memcpy((void*)&(PAGE0->mem_boot), &mem_boot_boot, sizeof(mem_boot_boot));
 	memcpy((void*)&(PAGE0->mem_kbd),  &mem_kbd_boot, sizeof(mem_kbd_boot));
 
+	malloc_preinit();
+
 	// set Qemu serial debug port
 	DebugOutputPort = PORT_SERIAL1;
 	// PlatformRunningOn = PF_QEMU;  // emulate runningOnQEMU()
@@ -162,11 +167,9 @@ void __VISIBLE start_parisc_firmware(unsigned long ram_size,
 	// maininit();
 	qemu_preinit();
 	// coreboot_preinit();
-	// malloc_preinit();
-	// malloc_low(1);
- 	// reloc_preinit(maininit, NULL);
 
 	serial_setup();
+//	ata_setup();
 
 	if (linux_kernel_entry) {
 		void (*start_kernel)(unsigned long mem_free, unsigned long cmdline,
