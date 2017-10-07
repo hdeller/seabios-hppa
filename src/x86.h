@@ -261,21 +261,21 @@ static inline void outb(u8 value, portaddr_t port) {
     *(volatile u8 *)(port) = value;
 }
 static inline void outw(u16 value, portaddr_t port) {
-    *(volatile u16 *)(port) = be16_to_cpu(value);
+    *(volatile u16 *)(port) = le16_to_cpu(value);
 }
 static inline void outl(u32 value, portaddr_t port) {
-    *(volatile u32 *)(port) = be32_to_cpu(value);
+    *(volatile u32 *)(port) = le32_to_cpu(value);
 }
 static inline u8 inb(portaddr_t port) {
     return *(volatile u8 *)(port);
 }
 static inline u16 inw(portaddr_t port) {
     u16 x = *(volatile u16 *)(port);
-    return le16_to_cpu(x);
+    return cpu_to_le16(x);
 }
 static inline u32 inl(portaddr_t port) {
-    u16 x = *(volatile u32 *)(port);
-    return le32_to_cpu(x);
+    u32 x = *(volatile u32 *)(port);
+    return cpu_to_le32(x);
 }
 
 static inline void insb(portaddr_t port, u8 *data, u32 count) {
@@ -284,11 +284,11 @@ static inline void insb(portaddr_t port, u8 *data, u32 count) {
 }
 static inline void insw(portaddr_t port, u16 *data, u32 count) {
     while (count--)
-	*data++ = cpu_to_le16(inw(port));
+	*data++ = le16_to_cpu(inw(port));
 }
 static inline void insl(portaddr_t port, u32 *data, u32 count) {
     while (count--)
-	*data++ = cpu_to_le32(inl(port));
+	*data++ = le32_to_cpu(inl(port));
 }
 // XXX - outs not limited to es segment
 static inline void outsb(portaddr_t port, u8 *data, u32 count) {

@@ -701,7 +701,7 @@ ata_extract_model(char *model, u32 size, u16 *buffer)
     // Read model name
     int i;
     for (i=0; i<size/2; i++)
-        *(u16*)&model[i*2] = be16_to_cpu(buffer[27+i]);
+        *(u16*)&model[i*2] = le16_to_cpu(buffer[27+i]);
     model[size] = 0x00;
     nullTrailingSpace(model);
     return model;
@@ -720,7 +720,7 @@ init_atadrive(struct atadrive_s *dummy, u16 *buffer)
     adrive->chan_gf = dummy->chan_gf;
     adrive->slave = dummy->slave;
     adrive->drive.cntl_id = adrive->chan_gf->ataid * 2 + dummy->slave;
-    adrive->drive.removable = (buffer[0] & 0x80) ? 1 : 0;
+    adrive->drive.removable = le16_to_cpu((buffer[0]) & 0x80) ? 1 : 0;
     return adrive;
 }
 
@@ -777,15 +777,15 @@ init_drive_ata(struct atadrive_s *dummy, u16 *buffer)
     adrive->drive.type = DTYPE_ATA;
     adrive->drive.blksize = DISK_SECTOR_SIZE;
 
-    adrive->drive.pchs.cylinder = buffer[1];
-    adrive->drive.pchs.head = buffer[3];
-    adrive->drive.pchs.sector = buffer[6];
+    adrive->drive.pchs.cylinder = le16_to_cpu(buffer[1]);
+    adrive->drive.pchs.head = le16_to_cpu(buffer[3]);
+    adrive->drive.pchs.sector = le16_to_cpu(buffer[6]);
 
     u64 sectors;
-    if (buffer[83] & (1 << 10)) // word 83 - lba48 support
-        sectors = *(u64*)&buffer[100]; // word 100-103
+    if (le16_to_cpu(buffer[83]) & (1 << 10)) // word 83 - lba48 support
+        sectors = le64_to_cpu(*(u64*)&buffer[100]); // word 100-103
     else
-        sectors = *(u32*)&buffer[60]; // word 60 and word 61
+        sectors = le32_to_cpu(*(u32*)&buffer[60]); // word 60 and word 61
     adrive->drive.sectors = sectors;
     u64 adjsize = sectors >> 11;
     char adjprefix = 'M';
@@ -905,7 +905,7 @@ ata_detect(void *data)
                 continue;
         }
 
-        u16 resetresult = buffer[93];
+        u16 resetresult = le16_to_cpu(buffer[93]);
         dprintf(6, "ata_detect resetresult=%04x\n", resetresult);
         if (!slave && (resetresult & 0xdf61) == 0x4041)
             // resetresult looks valid and device 0 is responding to
