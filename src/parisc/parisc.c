@@ -179,6 +179,9 @@ void __VISIBLE start_parisc_firmware(unsigned long ram_size,
 	serial_setup();
 	ata_setup();
 
+// struct disk_op_s  // CMD_READ
+
+
 	if (linux_kernel_entry) {
 		void (*start_kernel)(unsigned long mem_free, unsigned long cmdline,
 			unsigned long rdstart, unsigned long rdend);
