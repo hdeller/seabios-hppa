@@ -108,38 +108,13 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 }
 
 /*********** BOOT MENU *******/
-#if 0
-struct disk_op_s {
-    void *buf_fl;
-    struct drive_s *drive_fl;
-    u8 command;
-    u16 count;
-    union {
-        // Commands: READ, WRITE, VERIFY, SEEK, FORMAT
-        u64 lba;
-        // Commands: SCSI
-        struct {
-            u16 blocksize;
-            void *cdbcmd;
-        };
-    };
-};
-
-#define CMD_RESET   0x00
-#define CMD_READ    0x02
-#define CMD_WRITE   0x03
-#define CMD_VERIFY  0x04
-#define CMD_FORMAT  0x05
-#define CMD_SEEK    0x07
-#define CMD_ISREADY 0x10
-#endif
 
 extern struct drive_s *select_parisc_boot_drive(void);
 
 /* size of I/O block used in HP firmware */
 #define FW_BLOCKSIZE    2048
 
-void parisc_boot_menu(void)
+int parisc_boot_menu(unsigned char **iplstart, unsigned char **iplend)
 {
 	int ret;
 	unsigned int *target = (void *)0xa0000;
@@ -153,14 +128,14 @@ void parisc_boot_menu(void)
 	disk_op.drive_fl = select_parisc_boot_drive();
 	if (disk_op.drive_fl == NULL) {
 		printf("No boot device.\n");
-		return;
+		return 0;
 	}
 
 	/* seek to beginning of disc/CD */
 	ret = process_op(&disk_op);
-	printf("DISK_SEEK(0) = %d\n", ret);
+	printf("DISK_SEEK returned %d\n", ret);
 	// if (ret)
-	//	return;
+	//	return 0;
 
 	/* read boot sector of disc/CD */
 	target[0] = 0xabcd;
@@ -169,15 +144,42 @@ void parisc_boot_menu(void)
 	disk_op.count = (FW_BLOCKSIZE / disk_op.drive_fl->blksize);
 	disk_op.lba = 0;
 	ret = process_op(&disk_op);
-	printf("DISK_READ(%d) = %d\n", disk_op.count, ret);
+	printf("DISK_READ(count=%d) = %d\n", disk_op.count, ret);
 	//if (ret)
-	//	return;
+	//	return 0;
 	//
 	unsigned int ipl_addr = be32_to_cpu(target[0xf0/sizeof(int)]); /* offset 0xf0 in bootblock */
 	unsigned int ipl_size = be32_to_cpu(target[0xf4/sizeof(int)]);
 	unsigned int ipl_entry= be32_to_cpu(target[0xf8/sizeof(int)]);
+
+	/* check LIF header of bootblock */
 	printf("boot magic is 0x%x (should be 0x8000)\n", target[0]>>16);
 	printf("ipl  start at 0x%x, size %d, entry 0x%x\n", ipl_addr, ipl_size, ipl_entry);
+
+	// TODO: check ipl values, out of range, ... ?
+
+	/* seek to beginning of IPL */
+	disk_op.command = CMD_SEEK;
+	disk_op.count = 0; // (ipl_size / disk_op.drive_fl->blksize);
+	disk_op.lba = (ipl_addr / disk_op.drive_fl->blksize);
+	ret = process_op(&disk_op);
+	printf("DISK_SEEK to IPL returned %d\n", ret);
+
+	/* read IPL */
+	disk_op.command = CMD_READ;
+	disk_op.count = (ipl_size / disk_op.drive_fl->blksize);
+	disk_op.lba = (ipl_addr / disk_op.drive_fl->blksize);
+	ret = process_op(&disk_op);
+	printf("DISK_READ IPL returned %d\n", ret);
+
+	printf("First word at %p is 0x%x\n", target, target[0]);
+
+	/* execute IPL */
+	// TODO: flush D- and I-cache, not needed in emulation ?
+	*iplstart = *iplend = (unsigned char *) target;
+	*iplstart += ipl_entry;
+	*iplend += ipl_size;
+	return 1;
 }
 
 
@@ -215,6 +217,7 @@ void __VISIBLE start_parisc_firmware(unsigned long ram_size,
 	unsigned long initrd_end)
 {
 	unsigned int cpu_hz;
+	unsigned char *iplstart, *iplend;
 
 	/* Initialize PAGE0 */
 	PAGE0->memc_cont = ram_size;
@@ -257,7 +260,13 @@ void __VISIBLE start_parisc_firmware(unsigned long ram_size,
 //	printf("0xdeadbeef %x %x\n", cpu_to_le16(0xdeadbeef),cpu_to_le32(0xdeadbeef));
 //	printf("0xdeadbeef %x %x\n", le16_to_cpu(0xefbe),le32_to_cpu(0xefbeadde));
 
-	parisc_boot_menu();
+	if (parisc_boot_menu(&iplstart, &iplend)) {
+		void (*start_ipl)(long interactive, long mem_free);
+
+		start_ipl = (void *) iplstart;
+		start_ipl(1, (long)iplend);
+		hlt(); /* this ends the emulator */
+	}
 
 	if (linux_kernel_entry) {
 		void (*start_kernel)(unsigned long mem_free, unsigned long cmdline,
