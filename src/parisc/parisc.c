@@ -159,7 +159,7 @@ void parisc_boot_menu(void)
 	/* seek to beginning of disc/CD */
 	ret = process_op(&disk_op);
 	printf("DISK_SEEK(0) = %d\n", ret);
-	//if (ret)
+	// if (ret)
 	//	return;
 
 	/* read boot sector of disc/CD */
@@ -172,12 +172,12 @@ void parisc_boot_menu(void)
 	printf("DISK_READ(%d) = %d\n", disk_op.count, ret);
 	//if (ret)
 	//	return;
-unsigned int ipl_addr = be32_to_cpu(target[0xf0/sizeof(int)]); /* offset 0xf0 */
-unsigned int ipl_size = be32_to_cpu(target[0xf4/sizeof(int)]);
-unsigned int ipl_entry= be32_to_cpu(target[0xf8/sizeof(int)]);
-	printf("boot magic is 0x%x (should be 80/00)\n", target[0]);
+	//
+	unsigned int ipl_addr = be32_to_cpu(target[0xf0/sizeof(int)]); /* offset 0xf0 in bootblock */
+	unsigned int ipl_size = be32_to_cpu(target[0xf4/sizeof(int)]);
+	unsigned int ipl_entry= be32_to_cpu(target[0xf8/sizeof(int)]);
+	printf("boot magic is 0x%x (should be 0x8000)\n", target[0]>>16);
 	printf("ipl  start at 0x%x, size %d, entry 0x%x\n", ipl_addr, ipl_size, ipl_entry);
-
 }
 
 
