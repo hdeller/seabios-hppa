@@ -35,6 +35,9 @@ void mtrr_setup(void) { }
 void mathcp_setup(void) { }
 void smp_setup(void) { }
 void bios32_init(void) { }
+void yield_toirq(void) { }
+void farcall16(struct bregs *callregs) { }
+void farcall16big(struct bregs *callregs) { }
 
 void cpuid(u32 index, u32 *eax, u32 *ebx, u32 *ecx, u32 *edx)
 {

@@ -21,7 +21,7 @@
 #ifndef __ASSEMBLY__
 
 #include "types.h" // u32
-
+#include "byteorder.h" // le16_to_cpu
 
 #define   PSW_I   0x00000001
 
@@ -270,10 +270,10 @@ static inline u8 inb(portaddr_t port) {
     return *(volatile u8 *)(port);
 }
 static inline u16 inw(portaddr_t port) {
-    return *(volatile u16 *)(port);
+    return le16_to_cpu(*(volatile u16 *)(port));
 }
 static inline u32 inl(portaddr_t port) {
-    return *(volatile u32 *)(port);
+    return le32_to_cpu(*(volatile u32 *)(port));
 }
 
 static inline void insb(portaddr_t port, u8 *data, u32 count) {

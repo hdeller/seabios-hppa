@@ -35,7 +35,46 @@ static inline u64 __swab64(u64 val) {
 #define swab64(x) (__builtin_constant_p((u64)(x)) \
                    ? __swab64_constant(x) : __swab64(x))
 
-static inline u16 cpu_to_le16(u16 x) {  // TODO !!!!!!
+#if CONFIG_PARISC
+static inline u16 cpu_to_le16(u16 x) {
+    return swab16(x);
+}
+static inline u32 cpu_to_le32(u32 x) {
+    return swab32(x);
+}
+static inline u64 cpu_to_le64(u64 x) {
+    return swab64(x);
+}
+static inline u16 le16_to_cpu(u16 x) {
+    return swab16(x);
+}
+static inline u32 le32_to_cpu(u32 x) {
+    return swab32(x);
+}
+static inline u64 le64_to_cpu(u64 x) {
+    return swab64(x);
+}
+
+static inline u16 cpu_to_be16(u16 x) {
+    return x;
+}
+static inline u32 cpu_to_be32(u32 x) {
+    return x;
+}
+static inline u64 cpu_to_be64(u64 x) {
+    return x;
+}
+static inline u16 be16_to_cpu(u16 x) {
+    return x;
+}
+static inline u32 be32_to_cpu(u32 x) {
+    return x;
+}
+static inline u64 be64_to_cpu(u64 x) {
+    return x;
+}
+#else
+static inline u16 cpu_to_le16(u16 x) {
     return x;
 }
 static inline u32 cpu_to_le32(u32 x) {
@@ -72,5 +111,6 @@ static inline u32 be32_to_cpu(u32 x) {
 static inline u64 be64_to_cpu(u64 x) {
     return swab64(x);
 }
+#endif
 
 #endif // byteorder.h
