@@ -108,10 +108,77 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 }
 
 /*********** BOOT MENU *******/
+#if 0
+struct disk_op_s {
+    void *buf_fl;
+    struct drive_s *drive_fl;
+    u8 command;
+    u16 count;
+    union {
+        // Commands: READ, WRITE, VERIFY, SEEK, FORMAT
+        u64 lba;
+        // Commands: SCSI
+        struct {
+            u16 blocksize;
+            void *cdbcmd;
+        };
+    };
+};
 
-extern int parisc_boot_menu(void);
+#define CMD_RESET   0x00
+#define CMD_READ    0x02
+#define CMD_WRITE   0x03
+#define CMD_VERIFY  0x04
+#define CMD_FORMAT  0x05
+#define CMD_SEEK    0x07
+#define CMD_ISREADY 0x10
+#endif
 
-// struct disk_op_s  // CMD_READ
+extern struct drive_s *select_parisc_boot_drive(void);
+
+/* size of I/O block used in HP firmware */
+#define FW_BLOCKSIZE    2048
+
+void parisc_boot_menu(void)
+{
+	int ret;
+	unsigned int *target = (void *)0xa0000;
+	struct disk_op_s disk_op = {
+		.buf_fl = target,
+		.command = CMD_SEEK,
+		.count = 0,
+		.lba = 0,
+	};
+
+	disk_op.drive_fl = select_parisc_boot_drive();
+	if (disk_op.drive_fl == NULL) {
+		printf("No boot device.\n");
+		return;
+	}
+
+	/* seek to beginning of disc/CD */
+	ret = process_op(&disk_op);
+	printf("DISK_SEEK(0) = %d\n", ret);
+	//if (ret)
+	//	return;
+
+	/* read boot sector of disc/CD */
+	target[0] = 0xabcd;
+	disk_op.command = CMD_READ;
+	printf("blocksize is %d\n", disk_op.drive_fl->blksize);
+	disk_op.count = (FW_BLOCKSIZE / disk_op.drive_fl->blksize);
+	disk_op.lba = 0;
+	ret = process_op(&disk_op);
+	printf("DISK_READ(%d) = %d\n", disk_op.count, ret);
+	//if (ret)
+	//	return;
+unsigned int ipl_addr = be32_to_cpu(target[0xf0/sizeof(int)]); /* offset 0xf0 */
+unsigned int ipl_size = be32_to_cpu(target[0xf4/sizeof(int)]);
+unsigned int ipl_entry= be32_to_cpu(target[0xf8/sizeof(int)]);
+	printf("boot magic is 0x%x (should be 80/00)\n", target[0]);
+	printf("ipl  start at 0x%x, size %d, entry 0x%x\n", ipl_addr, ipl_size, ipl_entry);
+
+}
 
 
 /*********** MAIN *******/
@@ -186,6 +253,9 @@ void __VISIBLE start_parisc_firmware(unsigned long ram_size,
 
 	serial_setup();
 	ata_setup();
+//
+//	printf("0xdeadbeef %x %x\n", cpu_to_le16(0xdeadbeef),cpu_to_le32(0xdeadbeef));
+//	printf("0xdeadbeef %x %x\n", le16_to_cpu(0xefbe),le32_to_cpu(0xefbeadde));
 
 	parisc_boot_menu();
 

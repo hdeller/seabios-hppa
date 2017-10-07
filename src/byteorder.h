@@ -1,6 +1,7 @@
 #ifndef __BYTEORDER_H
 #define __BYTEORDER_H
 
+#include "config.h" // IMPORTANT for CONFIG_PARISC
 #include "types.h" // u32
 
 static inline u16 __swab16_constant(u16 val) {

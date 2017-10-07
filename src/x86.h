@@ -261,19 +261,21 @@ static inline void outb(u8 value, portaddr_t port) {
     *(volatile u8 *)(port) = value;
 }
 static inline void outw(u16 value, portaddr_t port) {
-    *(volatile u16 *)(port) = value;
+    *(volatile u16 *)(port) = be16_to_cpu(value);
 }
 static inline void outl(u32 value, portaddr_t port) {
-    *(volatile u32 *)(port) = value;
+    *(volatile u32 *)(port) = be32_to_cpu(value);
 }
 static inline u8 inb(portaddr_t port) {
     return *(volatile u8 *)(port);
 }
 static inline u16 inw(portaddr_t port) {
-    return le16_to_cpu(*(volatile u16 *)(port));
+    u16 x = *(volatile u16 *)(port);
+    return le16_to_cpu(x);
 }
 static inline u32 inl(portaddr_t port) {
-    return le32_to_cpu(*(volatile u32 *)(port));
+    u16 x = *(volatile u32 *)(port);
+    return le32_to_cpu(x);
 }
 
 static inline void insb(portaddr_t port, u8 *data, u32 count) {
@@ -282,11 +284,11 @@ static inline void insb(portaddr_t port, u8 *data, u32 count) {
 }
 static inline void insw(portaddr_t port, u16 *data, u32 count) {
     while (count--)
-	*data++ = inw(port);
+	*data++ = cpu_to_le16(inw(port));
 }
 static inline void insl(portaddr_t port, u32 *data, u32 count) {
     while (count--)
-	*data++ = inl(port);
+	*data++ = cpu_to_le32(inl(port));
 }
 // XXX - outs not limited to es segment
 static inline void outsb(portaddr_t port, u8 *data, u32 count) {
@@ -294,12 +296,16 @@ static inline void outsb(portaddr_t port, u8 *data, u32 count) {
 	outb(*data++, port);
 }
 static inline void outsw(portaddr_t port, u16 *data, u32 count) {
-    while (count--)
-	outw(*data++, port);
+    while (count--) {
+	outw(*data, port);
+	data++;
+    }
 }
 static inline void outsl(portaddr_t port, u32 *data, u32 count) {
-    while (count--)
-	outl(*data++, port);
+    while (count--) {
+	outl(*data, port);
+	data++;
+    }
 }
 
 /* Compiler barrier is enough as an x86 CPU does not reorder reads or writes */

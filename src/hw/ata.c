@@ -740,7 +740,7 @@ init_drive_atapi(struct atadrive_s *dummy, u16 *buffer)
     adrive->drive.type = DTYPE_ATA_ATAPI;
     adrive->drive.blksize = CDROM_SECTOR_SIZE;
     adrive->drive.sectors = (u64)-1;
-    u8 iscd = ((be16_to_cpu(buffer[0]) >> 8) & 0x1f) == 0x05;
+    u8 iscd = ((le16_to_cpu(buffer[0]) >> 8) & 0x1f) == 0x05;
     char model[MAXMODEL+1];
     char *desc = znprintf(MAXDESCSIZE
                           , "DVD/CD [ata%d-%d: %s ATAPI-%d %s]"
