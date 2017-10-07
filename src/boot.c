@@ -530,6 +530,25 @@ interactive_bootmenu(void)
     hlist_add_head(&pos->node, &BootList);
 }
 
+#if CONFIG_PARISC
+int parisc_boot_menu(void)
+{
+    printf("Select boot device:\n\n");
+
+    // Show menu items
+    int maxmenu = 0;
+    struct bootentry_s *pos;
+    hlist_for_each_entry(pos, &BootList, node) {
+        char desc[77];
+        maxmenu++;
+        printf("%d. %s\n", maxmenu
+               , strtcpy(desc, pos->description, ARRAY_SIZE(desc)));
+    }
+    return 0;
+}
+#endif
+
+
 // BEV (Boot Execution Vector) list
 struct bev_s {
     int type;

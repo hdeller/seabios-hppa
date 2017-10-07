@@ -77,7 +77,16 @@ static struct putcinfo debuginfo = { debug_putc };
 static void
 screenc(char c)
 {
-#ifndef CONFIG_PARISC
+#if CONFIG_PARISC
+    for (;;) {
+	const portaddr_t addr = DINO_UART_HPA+0x800;
+        u8 lsr = inb(addr+SEROFF_LSR);
+        if ((lsr & 0x60) == 0x60) {
+            // Success - can write data
+            outb(c, addr+SEROFF_DATA);
+            break;
+        }
+    }
 #else
     struct bregs br;
     memset(&br, 0, sizeof(br));

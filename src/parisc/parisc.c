@@ -107,6 +107,11 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 	return PDC_BAD_OPTION;
 }
 
+/*********** BOOT MENU *******/
+
+extern int parisc_boot_menu(void);
+
+// struct disk_op_s  // CMD_READ
 
 
 /*********** MAIN *******/
@@ -163,11 +168,11 @@ void __VISIBLE start_parisc_firmware(unsigned long ram_size,
 	DebugOutputPort = PORT_SERIAL1;
 	// PlatformRunningOn = PF_QEMU;  // emulate runningOnQEMU()
 
-	dprintf(0, "\n");
-	dprintf(0, "PARISC SeaBIOS Firmware started, %lu MB RAM.\n", ram_size/1024/1024);
+	printf("\n");
+	printf("PARISC SeaBIOS Firmware started, %lu MB RAM.\n", ram_size/1024/1024);
 
 	cpu_hz = 100 * PAGE0->mem_10msec; /* Hz of this PARISC */
-	dprintf(0, "1 CPU at %d.%06d MHz\n",
+	printf("1 CPU at %d.%06d MHz\n",
 			cpu_hz / 1000000, cpu_hz % 1000000 );
 
 	// mdelay(1000); // test: "wait 1 second"
@@ -182,8 +187,7 @@ void __VISIBLE start_parisc_firmware(unsigned long ram_size,
 	serial_setup();
 	ata_setup();
 
-// struct disk_op_s  // CMD_READ
-
+	parisc_boot_menu();
 
 	if (linux_kernel_entry) {
 		void (*start_kernel)(unsigned long mem_free, unsigned long cmdline,
