@@ -548,7 +548,7 @@ struct drive_s *select_parisc_boot_drive(void)
     /* try each boot device */
     hlist_for_each_entry(pos, &BootList, node) {
 	if (pos->type == IPL_TYPE_CDROM) { //IPL_TYPE_HARDDISK) // IPL_TYPE_CDROM)
-                printf("Booting from: %s\n",pos->description);
+                printf("Booting from %s\n",pos->description);
 		return pos->drive;
 	}
     }

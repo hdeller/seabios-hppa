@@ -57,6 +57,22 @@ void wrmsr_smp(u32 index, u64 val) { }
 
 /*********** IODC ******/
 
+static struct drive_s *boot_drive;
+
+
+char parisc_serial_in(void)
+{
+	const portaddr_t addr = DINO_UART_HPA+0x800;
+
+	while (1) {
+		u8 lsr = inb(addr+SEROFF_LSR);
+		if (lsr & 0x01) {
+			// Success - can read data
+			return inb(addr+SEROFF_DATA);
+		}
+	}
+}
+
 int __VISIBLE parisc_iodc_entry(unsigned int *arg)
 {
 	unsigned long hpa = ARG0;
@@ -64,19 +80,46 @@ int __VISIBLE parisc_iodc_entry(unsigned int *arg)
 	unsigned long spa = ARG2;
 	unsigned long layers = ARG3;
 	unsigned long *result = (unsigned long *)ARG4;
-	
-	/* search for hpa */
+	int ret, len;
+	char *c;
+	struct disk_op_s disk_op;
 
+	/* console I/O */
 	if (hpa == DINO_UART_HPA || hpa == LASI_UART_HPA)
 	switch (option) {
 	case ENTRY_IO_COUT: /* console output */
-		dprintf(0, (char*)ARG6);
+		c = (char*)ARG6;
+		result[0] = len = ARG7;
+		while (len--)
+			printf("%c", *c++);
+		return PDC_OK;
+	case ENTRY_IO_CIN: /* console input */
+		c = (char*)ARG6;
+		result[0] = len = ARG7;
+		while (len--)
+			*c++ = parisc_serial_in();
+		return PDC_OK;
+	}
+
+	/* boot medium I/O */
+	if (hpa == IDE_HPA)
+	switch (option) {
+	case ENTRY_IO_BOOTIN: /* boot medium IN */
+		disk_op.drive_fl = boot_drive;
+		disk_op.buf_fl = (void*)ARG6;
+		disk_op.command = CMD_READ;
+		disk_op.count = (ARG7 / disk_op.drive_fl->blksize);
+		disk_op.lba = (ARG5 / disk_op.drive_fl->blksize);
+		ret = process_op(&disk_op);
+		// dprintf(0, "\nBOOT IO res %d count = %d\n", ret, ARG7);
 		result[0] = ARG7;
+		if (ret)
+			return PDC_ERROR;
 		return PDC_OK;
 	}
 
 	dprintf(0, "\nIODC option #%lx called: hpa=%lx spa=%lx layers=%lx ", option, hpa, spa, layers);
-	dprintf(0, "result=%p %x %x %x\n", result, ARG5, ARG6, ARG7);
+	dprintf(0, "result=%p arg5=%x arg6=%x arg7=%x\n", result, ARG5, ARG6, ARG7);
 
 	hlt();
 	return PDC_BAD_OPTION;
@@ -86,21 +129,18 @@ int __VISIBLE parisc_iodc_entry(unsigned int *arg)
 
 int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 {
-	//unsigned long hpa = ARG0;
-//	unsigned long option = ARG1;
+	unsigned long option = ARG0;
 	//unsigned long spa = ARG2;
 	//unsigned long layers = ARG3;
 //	unsigned long *result = (unsigned long *)ARG4;
 	
-#if 0
 	switch (option) {
-	case ENTRY_IO_COUT: /* console output */
-		dprintf(0, (char*)ARG6);
-		result[0] = ARG7;
-		return PDC_OK;
+	case PDC_IODC: /* console output */
+		dprintf(0, "\n\nUnimplemented PDC_IODC function %x %x %x %x\n", ARG2, ARG3, ARG4, ARG5);
+		return PDC_BAD_OPTION;
 	}
-#endif
-	dprintf(0, "\nPDC called %x %x %x %x ", ARG0, ARG1, ARG2, ARG3);
+
+	dprintf(0, "\n\nUnimplemented PDC option %x %x %x %x ", ARG0, ARG1, ARG2, ARG3);
 	dprintf(0, "%x %x %x %x\n", ARG4, ARG5, ARG6, ARG7);
 
 	hlt();
@@ -117,7 +157,7 @@ extern struct drive_s *select_parisc_boot_drive(void);
 int parisc_boot_menu(unsigned char **iplstart, unsigned char **iplend)
 {
 	int ret;
-	unsigned int *target = (void *)0xa0000;
+	unsigned int *target = (void *)0x60000; // bug in palo: 0xa0000 crashes.
 	struct disk_op_s disk_op = {
 		.buf_fl = target,
 		.command = CMD_SEEK,
@@ -125,8 +165,9 @@ int parisc_boot_menu(unsigned char **iplstart, unsigned char **iplend)
 		.lba = 0,
 	};
 
-	disk_op.drive_fl = select_parisc_boot_drive();
-	if (disk_op.drive_fl == NULL) {
+	boot_drive = select_parisc_boot_drive();
+	disk_op.drive_fl = boot_drive;
+	if (boot_drive == NULL) {
 		printf("No boot device.\n");
 		return 0;
 	}
