@@ -118,7 +118,7 @@ int __VISIBLE parisc_iodc_entry(unsigned int *arg)
 		return PDC_OK;
 	}
 
-	dprintf(0, "\nIODC option #%lx called: hpa=%lx spa=%lx layers=%lx ", option, hpa, spa, layers);
+	dprintf(0, "\nIODC option #%ld called: hpa=%lx spa=%lx layers=%lx ", option, hpa, spa, layers);
 	dprintf(0, "result=%p arg5=%x arg6=%x arg7=%x\n", result, ARG5, ARG6, ARG7);
 
 	hlt();
@@ -129,22 +129,41 @@ int __VISIBLE parisc_iodc_entry(unsigned int *arg)
 
 int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 {
-	unsigned long option = ARG0;
-	//unsigned long spa = ARG2;
-	//unsigned long layers = ARG3;
-//	unsigned long *result = (unsigned long *)ARG4;
+	unsigned long proc = ARG0;
+	unsigned long option = ARG1;
+	unsigned long *result = (unsigned long *)ARG2;
 	
-	switch (option) {
+	switch (proc) {
 	case PDC_IODC: /* console output */
 		dprintf(0, "\n\nUnimplemented PDC_IODC function %x %x %x %x\n", ARG2, ARG3, ARG4, ARG5);
-		return PDC_BAD_OPTION;
+		return PDC_BAD_PROC;
+	case PDC_MODEL: /* model information */
+		if (option == PDC_MODEL_CAPABILITIES) {
+			*result = PDC_MODEL_OS32 | PDC_MODEL_NVA_UNSUPPORTED; /* FIXME! */
+			// PDC_MODEL_IOPDIR_FDC, PDC_MODEL_NVA_MASK ???
+			return PDC_OK;
+		}
+		return PDC_BAD_PROC;
+	case PDC_INSTR:
+		return PDC_BAD_PROC;
+	case PDC_PSW:	/* Get/Set default System Mask  */
+		if (option > PDC_PSW_SET_DEFAULTS)
+			return PDC_BAD_OPTION;
+		/* FIXME: For 64bit support enable PDC_PSW_WIDE_BIT too! */
+		if (option == PDC_PSW_MASK || option == PDC_PSW_GET_DEFAULTS)
+			*result = PDC_PSW_ENDIAN_BIT;
+		if (option == PDC_PSW_SET_DEFAULTS)
+			if (ARG2 & PDC_PSW_ENDIAN_BIT == 0)
+				return PDC_INVALID_ARG;
+			return PDC_OK;
+		return PDC_OK;
 	}
 
-	dprintf(0, "\n\nUnimplemented PDC option %x %x %x %x ", ARG0, ARG1, ARG2, ARG3);
+	dprintf(0, "\n\nUnimplemented PDC proc %d option %d %x %x ", ARG0, ARG1, ARG2, ARG3);
 	dprintf(0, "%x %x %x %x\n", ARG4, ARG5, ARG6, ARG7);
 
 	hlt();
-	return PDC_BAD_OPTION;
+	return PDC_BAD_PROC;
 }
 
 /*********** BOOT MENU *******/
