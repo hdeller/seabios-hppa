@@ -17,6 +17,7 @@
 #include "fw/paravirt.h" // PlatformRunningOn
 #include "parisc/hppa_hardware.h" // DINO_UART_BASE
 #include "parisc/pdc.h"
+#include "parisc/b160l.h"
 
 int HaveRunPost;
 u8 ExtraStack[BUILD_EXTRA_STACK_SIZE+1] __aligned(8);
@@ -59,6 +60,7 @@ void wrmsr_smp(u32 index, u64 val) { }
 
 static struct drive_s *boot_drive;
 
+static struct pdc_iodc *iodc_list[] = { PARISC_HPA_LIST };
 
 char parisc_serial_in(void)
 {
@@ -129,13 +131,17 @@ int __VISIBLE parisc_iodc_entry(unsigned int *arg)
 
 int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 {
+	static unsigned long psw_defaults = PDC_PSW_ENDIAN_BIT;
 	unsigned long proc = ARG0;
 	unsigned long option = ARG1;
 	unsigned long *result = (unsigned long *)ARG2;
 	
 	switch (proc) {
+	case PDC_CHASSIS: /* chassis functions */
+		dprintf(0, "\n\nUnimplemented PDC_CHASSIS function %d %x %x %x %x\n", ARG1, ARG2, ARG3, ARG4, ARG5);
+		return PDC_BAD_PROC;
 	case PDC_IODC: /* console output */
-		dprintf(0, "\n\nUnimplemented PDC_IODC function %x %x %x %x\n", ARG2, ARG3, ARG4, ARG5);
+		dprintf(0, "\n\nUnimplemented PDC_IODC function %d %x %x %x %x\n", ARG1, ARG2, ARG3, ARG4, ARG5);
 		return PDC_BAD_PROC;
 	case PDC_MODEL: /* model information */
 		if (option == PDC_MODEL_CAPABILITIES) {
@@ -150,12 +156,14 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 		if (option > PDC_PSW_SET_DEFAULTS)
 			return PDC_BAD_OPTION;
 		/* FIXME: For 64bit support enable PDC_PSW_WIDE_BIT too! */
-		if (option == PDC_PSW_MASK || option == PDC_PSW_GET_DEFAULTS)
+		if (option == PDC_PSW_MASK)
 			*result = PDC_PSW_ENDIAN_BIT;
-		if (option == PDC_PSW_SET_DEFAULTS)
-			if (ARG2 & PDC_PSW_ENDIAN_BIT == 0)
-				return PDC_INVALID_ARG;
-			return PDC_OK;
+		if (option == PDC_PSW_GET_DEFAULTS)
+			*result = psw_defaults;
+		if (option == PDC_PSW_SET_DEFAULTS) {
+			// if ((ARG2 & PDC_PSW_ENDIAN_BIT) == 0)
+			psw_defaults = ARG2;
+		}
 		return PDC_OK;
 	}
 
@@ -204,7 +212,7 @@ int parisc_boot_menu(unsigned char **iplstart, unsigned char **iplend)
 	disk_op.count = (FW_BLOCKSIZE / disk_op.drive_fl->blksize);
 	disk_op.lba = 0;
 	ret = process_op(&disk_op);
-	// printf("DISK_READ(count=%d) = %d\n", disk_op.count, ret);
+	printf("DISK_READ(count=%d) = %d\n", disk_op.count, ret);
 	if (ret)
 		return 0;
 
@@ -213,8 +221,8 @@ int parisc_boot_menu(unsigned char **iplstart, unsigned char **iplend)
 	unsigned int ipl_entry= be32_to_cpu(target[0xf8/sizeof(int)]);
 
 	/* check LIF header of bootblock */
-	// printf("boot magic is 0x%x (should be 0x8000)\n", target[0]>>16);
-	// printf("ipl  start at 0x%x, size %d, entry 0x%x\n", ipl_addr, ipl_size, ipl_entry);
+	printf("boot magic is 0x%x (should be 0x8000)\n", target[0]>>16);
+	printf("ipl  start at 0x%x, size %d, entry 0x%x\n", ipl_addr, ipl_size, ipl_entry);
 
 	// TODO: check ipl values, out of range, ... ?
 
@@ -232,7 +240,7 @@ int parisc_boot_menu(unsigned char **iplstart, unsigned char **iplend)
 	ret = process_op(&disk_op);
 	// printf("DISK_READ IPL returned %d\n", ret);
 
-	// printf("First word at %p is 0x%x\n", target, target[0]);
+	printf("First word at %p is 0x%x\n", target, target[0]);
 
 	/* execute IPL */
 	// TODO: flush D- and I-cache, not needed in emulation ?
