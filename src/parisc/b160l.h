@@ -1,19 +1,21 @@
 /* AUTO-GENERATED FILE FOR QEMU */
-
 #define PARISC_MODEL "9000/778/B160L"
-
-#define PARISC_MODEL_NUM 0x00005020, 0x00000481, 0x00000000, 0x02020202, 0x7794d7fe, 0x100000f0, 0x00000004, 0x000000ba, 0x000000ba
-
-#define PARISC_PDC_VERSION 0x00000008
-
-#define PARISC_CPUID 0x000001e8
-
-#define PARISC_CAPABILITIES 0x00000002
-
-
+#define PARISC_PDC_MODEL 0x5020, 0x481, 0x0,\
+0x2020202, 0x7794d7fe, 0x100000f0, 0x4, 0xba, 0xba
+#define PARISC_PDC_VERSION 0x0008
+#define PARISC_PDC_CPUID 0x01e8
+#define PARISC_PDC_CAPABILITIES 0x0002
+#define PARISC_PDC_ENTRY_ORG 0x4800
+#define PARISC_PDC_CACHE_INFO\
+	0x10000, 0x41402000, 0x0000, 0x0020, 0x0400\
+	, 0x0002, 0x10000, 0x41402000, 0x0000, 0x0020\
+	, 0x0400, 0x0002, 0x0060, 0xd2000, 0x0000\
+	, 0x0000, 0x0001, 0x0000, 0x0000, 0x0001\
+	, 0x0001, 0x0060, 0xd2000, 0x0000, 0x0000\
+	, 0x0001, 0x0000, 0x0000, 0x0001, 0x0001
 #define HPA_ffc00000_DESCRIPTION "Phantom PseudoBC GSC+ Port"
 static struct pdc_iodc iodc_data_hpa_ffc00000 = {
-       .hversion_model = 0x0050,
+	.hversion_model = 0x0050,
 	.hversion = 0x0040,
 	.spa = 0x0000,
 	.type = 0x0007,
@@ -29,7 +31,6 @@ static struct pdc_iodc iodc_data_hpa_ffc00000 = {
 };
 #define HPA_ffc00000_num_addr 0
 #define HPA_ffc00000_add_addr 0
-
 #define HPA_fff80000_DESCRIPTION "Dino PCI Bridge"
 static struct pdc_iodc iodc_data_hpa_fff80000 = {
 	.hversion_model = 0x0068,
@@ -48,7 +49,6 @@ static struct pdc_iodc iodc_data_hpa_fff80000 = {
 };
 #define HPA_fff80000_num_addr 0
 #define HPA_fff80000_add_addr 0
-
 #define HPA_fff83000_DESCRIPTION "Merlin+ 132 Dino RS-232"
 static struct pdc_iodc iodc_data_hpa_fff83000 = {
 	.hversion_model = 0x0002,
@@ -67,7 +67,6 @@ static struct pdc_iodc iodc_data_hpa_fff83000 = {
 };
 #define HPA_fff83000_num_addr 0
 #define HPA_fff83000_add_addr 0
-
 #define HPA_fff8c000_DESCRIPTION "Merlin 160 Core FW-SCSI"
 static struct pdc_iodc iodc_data_hpa_fff8c000 = {
 	.hversion_model = 0x0003,
@@ -86,7 +85,6 @@ static struct pdc_iodc iodc_data_hpa_fff8c000 = {
 };
 #define HPA_fff8c000_num_addr 0
 #define HPA_fff8c000_add_addr 0
-
 #define HPA_ffd00000_DESCRIPTION "Merlin 160 Core BA"
 static struct pdc_iodc iodc_data_hpa_ffd00000 = {
 	.hversion_model = 0x0003,
@@ -105,7 +103,6 @@ static struct pdc_iodc iodc_data_hpa_ffd00000 = {
 };
 #define HPA_ffd00000_num_addr 2
 #define HPA_ffd00000_add_addr 0xffd0c000, 0xffc00000, 
-
 #define HPA_ffd05000_DESCRIPTION "Merlin 160 Core RS-232"
 static struct pdc_iodc iodc_data_hpa_ffd05000 = {
 	.hversion_model = 0x0003,
@@ -124,7 +121,6 @@ static struct pdc_iodc iodc_data_hpa_ffd05000 = {
 };
 #define HPA_ffd05000_num_addr 0
 #define HPA_ffd05000_add_addr 0
-
 #define HPA_ffd06000_DESCRIPTION "Merlin 160 Core SCSI"
 static struct pdc_iodc iodc_data_hpa_ffd06000 = {
 	.hversion_model = 0x0003,
@@ -143,7 +139,6 @@ static struct pdc_iodc iodc_data_hpa_ffd06000 = {
 };
 #define HPA_ffd06000_num_addr 0
 #define HPA_ffd06000_add_addr 0
-
 #define HPA_ffd07000_DESCRIPTION "Merlin 160 Core LAN (802.3)"
 static struct pdc_iodc iodc_data_hpa_ffd07000 = {
 	.hversion_model = 0x0003,
@@ -162,7 +157,6 @@ static struct pdc_iodc iodc_data_hpa_ffd07000 = {
 };
 #define HPA_ffd07000_num_addr 0
 #define HPA_ffd07000_add_addr 0
-
 #define HPA_ffd02000_DESCRIPTION "Merlin 160 Core Centronics"
 static struct pdc_iodc iodc_data_hpa_ffd02000 = {
 	.hversion_model = 0x0003,
@@ -181,7 +175,6 @@ static struct pdc_iodc iodc_data_hpa_ffd02000 = {
 };
 #define HPA_ffd02000_num_addr 2
 #define HPA_ffd02000_add_addr 0xffd01000, 0xffd03000, 
-
 #define HPA_ffd04000_DESCRIPTION "Merlin 160 Core Audio"
 static struct pdc_iodc iodc_data_hpa_ffd04000 = {
 	.hversion_model = 0x0003,
@@ -200,7 +193,6 @@ static struct pdc_iodc iodc_data_hpa_ffd04000 = {
 };
 #define HPA_ffd04000_num_addr 0
 #define HPA_ffd04000_add_addr 0
-
 #define HPA_ffd08000_DESCRIPTION "Merlin 160 Core PS/2 Port"
 static struct pdc_iodc iodc_data_hpa_ffd08000 = {
 	.hversion_model = 0x0003,
@@ -219,7 +211,6 @@ static struct pdc_iodc iodc_data_hpa_ffd08000 = {
 };
 #define HPA_ffd08000_num_addr 0
 #define HPA_ffd08000_add_addr 0
-
 #define HPA_ffd08100_DESCRIPTION "Merlin 160 Core PS/2 Port"
 static struct pdc_iodc iodc_data_hpa_ffd08100 = {
 	.hversion_model = 0x0003,
@@ -238,7 +229,6 @@ static struct pdc_iodc iodc_data_hpa_ffd08100 = {
 };
 #define HPA_ffd08100_num_addr 0
 #define HPA_ffd08100_add_addr 0
-
 #define HPA_fa000000_DESCRIPTION "Coral SGC Graphics"
 static struct pdc_iodc iodc_data_hpa_fa000000 = {
 	.hversion_model = 0x0000,
@@ -257,7 +247,6 @@ static struct pdc_iodc iodc_data_hpa_fa000000 = {
 };
 #define HPA_fa000000_num_addr 0
 #define HPA_fa000000_add_addr 0
-
 #define HPA_f4000000_DESCRIPTION "Coral SGC Graphics"
 static struct pdc_iodc iodc_data_hpa_f4000000 = {
 	.hversion_model = 0x0000,
@@ -276,7 +265,6 @@ static struct pdc_iodc iodc_data_hpa_f4000000 = {
 };
 #define HPA_f4000000_num_addr 0
 #define HPA_f4000000_add_addr 0
-
 #define HPA_f8000000_DESCRIPTION "Gecko GSC Core Graphics"
 static struct pdc_iodc iodc_data_hpa_f8000000 = {
 	.hversion_model = 0x0001,
@@ -295,7 +283,6 @@ static struct pdc_iodc iodc_data_hpa_f8000000 = {
 };
 #define HPA_f8000000_num_addr 1
 #define HPA_f8000000_add_addr 0xf0011000, 
-
 #define HPA_fffbe000_DESCRIPTION "Merlin L2 160 (9000/778/B160L)"
 static struct pdc_iodc iodc_data_hpa_fffbe000 = {
 	.hversion_model = 0x0050,
@@ -314,7 +301,6 @@ static struct pdc_iodc iodc_data_hpa_fffbe000 = {
 };
 #define HPA_fffbe000_num_addr 0
 #define HPA_fffbe000_add_addr 0
-
 #define HPA_fffbf000_DESCRIPTION "Memory"
 static struct pdc_iodc iodc_data_hpa_fffbf000 = {
 	.hversion_model = 0x0006,
@@ -333,7 +319,6 @@ static struct pdc_iodc iodc_data_hpa_fffbf000 = {
 };
 #define HPA_fffbf000_num_addr 0
 #define HPA_fffbf000_add_addr 0
-
 #define HPA_fff81000_DESCRIPTION "Merlin+ 132 Dino PS/2 Port"
 static struct pdc_iodc iodc_data_hpa_fff81000 = {
 	.hversion_model = 0x0002,
@@ -353,25 +338,44 @@ static struct pdc_iodc iodc_data_hpa_fff81000 = {
 #define HPA_fff81000_num_addr 0
 #define HPA_fff81000_add_addr 0
 
-
+#define PARISC_IODC_LIST \
+	&iodc_data_hpa_ffc00000,\
+	&iodc_data_hpa_fff80000,\
+	&iodc_data_hpa_fff83000,\
+	&iodc_data_hpa_fff8c000,\
+	&iodc_data_hpa_ffd00000,\
+	&iodc_data_hpa_ffd05000,\
+	&iodc_data_hpa_ffd06000,\
+	&iodc_data_hpa_ffd07000,\
+	&iodc_data_hpa_ffd02000,\
+	&iodc_data_hpa_ffd04000,\
+	&iodc_data_hpa_ffd08000,\
+	&iodc_data_hpa_ffd08100,\
+	&iodc_data_hpa_fa000000,\
+	&iodc_data_hpa_f4000000,\
+	&iodc_data_hpa_f8000000,\
+	&iodc_data_hpa_fffbe000,\
+	&iodc_data_hpa_fffbf000,\
+	&iodc_data_hpa_fff81000,\
+	NULL
 
 #define PARISC_HPA_LIST \
-	&iodc_data_hpa_ffc00000, \
-	&iodc_data_hpa_fff80000, \
-	&iodc_data_hpa_fff83000, \
-	&iodc_data_hpa_fff8c000, \
-	&iodc_data_hpa_ffd00000, \
-	&iodc_data_hpa_ffd05000, \
-	&iodc_data_hpa_ffd06000, \
-	&iodc_data_hpa_ffd07000, \
-	&iodc_data_hpa_ffd02000, \
-	&iodc_data_hpa_ffd04000, \
-	&iodc_data_hpa_ffd08000, \
-	&iodc_data_hpa_ffd08100, \
-	&iodc_data_hpa_fa000000, \
-	&iodc_data_hpa_f4000000, \
-	&iodc_data_hpa_f8000000, \
-	&iodc_data_hpa_fffbe000, \
-	&iodc_data_hpa_fffbf000, \
-	&iodc_data_hpa_fff81000, \
-	NULL
+	0xffc00000,\
+	0xfff80000,\
+	0xfff83000,\
+	0xfff8c000,\
+	0xffd00000,\
+	0xffd05000,\
+	0xffd06000,\
+	0xffd07000,\
+	0xffd02000,\
+	0xffd04000,\
+	0xffd08000,\
+	0xffd08100,\
+	0xfa000000,\
+	0xf4000000,\
+	0xf8000000,\
+	0xfffbe000,\
+	0xfffbf000,\
+	0xfff81000,\
+	0UL

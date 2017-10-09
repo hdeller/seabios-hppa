@@ -60,7 +60,8 @@ void wrmsr_smp(u32 index, u64 val) { }
 
 static struct drive_s *boot_drive;
 
-static struct pdc_iodc *iodc_list[] = { PARISC_HPA_LIST };
+static struct pdc_iodc *iodc_list[] = { PARISC_IODC_LIST };
+static unsigned long hpa_list[] = { PARISC_HPA_LIST };
 
 #define SERIAL_TIMEOUT 20
 unsigned long parisc_serial_in(char *c, unsigned long maxchars)
@@ -135,61 +136,108 @@ int __VISIBLE parisc_iodc_entry(unsigned int *arg)
 
 /*********** PDC *******/
 
+char *pdc_name(unsigned long num)
+{
+	#define DO(x) if (num == x) return #x;
+	DO(PDC_POW_FAIL)
+	DO(PDC_CHASSIS)
+	DO(PDC_PIM)
+	DO(PDC_MODEL)
+	DO(PDC_CACHE)
+	DO(PDC_HPA)
+	DO(PDC_COPROC)
+	DO(PDC_IODC)
+	DO(PDC_TOD)
+	DO(PDC_STABLE)
+	DO(PDC_NVOLATILE)
+	DO(PDC_ADD_VALID)
+	DO(PDC_INSTR)
+	DO(PDC_PROC)
+	DO(PDC_BLOCK_TLB)
+	DO(PDC_TLB)
+	DO(PDC_MEM)
+	DO(PDC_PSW)
+	DO(PDC_SYSTEM_MAP)
+	DO(PDC_SOFT_POWER)
+	DO(PDC_MEM_MAP)
+	DO(PDC_EEPROM)
+	DO(PDC_NVM)
+	DO(PDC_SEED_ERROR)
+	DO(PDC_IO)
+	DO(PDC_BROADCAST_RESET)
+	DO(PDC_LAN_STATION_ID)
+	DO(PDC_CHECK_RANGES)
+	DO(PDC_NV_SECTIONS)
+	DO(PDC_PERFORMANCE)
+	DO(PDC_SYSTEM_INFO)
+	DO(PDC_RDR)
+	DO(PDC_INTRIGUE)
+	DO(PDC_STI)
+	DO(PDC_PCI_INDEX)
+	DO(PDC_INITIATOR)
+	DO(PDC_LINK)
+	return "UNKNOWN!";
+}
+
 int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 {
 	static unsigned long psw_defaults = PDC_PSW_ENDIAN_BIT;
+	static unsigned long cache_info[] = { PARISC_PDC_CACHE_INFO };
+	static unsigned long model[] = { PARISC_PDC_MODEL };
+
 	unsigned long proc = ARG0;
 	unsigned long option = ARG1;
 	unsigned long *result = (unsigned long *)ARG2;
-	
+#if 0
+	dprintf(0, "\nStart PDC proc %s(%d) option %d result=%x ARG3=%x ", pdc_name(ARG0), ARG0, ARG1, ARG2, ARG3);
+	dprintf(0, "ARG4=%x ARG5=%x ARG6=%x ARG7=%x\n", ARG4, ARG5, ARG6, ARG7);
+#endif
 	switch (proc) {
 	case PDC_CHASSIS: /* chassis functions */
 		// dprintf(0, "\n\nUnimplemented PDC_CHASSIS function %d %x %x %x %x\n", ARG1, ARG2, ARG3, ARG4, ARG5);
 		return PDC_BAD_PROC;
 	case PDC_IODC: /* Call IODC functions */
-		if (option == 0 && ARG3 == DINO_UART_HPA && ARG4 == 0) { // Get entry point
-			// Copy IODC data to caller
-			dprintf(0, "\n\nPDC_IODC/0 copy %x %x %x %x\n", ARG3, ARG4, ARG5, ARG6);
-			memcpy((void*)ARG5, &iodc_data_hpa_fff83000, ARG6);
-			*result = ARG6;
-			return PDC_OK;
+		switch (option) {
+		case 0:			// Get entry point
+			switch (ARG3) {
+			case DINO_UART_HPA:
+				if (ARG4 == 0) {
+					memcpy((void*)ARG5, &iodc_data_hpa_fff83000, ARG6);
+					*result = ARG6;
+					return PDC_OK;
+				}
+				if (ARG4 == 3) { // Search next (correct ??, write to ARG7 too?)
+					result[0] = 0;
+					result[1] = CL_DUPLEX;
+					result[2] = 0;
+					result[3] = 0;
+					return PDC_OK;
+					// return PDC_NE_BOOTDEV;
+				}
+				break;
+			case IDE_HPA:
+				if (ARG4 == 0) {
+					memcpy((void*)ARG5, &iodc_data_hpa_fff8c000, ARG6); // FIXME !!!
+					*result = ARG6;
+					return PDC_OK;
+				}
+				if (ARG4 == 3) { // Search next (correct ??, write to ARG7 too?)
+					result[0] = 0;
+					result[1] = CL_RANDOM;
+					result[2] = 0;
+					result[3] = 0;
+					return PDC_OK;
+					// return PDC_NE_BOOTDEV;
+				}
+				break;
+			}
 		}
-		if (option == 0 && ARG3 == DINO_UART_HPA && ARG4 == 3) { // Search next
-			result[0] = 0;
-			result[1] = CL_DUPLEX;
-			result[2] = 0;
-			result[3] = 0;
-			//return PDC_OK;
-			return PDC_NE_BOOTDEV;
-		}
-		if (option == 0 && ARG3 == IDE_HPA && ARG4 == 0) { // Get entry point
-			// Copy IODC data to caller
-			dprintf(0, "\n\nPDC_IODC/0 copy %x %x %x %x\n", ARG3, ARG4, ARG5, ARG6);
-			memcpy((void*)ARG5, &iodc_data_hpa_fff8c000, ARG6); // FIXME !!!
-			*result = ARG6;
-			return PDC_OK;
-		}
-		if (option == 0 && ARG3 == IDE_HPA && ARG4 == 3) { // Search next
-			result[0] = 0;
-			result[1] = CL_RANDOM;
-			result[2] = 0;
-			result[3] = 0;
-			// return PDC_OK;
-			return PDC_NE_BOOTDEV;
-		}
-		if (option == 0 && ARG3 == IDE_HPA && ARG4 == 4) { // Test & Initialize
-			result[0] = 0;
-			result[1] = CL_RANDOM;
-			result[2] = 0;
-			result[3] = 0;
-			return PDC_OK;
-		}
-		dprintf(0, "\n\nUnimplemented PDC_IODC function %d %x %x ARG4=%x ARG5=%x\n", ARG1, ARG2, ARG3, ARG4, ARG5);
-		return PDC_BAD_PROC;
+		dprintf(0, "\n\nUnimplemented PDC_IODC function %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
+		return PDC_BAD_OPTION;
 	case PDC_MODEL: /* model information */ {
 		switch (option) {
 		case PDC_MODEL_INFO:
-			*(struct pdc_model*) result = (struct pdc_model) { PARISC_MODEL_NUM };
+			memcpy(result, model, sizeof(model));
 			return PDC_OK;
 		case PDC_MODEL_CAPABILITIES:
 			*result = PDC_MODEL_OS32 | PDC_MODEL_NVA_UNSUPPORTED; // PARISC_CAPABILITIES
@@ -202,7 +250,7 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 	case PDC_CACHE:
 		switch (option) {
 		case PDC_CACHE_INFO:
-			memset(result, 0, 30*sizeof(*result));
+			memcpy(result, cache_info, sizeof(cache_info));
 			return PDC_OK;
 		}
 		dprintf(0, "\n\nUnimplemented PDC_CACHE function %d %x %x %x %x\n", ARG1, ARG2, ARG3, ARG4, ARG5);
@@ -273,7 +321,7 @@ int parisc_boot_menu(unsigned char **iplstart, unsigned char **iplend)
 	disk_op.count = (FW_BLOCKSIZE / disk_op.drive_fl->blksize);
 	disk_op.lba = 0;
 	ret = process_op(&disk_op);
-	printf("DISK_READ(count=%d) = %d\n", disk_op.count, ret);
+	// printf("DISK_READ(count=%d) = %d\n", disk_op.count, ret);
 	if (ret)
 		return 0;
 
@@ -282,8 +330,8 @@ int parisc_boot_menu(unsigned char **iplstart, unsigned char **iplend)
 	unsigned int ipl_entry= be32_to_cpu(target[0xf8/sizeof(int)]);
 
 	/* check LIF header of bootblock */
-	printf("boot magic is 0x%x (should be 0x8000)\n", target[0]>>16);
-	printf("ipl  start at 0x%x, size %d, entry 0x%x\n", ipl_addr, ipl_size, ipl_entry);
+	// printf("boot magic is 0x%x (should be 0x8000)\n", target[0]>>16);
+	// printf("ipl  start at 0x%x, size %d, entry 0x%x\n", ipl_addr, ipl_size, ipl_entry);
 
 	// TODO: check ipl values, out of range, ... ?
 
@@ -301,7 +349,7 @@ int parisc_boot_menu(unsigned char **iplstart, unsigned char **iplend)
 	ret = process_op(&disk_op);
 	// printf("DISK_READ IPL returned %d\n", ret);
 
-	printf("First word at %p is 0x%x\n", target, target[0]);
+	// printf("First word at %p is 0x%x\n", target, target[0]);
 
 	/* execute IPL */
 	// TODO: flush D- and I-cache, not needed in emulation ?
@@ -324,6 +372,7 @@ static const struct pz_device mem_cons_boot = {
 };
 
 static const struct pz_device mem_boot_boot = {
+	.dp.flags = PF_AUTOBOOT,
 	.hpa = IDE_HPA,
 	.iodc_io = (unsigned long) &iodc_entry,
 	.cl_class = CL_RANDOM,
@@ -363,6 +412,8 @@ void __VISIBLE start_parisc_firmware(unsigned long ram_size,
 //	memcpy((void*)&(PAGE0->mem_kbd),  &mem_kbd_boot, sizeof(mem_kbd_boot));
 
 	malloc_preinit();
+	if (iodc_list[0] && hpa_list[0]) // avoid warning
+		iplstart = 0;
 
 	// set Qemu serial debug port
 	DebugOutputPort = PORT_SERIAL1;
@@ -406,7 +457,7 @@ void __VISIBLE start_parisc_firmware(unsigned long ram_size,
 	if (parisc_boot_menu(&iplstart, &iplend)) {
 		void (*start_ipl)(long interactive, long mem_free);
 
-		printf("Starting IPL boot code from boot medium.\n\n");
+		printf("\nStarting IPL boot code from boot medium.\n\n");
 		start_ipl = (void *) iplstart;
 		start_ipl(0, (long)iplend); // first parameter: 1=interactive, 0=non-interactive
 		hlt(); /* this ends the emulator */
