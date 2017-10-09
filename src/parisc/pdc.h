@@ -15,6 +15,7 @@
 #define PDC_ERROR		 -3	/* Call could not complete without an error */
 #define PDC_NE_MOD		 -5	/* Module not found		*/
 #define PDC_NE_CELL_MOD		 -7	/* Cell module not found	*/
+#define PDC_NE_BOOTDEV		 -9	/* Cannot locate a console device or boot device */
 #define PDC_INVALID_ARG		-10	/* Called with an invalid argument */
 #define PDC_BUS_POW_WARN	-12	/* Call could not complete in allowed power budget */
 #define PDC_NOT_NARROW		-17	/* Narrow mode not supported	*/

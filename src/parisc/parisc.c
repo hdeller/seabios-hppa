@@ -62,17 +62,23 @@ static struct drive_s *boot_drive;
 
 static struct pdc_iodc *iodc_list[] = { PARISC_HPA_LIST };
 
-char parisc_serial_in(void)
+#define SERIAL_TIMEOUT 20
+unsigned long parisc_serial_in(char *c, unsigned long maxchars)
 {
 	const portaddr_t addr = DINO_UART_HPA+0x800;
-
-	while (1) {
+	unsigned long end = timer_calc(SERIAL_TIMEOUT);
+	unsigned long count = 0;
+	while (count < maxchars) {
 		u8 lsr = inb(addr+SEROFF_LSR);
 		if (lsr & 0x01) {
 			// Success - can read data
-			return inb(addr+SEROFF_DATA);
+			*c++ = inb(addr+SEROFF_DATA);
+			count++;
 		}
+	        if (timer_check(end))
+			break;
 	}
+	return count;
 }
 
 int __VISIBLE parisc_iodc_entry(unsigned int *arg)
@@ -86,6 +92,8 @@ int __VISIBLE parisc_iodc_entry(unsigned int *arg)
 	char *c;
 	struct disk_op_s disk_op;
 
+//	dprintf(0, "\nIODC option start #%ld : hpa=%lx spa=%lx layers=%lx ", option, hpa, spa, layers);
+//	dprintf(0, "result=%p arg5=%x arg6=%x arg7=%x\n", result, ARG5, ARG6, ARG7);
 	/* console I/O */
 	if (hpa == DINO_UART_HPA || hpa == LASI_UART_HPA)
 	switch (option) {
@@ -95,11 +103,9 @@ int __VISIBLE parisc_iodc_entry(unsigned int *arg)
 		while (len--)
 			printf("%c", *c++);
 		return PDC_OK;
-	case ENTRY_IO_CIN: /* console input */
+	case ENTRY_IO_CIN: /* console input, with 5 seconds timeout */
 		c = (char*)ARG6;
-		result[0] = len = ARG7;
-		while (len--)
-			*c++ = parisc_serial_in();
+		result[0] = parisc_serial_in(c, ARG7);
 		return PDC_OK;
 	}
 
@@ -138,17 +144,72 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 	
 	switch (proc) {
 	case PDC_CHASSIS: /* chassis functions */
-		dprintf(0, "\n\nUnimplemented PDC_CHASSIS function %d %x %x %x %x\n", ARG1, ARG2, ARG3, ARG4, ARG5);
+		// dprintf(0, "\n\nUnimplemented PDC_CHASSIS function %d %x %x %x %x\n", ARG1, ARG2, ARG3, ARG4, ARG5);
 		return PDC_BAD_PROC;
-	case PDC_IODC: /* console output */
-		dprintf(0, "\n\nUnimplemented PDC_IODC function %d %x %x %x %x\n", ARG1, ARG2, ARG3, ARG4, ARG5);
+	case PDC_IODC: /* Call IODC functions */
+		if (option == 0 && ARG3 == DINO_UART_HPA && ARG4 == 0) { // Get entry point
+			// Copy IODC data to caller
+			dprintf(0, "\n\nPDC_IODC/0 copy %x %x %x %x\n", ARG3, ARG4, ARG5, ARG6);
+			memcpy((void*)ARG5, &iodc_data_hpa_fff83000, ARG6);
+			*result = ARG6;
+			return PDC_OK;
+		}
+		if (option == 0 && ARG3 == DINO_UART_HPA && ARG4 == 3) { // Search next
+			result[0] = 0;
+			result[1] = CL_DUPLEX;
+			result[2] = 0;
+			result[3] = 0;
+			//return PDC_OK;
+			return PDC_NE_BOOTDEV;
+		}
+		if (option == 0 && ARG3 == IDE_HPA && ARG4 == 0) { // Get entry point
+			// Copy IODC data to caller
+			dprintf(0, "\n\nPDC_IODC/0 copy %x %x %x %x\n", ARG3, ARG4, ARG5, ARG6);
+			memcpy((void*)ARG5, &iodc_data_hpa_fff8c000, ARG6); // FIXME !!!
+			*result = ARG6;
+			return PDC_OK;
+		}
+		if (option == 0 && ARG3 == IDE_HPA && ARG4 == 3) { // Search next
+			result[0] = 0;
+			result[1] = CL_RANDOM;
+			result[2] = 0;
+			result[3] = 0;
+			// return PDC_OK;
+			return PDC_NE_BOOTDEV;
+		}
+		if (option == 0 && ARG3 == IDE_HPA && ARG4 == 4) { // Test & Initialize
+			result[0] = 0;
+			result[1] = CL_RANDOM;
+			result[2] = 0;
+			result[3] = 0;
+			return PDC_OK;
+		}
+		dprintf(0, "\n\nUnimplemented PDC_IODC function %d %x %x ARG4=%x ARG5=%x\n", ARG1, ARG2, ARG3, ARG4, ARG5);
 		return PDC_BAD_PROC;
-	case PDC_MODEL: /* model information */
-		if (option == PDC_MODEL_CAPABILITIES) {
-			*result = PDC_MODEL_OS32 | PDC_MODEL_NVA_UNSUPPORTED; /* FIXME! */
+	case PDC_MODEL: /* model information */ {
+		switch (option) {
+		case PDC_MODEL_INFO:
+			*(struct pdc_model*) result = (struct pdc_model) { PARISC_MODEL_NUM };
+			return PDC_OK;
+		case PDC_MODEL_CAPABILITIES:
+			*result = PDC_MODEL_OS32 | PDC_MODEL_NVA_UNSUPPORTED; // PARISC_CAPABILITIES
 			// PDC_MODEL_IOPDIR_FDC, PDC_MODEL_NVA_MASK ???
 			return PDC_OK;
 		}
+		dprintf(0, "\n\nUnimplemented PDC_MODEL function %d %x %x %x %x\n", ARG1, ARG2, ARG3, ARG4, ARG5);
+		return PDC_BAD_PROC;
+	}
+	case PDC_CACHE:
+		switch (option) {
+		case PDC_CACHE_INFO:
+			memset(result, 0, 30*sizeof(*result));
+			return PDC_OK;
+		}
+		dprintf(0, "\n\nUnimplemented PDC_CACHE function %d %x %x %x %x\n", ARG1, ARG2, ARG3, ARG4, ARG5);
+		return PDC_BAD_PROC;
+	case PDC_STABLE:
+		return PDC_BAD_OPTION;
+	case PDC_NVOLATILE:
 		return PDC_BAD_PROC;
 	case PDC_INSTR:
 		return PDC_BAD_PROC;
@@ -271,8 +332,8 @@ static const struct pz_device mem_boot_boot = {
 static const struct pz_device mem_kbd_boot = {
 	.hpa = DINO_UART_HPA,
 	.iodc_io = (unsigned long) &iodc_entry,
-	.cl_class = CL_DUPLEX,
-	// .cl_class = CL_KEYBD,
+	// .cl_class = CL_DUPLEX,
+	.cl_class = CL_KEYBD,
 };
 
 
@@ -299,7 +360,7 @@ void __VISIBLE start_parisc_firmware(unsigned long ram_size,
 	PAGE0->imm_max_mem = ram_size;
 	memcpy((void*)&(PAGE0->mem_cons), &mem_cons_boot, sizeof(mem_cons_boot));
 	memcpy((void*)&(PAGE0->mem_boot), &mem_boot_boot, sizeof(mem_boot_boot));
-	memcpy((void*)&(PAGE0->mem_kbd),  &mem_kbd_boot, sizeof(mem_kbd_boot));
+//	memcpy((void*)&(PAGE0->mem_kbd),  &mem_kbd_boot, sizeof(mem_kbd_boot));
 
 	malloc_preinit();
 
@@ -347,7 +408,7 @@ void __VISIBLE start_parisc_firmware(unsigned long ram_size,
 
 		printf("Starting IPL boot code from boot medium.\n\n");
 		start_ipl = (void *) iplstart;
-		start_ipl(1, (long)iplend);
+		start_ipl(0, (long)iplend); // first parameter: 1=interactive, 0=non-interactive
 		hlt(); /* this ends the emulator */
 	}
 
