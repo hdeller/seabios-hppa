@@ -385,6 +385,12 @@ static const struct pz_device mem_kbd_boot = {
 	.cl_class = CL_KEYBD,
 };
 
+void reset(void)
+{
+	hlt(); // TODO: Reset the machine
+}
+
+
 
 #define PAGE0 ((volatile struct zeropage *) 0UL)
 
@@ -437,6 +443,7 @@ void __VISIBLE start_parisc_firmware(unsigned long ram_size,
 	qemu_preinit();
 	// coreboot_preinit();
 
+	pci_setup();
 	serial_setup();
 	ata_setup();
 

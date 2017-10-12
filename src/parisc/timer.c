@@ -31,6 +31,11 @@ pmtimer_setup(u16 ioport)
 {
 }
 
+u32 ticks_from_ms(u32 ms)
+{
+    return 0;
+}
+
 
 /****************************************************************
  * Internal timer reading
@@ -42,7 +47,7 @@ u32 TimerLast VARLOW;
 static u32
 timer_read(void)
 {
-        return rdtscll();
+    return rdtscll();
 }
 
 // Check if the current time is past a previously calculated end time.

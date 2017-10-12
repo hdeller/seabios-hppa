@@ -11,8 +11,12 @@
 #include "util.h" // udelay
 #include "x86.h" // outl
 
+#if !CONFIG_PARISC
 #define PORT_PCI_CMD           0x0cf8
 #define PORT_PCI_DATA          0x0cfc
+#else
+#include "parisc/hppa_hardware.h"
+#endif
 
 void pci_config_writel(u16 bdf, u32 addr, u32 val)
 {

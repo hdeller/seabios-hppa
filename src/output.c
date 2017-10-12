@@ -79,7 +79,7 @@ screenc(char c)
 {
 #if CONFIG_PARISC
     for (;;) {
-	const portaddr_t addr = DINO_UART_HPA+0x800;
+	const portaddr_t addr = PORT_SERIAL1;
         u8 lsr = inb(addr+SEROFF_LSR);
         if ((lsr & 0x60) == 0x60) {
             // Success - can write data

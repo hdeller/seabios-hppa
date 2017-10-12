@@ -14,10 +14,8 @@
 #include "parisc/hppa_hardware.h"
 #define PORT_LPT2              0
 #define PORT_SERIAL4           0
-#define PORT_SERIAL2           (LASI_UART_HPA+0x800)
 #define PORT_LPT1              0
 #define PORT_SERIAL3           0
-#define PORT_SERIAL1           (DINO_UART_HPA+0x800)
 #endif
 
 // Serial port offsets

@@ -114,7 +114,7 @@ END(startup)
 
 ENTRY(pdc_entry)
 	stw %rp,-20(%sp)
-	stw %r27,-32(%sp)
+	stw %dp,-32(%sp)
 	stw %arg0,-36(%sp)
 	stw %arg1,-40(%sp)
 	stw %arg2,-44(%sp)
@@ -128,7 +128,7 @@ ENTRY(pdc_entry)
 	ldo -FRAME_SIZE(%sp),%sp
 	ldw -20(%sp),%rp
 	bv %r0(%rp)
-	ldw -32(%sp),%r27
+	ldw -32(%sp),%dp
 END(pdc_entry)
 
 ENTRY(iodc_entry)
