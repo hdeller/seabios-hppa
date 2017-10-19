@@ -507,6 +507,28 @@ static void mch_mem_addr_setup(struct pci_device *dev, void *arg)
         pci_io_low_end = acpi_pm_base;
 }
 
+
+static int dino_pci_slot_get_irq(struct pci_device *pci, int pin)
+{
+    int slot = pci_bdf_to_dev(pci->bdf);
+    dprintf(1, "%s: PCI slot %d IRQ %d\n", __FUNCTION__, slot, 10 + slot);
+    return 10 + slot;
+}
+
+static void dino_mem_addr_setup(struct pci_device *dev, void *arg)
+{
+    pcimem_start = 0xf2000000ULL;
+    pcimem_end   = 0xff800000ULL;
+
+    /* setup pci i/o and mem window */
+
+    pci_slot_get_irq = dino_pci_slot_get_irq;
+
+    /* setup io address space */
+    pci_io_low_end = 0xa000;
+}
+
+
 static const struct pci_device_id pci_platform_tbl[] = {
     PCI_DEVICE(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82441,
                i440fx_mem_addr_setup),
@@ -518,8 +540,13 @@ static const struct pci_device_id pci_platform_tbl[] = {
 static void pci_bios_init_platform(void)
 {
     struct pci_device *pci;
-    foreachpci(pci) {
-        pci_init_device(pci_platform_tbl, pci, NULL);
+
+    if (CONFIG_PARISC)
+        dino_mem_addr_setup(NULL, NULL);
+    else {
+        foreachpci(pci) {
+             pci_init_device(pci_platform_tbl, pci, NULL);
+        }
     }
 }
 
@@ -729,6 +756,7 @@ static u64 pci_region_align(struct pci_region *r)
     struct pci_region_entry *entry;
     hlist_for_each_entry(entry, &r->list, node) {
         // The first entry in the sorted list has the largest alignment
+  dprintf(1,"ALIGN = %lld\n", entry->align);
         return entry->align;
     }
     return 1;
@@ -739,6 +767,7 @@ static u64 pci_region_sum(struct pci_region *r)
     u64 sum = 0;
     struct pci_region_entry *entry;
     hlist_for_each_entry(entry, &r->list, node) {
+dprintf(1, "SUM = %lld\n", entry->size);
         sum += entry->size;
     }
     return sum;
@@ -785,6 +814,7 @@ pci_region_create_entry(struct pci_bus *bus, struct pci_device *dev,
             break;
     }
     hlist_add(&entry->node, pprev);
+dprintf(1, "Add entry  size=%lld align=%lld  type=%d\n", size, align, type);
     return entry;
 }
 
@@ -867,6 +897,8 @@ static int pci_bios_check_devices(struct pci_bus *busses)
             int type, is64;
             u64 size;
             pci_bios_get_bar(pci, i, &type, &size, &is64);
+
+    dprintf(1, "PCI: check devices bar %d  type %d\n", i, type);
             if (size == 0)
                 continue;
 
@@ -992,8 +1024,8 @@ static int pci_bios_init_root_regions_io(struct pci_bus *bus)
      */
     struct pci_region *r_io = &bus->r[PCI_REGION_TYPE_IO];
     u64 sum = pci_region_sum(r_io);
-    if (sum < 0x4000) {
-        /* traditional region is big enougth, use it */
+    if (sum < 0x4000 && !CONFIG_PARISC) {
+        /* traditional region is big enough, use it */
         r_io->base = 0xc000;
     } else if (sum < pci_io_low_end - 0x1000) {
         /* use the larger region at 0x1000 */
@@ -1002,7 +1034,7 @@ static int pci_bios_init_root_regions_io(struct pci_bus *bus)
         /* not enouth io address space -> error out */
         return -1;
     }
-    dprintf(1, "PCI: IO: %4llx - %4llx\n", r_io->base, r_io->base + sum - 1);
+    dprintf(1, "PCI: IO: %llx - %llx\n", r_io->base, r_io->base + sum - 1);
     return 0;
 }
 
@@ -1039,9 +1071,9 @@ pci_region_map_one_entry(struct pci_region_entry *entry, u64 addr)
 {
     if (entry->bar >= 0) {
         dprintf(1, "PCI: map device bdf=%pP"
-                "  bar %d, addr %08llx, size %08llx [%s]\n",
+                "  bar %d, addr %08llx, size %08llx [%d: %s]\n",
                 entry->dev,
-                entry->bar, addr, entry->size, region_type_name[entry->type]);
+                entry->bar, addr, entry->size, entry->type, region_type_name[entry->type]);
 
         pci_set_io_region_addr(entry->dev, entry->bar, addr, entry->is64);
         return;
@@ -1073,6 +1105,7 @@ static void pci_region_map_entries(struct pci_bus *busses, struct pci_region *r)
     struct pci_region_entry *entry;
     hlist_for_each_entry_safe(entry, n, &r->list, node) {
         u64 addr = r->base;
+    dprintf(1, "alloc : %llx \n", addr);
         r->base += entry->size;
         if (entry->bar == -1)
             // Update bus base address if entry is a bridge region
@@ -1093,6 +1126,7 @@ static void pci_bios_map_devices(struct pci_bus *busses)
         struct pci_region r64_mem, r64_pref;
         r64_mem.list.first = NULL;
         r64_pref.list.first = NULL;
+    dprintf(1, "PCI: 32  xxxxxxx\n");
         pci_region_migrate_64bit_entries(&busses[0].r[PCI_REGION_TYPE_MEM],
                                          &r64_mem);
         pci_region_migrate_64bit_entries(&busses[0].r[PCI_REGION_TYPE_PREFMEM],

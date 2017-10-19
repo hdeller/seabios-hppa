@@ -14,6 +14,7 @@
 #include "malloc.h" // malloc
 #include "hw/serialio.h" // qemu_debug_port
 #include "hw/ata.h"
+#include "hw/rtc.h"
 #include "fw/paravirt.h" // PlatformRunningOn
 #include "parisc/hppa_hardware.h" // DINO_UART_BASE
 #include "parisc/pdc.h"
@@ -136,6 +137,35 @@ int __VISIBLE parisc_iodc_entry(unsigned int *arg)
 
 /*********** PDC *******/
 
+/* https://codereview.stackexchange.com/questions/38275/convert-between-date-time-and-time-stamp-without-using-standard-library-routines */
+
+static unsigned short days[4][12] =
+{
+    {   0,  31,  60,  91, 121, 152, 182, 213, 244, 274, 305, 335},
+    { 366, 397, 425, 456, 486, 517, 547, 578, 609, 639, 670, 700},
+    { 731, 762, 790, 821, 851, 882, 912, 943, 974,1004,1035,1065},
+    {1096,1127,1155,1186,1216,1247,1277,1308,1339,1369,1400,1430},
+};
+
+static inline int rtc_from_bcd(int a)
+{
+	return ((a >> 4) * 10) + (a & 0x0f);
+}
+
+static unsigned long seconds_since_1970(void)
+{
+	#define SECONDS_2000_JAN_1 946684800
+	/* assumption: only dates between 01/01/2000 and 31/12/2099 */
+	unsigned int second = rtc_from_bcd(rtc_read(CMOS_RTC_SECONDS));
+	unsigned int minute = rtc_from_bcd(rtc_read(CMOS_RTC_MINUTES));
+	unsigned int hour   = rtc_from_bcd(rtc_read(CMOS_RTC_HOURS));
+	unsigned int day    = rtc_from_bcd(rtc_read(CMOS_RTC_DAY_MONTH)) - 1;
+	unsigned int month  = rtc_from_bcd(rtc_read(CMOS_RTC_MONTH)) - 1;
+	unsigned int year   = rtc_from_bcd(rtc_read(CMOS_RTC_YEAR));
+	return (((year/4*(365*4+1)+days[year%4][month]+day)*24+hour)*60+minute)
+			*60+second + SECONDS_2000_JAN_1;
+}
+
 char *pdc_name(unsigned long num)
 {
 	#define DO(x) if (num == x) return #x;
@@ -234,6 +264,10 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 		}
 		dprintf(0, "\n\nUnimplemented PDC_IODC function %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
 		return PDC_BAD_OPTION;
+	case PDC_TOD:	/* Time of day */ {
+		return seconds_since_1970();
+		return PDC_OK;
+	}
 	case PDC_MODEL: /* model information */ {
 		switch (option) {
 		case PDC_MODEL_INFO:
@@ -436,6 +470,11 @@ void __VISIBLE start_parisc_firmware(unsigned long ram_size,
 	// printf("0xdeadbeef %x %x\n", cpu_to_le16(0xdeadbeef),cpu_to_le32(0xdeadbeef));
 	// printf("0xdeadbeef %x %x\n", le16_to_cpu(0xefbe),le32_to_cpu(0xefbeadde));
 
+	printf("Current date %d-%d-%d\n", rtc_from_bcd(rtc_read(CMOS_RTC_YEAR)),
+		rtc_from_bcd(rtc_read(CMOS_RTC_MONTH)),
+		rtc_from_bcd(rtc_read(CMOS_RTC_DAY_MONTH)));
+	printf("Current seconds %lu\n", seconds_since_1970());
+
 	// handle_post();
 	serial_debug_preinit();
 	debug_banner();
@@ -445,7 +484,7 @@ void __VISIBLE start_parisc_firmware(unsigned long ram_size,
 
 	pci_setup();
 	serial_setup();
-	ata_setup();
+	block_setup();
 
 	printf("\n");
 
