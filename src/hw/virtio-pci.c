@@ -56,14 +56,14 @@ u64 _vp_read(struct vp_cap *cap, u32 offset, u8 size)
         void *addr = cap->memaddr + offset;
         switch (size) {
         case 8:
-            var = readl(addr);
-            var |= (u64)readl(addr+4) << 32;
+            var = le32_to_cpu(readl(addr));
+            var |= (u64)le32_to_cpu(readl(addr+4)) << 32;
             break;
         case 4:
-            var = readl(addr);
+            var = le32_to_cpu(readl(addr));
             break;
         case 2:
-            var = readw(addr);
+            var = le16_to_cpu(readw(addr));
             break;
         case 1:
             var = readb(addr);
@@ -109,13 +109,13 @@ u64 _vp_read(struct vp_cap *cap, u32 offset, u8 size)
         }
     }
     }
-    dprintf(9, "vp read   %x (%d) -> 0x%llx\n", cap->ioaddr + offset, size, var);
+    dprintf(1, "vp read   %x (%d) -> 0x%llx\n", cap->ioaddr + offset, size, var);
     return var;
 }
 
 void _vp_write(struct vp_cap *cap, u32 offset, u8 size, u64 var)
 {
-    dprintf(9, "vp write  %x (%d) <- 0x%llx\n", cap->ioaddr + offset, size, var);
+    dprintf(1, "vp write  %x (%d) <- 0x%llx   mode=%d\n", cap->ioaddr + offset, size, var, cap->mode);
 
     switch (cap->mode) {
     case VP_ACCESS_IO:
@@ -140,10 +140,10 @@ void _vp_write(struct vp_cap *cap, u32 offset, u8 size, u64 var)
         void *addr = cap->memaddr + offset;
         switch (size) {
         case 4:
-            writel(addr, var);
+            writel(addr, cpu_to_le32(var));
             break;
         case 2:
-            writew(addr, var);
+            writew(addr, cpu_to_le16(var));
             break;
         case 1:
             writeb(addr, var);

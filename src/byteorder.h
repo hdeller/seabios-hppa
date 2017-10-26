@@ -74,6 +74,16 @@ static inline u32 be32_to_cpu(u32 x) {
 static inline u64 be64_to_cpu(u64 x) {
     return x;
 }
+
+static inline void convert_to_le32(u32 *script, unsigned long bytes)
+{
+    while (bytes > 0) {
+	*script = le32_to_cpu(*script);
+	script++;
+	bytes -= sizeof(u32);
+    }
+}
+
 #else
 static inline u16 cpu_to_le16(u16 x) {
     return x;
@@ -111,6 +121,10 @@ static inline u32 be32_to_cpu(u32 x) {
 }
 static inline u64 be64_to_cpu(u64 x) {
     return swab64(x);
+}
+
+static inline void convert_to_le32(u32 *script, unsigned long bytes)
+{
 }
 #endif
 

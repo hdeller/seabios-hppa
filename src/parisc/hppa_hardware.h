@@ -1,7 +1,7 @@
 /* HPPA cores and system support chips.  */
 
 #define FIRMWARE_START	0xf0000000
-#define FIRMWARE_END	0xf1000000
+#define FIRMWARE_END	0xf0800000
 
 #define DEVICE_HPA_LEN	0x00100000
 

@@ -494,11 +494,8 @@ fill_edd(struct segoff_s edd, struct drive_s *drive_fl)
 void
 block_setup(void)
 {
-dprintf(0, "block_setup\n");
     floppy_setup();
-dprintf(0, "block_setup\n");
     ata_setup();
-dprintf(0, "block_setup\n");
     ahci_setup();
     sdcard_setup();
     ramdisk_setup();

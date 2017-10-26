@@ -217,6 +217,10 @@ static void mch_isa_bridge_setup(struct pci_device *dev, void *arg)
 
 static void storage_ide_setup(struct pci_device *pci, void *arg)
 {
+    /* On parisc, keep PCI IDE IO ports in PCI space */
+    if (CONFIG_PARISC)
+	return;
+
     /* IDE: we map it as in ISA mode */
     pci_set_io_region_addr(pci, 0, PORT_ATA1_CMD_BASE, 0);
     pci_set_io_region_addr(pci, 1, PORT_ATA1_CTRL_BASE, 0);
@@ -511,7 +515,7 @@ static void mch_mem_addr_setup(struct pci_device *dev, void *arg)
 static int dino_pci_slot_get_irq(struct pci_device *pci, int pin)
 {
     int slot = pci_bdf_to_dev(pci->bdf);
-    dprintf(1, "%s: PCI slot %d IRQ %d\n", __FUNCTION__, slot, 10 + slot);
+    // dprintf(1, "%s: PCI slot %d IRQ %d\n", __FUNCTION__, slot, 10 + slot);
     return 10 + slot;
 }
 
@@ -520,7 +524,26 @@ static void dino_mem_addr_setup(struct pci_device *dev, void *arg)
     pcimem_start = 0xf2000000ULL;
     pcimem_end   = 0xff800000ULL;
 
-    /* setup pci i/o and mem window */
+    /* Setup DINO PCI I/O and mem window */
+
+    outl(DINO_HPA | 1, 0xfffc0020); /* Set Dino Flex (Address) */
+    outl(0x00000080, DINO_HPA + 0x038); /* IO_CONTROL - enable DINO PCI */
+    outl(0x00000000, DINO_HPA + 0x804); /* Set PAMR */
+    outl(0x00000000, DINO_HPA + 0x808); /* Set PAPR */
+    outl(0x7ffffffe, DINO_HPA + 0x060); /* Set DINO_IO_ADDR_EN */
+    outl(0x0000006f, DINO_HPA + 0x810); /* Set PCICMD */
+#if 0
+m01 ghost_em write1 0xfffc0020 0xff000001      /* Set Flex                 */
+m02 ghost_em write1 0xff000038 0x00000080      /* Set IO_CONTROL           */
+m03 ghost_em write1 0xff000804 0x00000000      /* Set PAMR                 */
+m04 ghost_em write1 0xff000808 0x00000000      /* Set PAPR                 */
+m05 ghost_em write1 0xff00005c 0x00000001      /* Set IO_FBB_EN            */
+m06 ghost_em write1 0xff000060 0x0000fffe      /* Set IO_ADDR_EN           */
+m07 ghost_em write1 0xff00080c 0x00000000      /* Set DAMODE               */
+m08 ghost_em write1 0xff000824 0x00000000      /* Set PCIROR read hint=1   */
+m09 ghost_em write1 0xff000828 0x00000000      /* Set PCIWOR write hint=1  */
+m10 ghost_em write1 0xff000810 0x0000006f      /* Set PCICMD reset PCI     */
+#endif
 
     pci_slot_get_irq = dino_pci_slot_get_irq;
 
@@ -756,7 +779,6 @@ static u64 pci_region_align(struct pci_region *r)
     struct pci_region_entry *entry;
     hlist_for_each_entry(entry, &r->list, node) {
         // The first entry in the sorted list has the largest alignment
-  dprintf(1,"ALIGN = %lld\n", entry->align);
         return entry->align;
     }
     return 1;
@@ -767,7 +789,6 @@ static u64 pci_region_sum(struct pci_region *r)
     u64 sum = 0;
     struct pci_region_entry *entry;
     hlist_for_each_entry(entry, &r->list, node) {
-dprintf(1, "SUM = %lld\n", entry->size);
         sum += entry->size;
     }
     return sum;
@@ -814,7 +835,6 @@ pci_region_create_entry(struct pci_bus *bus, struct pci_device *dev,
             break;
     }
     hlist_add(&entry->node, pprev);
-dprintf(1, "Add entry  size=%lld align=%lld  type=%d\n", size, align, type);
     return entry;
 }
 
@@ -897,8 +917,6 @@ static int pci_bios_check_devices(struct pci_bus *busses)
             int type, is64;
             u64 size;
             pci_bios_get_bar(pci, i, &type, &size, &is64);
-
-    dprintf(1, "PCI: check devices bar %d  type %d\n", i, type);
             if (size == 0)
                 continue;
 
@@ -1034,7 +1052,7 @@ static int pci_bios_init_root_regions_io(struct pci_bus *bus)
         /* not enouth io address space -> error out */
         return -1;
     }
-    dprintf(1, "PCI: IO: %llx - %llx\n", r_io->base, r_io->base + sum - 1);
+    dprintf(1, "PCI: IO: %4llx - %4llx\n", r_io->base, r_io->base + sum - 1);
     return 0;
 }
 
@@ -1105,7 +1123,6 @@ static void pci_region_map_entries(struct pci_bus *busses, struct pci_region *r)
     struct pci_region_entry *entry;
     hlist_for_each_entry_safe(entry, n, &r->list, node) {
         u64 addr = r->base;
-    dprintf(1, "alloc : %llx \n", addr);
         r->base += entry->size;
         if (entry->bar == -1)
             // Update bus base address if entry is a bridge region
@@ -1126,7 +1143,6 @@ static void pci_bios_map_devices(struct pci_bus *busses)
         struct pci_region r64_mem, r64_pref;
         r64_mem.list.first = NULL;
         r64_pref.list.first = NULL;
-    dprintf(1, "PCI: 32  xxxxxxx\n");
         pci_region_migrate_64bit_entries(&busses[0].r[PCI_REGION_TYPE_MEM],
                                          &r64_mem);
         pci_region_migrate_64bit_entries(&busses[0].r[PCI_REGION_TYPE_PREFMEM],
