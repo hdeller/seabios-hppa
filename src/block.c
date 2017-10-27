@@ -611,7 +611,9 @@ process_op(struct disk_op_s *op)
             , op->count, op->command);
 
     int ret, origcount = op->count;
-    if (origcount * GET_FLATPTR(op->drive_fl->blksize) > 64*1024) {
+    /* on non-x86 there is no problem with large reads/writes above 64kb */
+    if (!CONFIG_PARISC &&
+	(origcount * GET_FLATPTR(op->drive_fl->blksize) > 64*1024)) {
         op->count = 0;
         return DISK_RET_EBOUNDARY;
     }
