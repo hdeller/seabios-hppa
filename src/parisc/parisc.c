@@ -216,6 +216,7 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 	static unsigned long psw_defaults = PDC_PSW_ENDIAN_BIT;
 	static unsigned long cache_info[] = { PARISC_PDC_CACHE_INFO };
 	static unsigned long model[] = { PARISC_PDC_MODEL };
+	static const char model_str[] = PARISC_MODEL;
 
 	unsigned long proc = ARG0;
 	unsigned long option = ARG1;
@@ -244,8 +245,8 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 			}
 			return -4; // invalid c_index
 		case PDC_MODEL_SYSMODEL:
-			result[0] = strlen(PARISC_MODEL);
-			strtcpy((char *)&result[1], PARISC_MODEL, sizeof(PARISC_MODEL));
+			result[0] = sizeof(model_str) - 1;
+			strtcpy((char *)ARG4, model_str, sizeof(model_str));
 			return PDC_OK;
 		case PDC_MODEL_CPU_ID:
 			result[0] = PARISC_PDC_CPUID;
