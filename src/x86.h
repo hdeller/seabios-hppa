@@ -88,10 +88,7 @@ static inline void nop(void)
     asm volatile("nop");
 }
 
-static inline void hlt(void)
-{
-    asm volatile("\t.word 0xffffffff": : :"memory");
-}
+extern void hlt(void);
 
 static inline void wbinvd(void)
 {

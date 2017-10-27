@@ -221,14 +221,14 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 	unsigned long option = ARG1;
 	unsigned long *result = (unsigned long *)ARG2;
 #if 0
-	dprintf(0, "\nStart PDC proc %s(%d) option %d result=%x ARG3=%x ", pdc_name(ARG0), ARG0, ARG1, ARG2, ARG3);
+	dprintf(0, "\nSeaBIOS: Start PDC proc %s(%d) option %d result=%x ARG3=%x ", pdc_name(ARG0), ARG0, ARG1, ARG2, ARG3);
 	dprintf(0, "ARG4=%x ARG5=%x ARG6=%x ARG7=%x\n", ARG4, ARG5, ARG6, ARG7);
 #endif
 	switch (proc) {
 	case PDC_POW_FAIL:
 		break;
 	case PDC_CHASSIS: /* chassis functions */
-		// dprintf(0, "\n\nUnimplemented PDC_CHASSIS function %d %x %x %x %x\n", ARG1, ARG2, ARG3, ARG4, ARG5);
+		// dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_CHASSIS function %d %x %x %x %x\n", ARG1, ARG2, ARG3, ARG4, ARG5);
 		return PDC_BAD_PROC;
 	case PDC_PIM:
 		break;
@@ -241,7 +241,7 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 			*result = PDC_MODEL_OS32 | PDC_MODEL_NVA_UNSUPPORTED; // PARISC_CAPABILITIES
 			return PDC_OK;
 		}
-		dprintf(0, "\n\nUnimplemented PDC_MODEL function %d %x %x %x %x\n", ARG1, ARG2, ARG3, ARG4, ARG5);
+		dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_MODEL function %d %x %x %x %x\n", ARG1, ARG2, ARG3, ARG4, ARG5);
 		return PDC_BAD_OPTION;
 	case PDC_CACHE:
 		switch (option) {
@@ -249,7 +249,7 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 			memcpy(result, cache_info, sizeof(cache_info));
 			return PDC_OK;
 		}
-		dprintf(0, "\n\nUnimplemented PDC_CACHE function %d %x %x %x %x\n", ARG1, ARG2, ARG3, ARG4, ARG5);
+		dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_CACHE function %d %x %x %x %x\n", ARG1, ARG2, ARG3, ARG4, ARG5);
 		return PDC_BAD_OPTION;
 	case PDC_HPA:
 		break;
@@ -300,7 +300,7 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 				break;
 			}
 		}
-		dprintf(0, "\n\nUnimplemented PDC_IODC function %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
+		dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_IODC function %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
 		return PDC_BAD_OPTION;
 	case PDC_TOD:	/* Time of day */
 		switch (option) {
@@ -309,14 +309,15 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 			result[1] = result[2] = result[3] = 0;
 			return PDC_OK;
 		}
-		dprintf(0, "\n\nUnimplemented PDC_TOD function %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
+		dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_TOD function %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
 		return PDC_BAD_OPTION;
 	case PDC_STABLE:
 		return PDC_BAD_OPTION;
 	case PDC_NVOLATILE:
 		return PDC_BAD_PROC;
 	case PDC_ADD_VALID:
-		break;
+		dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_ADD_VALID function %ld ARG2=%x\n", option, ARG2);
+		return PDC_OK;
 	case PDC_INSTR:
 		return PDC_BAD_PROC;
 	case PDC_CONFIG:	/* Obsolete */
@@ -326,7 +327,7 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 	case PDC_TLB:		/* not used on Linux. Maybe on HP-UX? */
 		return PDC_BAD_PROC;
 	case PDC_MEM:		/* replaced by PDC_SYSTEM_MAP, might be needed for 64-bit */
-		dprintf(0, "\n\nCheck PDC_MEM option %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
+		dprintf(0, "\n\nSeaBIOS: Check PDC_MEM option %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
 		return PDC_BAD_PROC;
 	case PDC_PSW:	/* Get/Set default System Mask  */
 		if (option > PDC_PSW_SET_DEFAULTS)
@@ -345,7 +346,7 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 		break; // TODO !!!
 	}
 
-	dprintf(0, "\nUnimplemented PDC proc %s(%d) option %d result=%x ARG3=%x ",
+	dprintf(0, "\nSeaBIOS: Unimplemented PDC proc %s(%d) option %d result=%x ARG3=%x ",
 			pdc_name(ARG0), ARG0, ARG1, ARG2, ARG3);
 	dprintf(0, "ARG4=%x ARG5=%x ARG6=%x ARG7=%x\n", ARG4, ARG5, ARG6, ARG7);
 
@@ -374,7 +375,7 @@ int parisc_boot_menu(unsigned char **iplstart, unsigned char **iplend)
 	boot_drive = select_parisc_boot_drive();
 	disk_op.drive_fl = boot_drive;
 	if (boot_drive == NULL) {
-		printf("No boot device.\n");
+		printf("SeaBIOS: No boot device.\n");
 		return 0;
 	}
 
@@ -455,11 +456,16 @@ static const struct pz_device mem_kbd_boot = {
 	.cl_class = CL_KEYBD,
 };
 
+void hlt(void)
+{
+    printf("SeaBIOS issued HALT SYSTEM.\n\n");
+    asm volatile("\t.word 0xffffffff": : :"memory");
+}
+
 void reset(void)
 {
 	hlt(); // TODO: Reset the machine
 }
-
 
 
 #define PAGE0 ((volatile struct zeropage *) 0UL)
@@ -506,10 +512,12 @@ void __VISIBLE start_parisc_firmware(unsigned long ram_size,
 	// printf("0xdeadbeef %x %x\n", cpu_to_le16(0xdeadbeef),cpu_to_le32(0xdeadbeef));
 	// printf("0xdeadbeef %x %x\n", le16_to_cpu(0xefbe),le32_to_cpu(0xefbeadde));
 
-	printf("Current date %d-%d-%d\n", rtc_from_bcd(rtc_read(CMOS_RTC_YEAR)),
+#if 0
+	printf("SeaBIOS: Current date %d-%d-%d\n", rtc_from_bcd(rtc_read(CMOS_RTC_YEAR)),
 		rtc_from_bcd(rtc_read(CMOS_RTC_MONTH)),
 		rtc_from_bcd(rtc_read(CMOS_RTC_DAY_MONTH)));
-	printf("Current seconds %lu\n", seconds_since_1970());
+	printf("SeaBIOS: Current seconds %lu\n", seconds_since_1970());
+#endif
 
 	// handle_post();
 	serial_debug_preinit();
