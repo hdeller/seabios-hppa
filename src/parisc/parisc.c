@@ -237,8 +237,21 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 		case PDC_MODEL_INFO:
 			memcpy(result, model, sizeof(model));
 			return PDC_OK;
+		case PDC_MODEL_VERSIONS:
+			if (ARG3 == 0) {
+				result[0] =  PARISC_PDC_VERSION;
+				return PDC_OK;
+			}
+			return -4; // invalid c_index
+		case PDC_MODEL_SYSMODEL:
+			result[0] = strlen(PARISC_MODEL);
+			strtcpy((char *)&result[1], PARISC_MODEL, sizeof(PARISC_MODEL));
+			return PDC_OK;
+		case PDC_MODEL_CPU_ID:
+			result[0] = PARISC_PDC_CPUID;
+			return PDC_OK;
 		case PDC_MODEL_CAPABILITIES:
-			*result = PDC_MODEL_OS32 | PDC_MODEL_NVA_UNSUPPORTED; // PARISC_CAPABILITIES
+			result[0] = PARISC_PDC_CAPABILITIES;
 			return PDC_OK;
 		}
 		dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_MODEL function %d %x %x %x %x\n", ARG1, ARG2, ARG3, ARG4, ARG5);
@@ -343,7 +356,15 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 		}
 		return PDC_OK;
 	case PDC_SYSTEM_MAP:
-		break; // TODO !!!
+		dprintf(0, "\n\nSeaBIOS: PDC_SYSTEM_MAP function %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
+		switch (option) {
+		case PDC_FIND_MODULE:
+			return PDC_OK;
+		case PDC_FIND_ADDRESS:
+		case PDC_TRANSLATE_PATH:
+			return PDC_OK;
+		}
+		break;
 	}
 
 	dprintf(0, "\nSeaBIOS: Unimplemented PDC proc %s(%d) option %d result=%x ARG3=%x ",
