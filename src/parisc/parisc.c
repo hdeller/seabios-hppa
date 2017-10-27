@@ -306,7 +306,7 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 		switch (option) {
 		case PDC_TOD_READ:
 			result[0] = seconds_since_1970();
-			result[1] result[2] = result[3] = 0;
+			result[1] = result[2] = result[3] = 0;
 			return PDC_OK;
 		}
 		dprintf(0, "\n\nUnimplemented PDC_TOD function %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
