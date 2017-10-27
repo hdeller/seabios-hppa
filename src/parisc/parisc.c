@@ -94,8 +94,10 @@ int __VISIBLE parisc_iodc_entry(unsigned int *arg)
 	char *c;
 	struct disk_op_s disk_op;
 
-//	dprintf(0, "\nIODC option start #%ld : hpa=%lx spa=%lx layers=%lx ", option, hpa, spa, layers);
-//	dprintf(0, "result=%p arg5=%x arg6=%x arg7=%x\n", result, ARG5, ARG6, ARG7);
+#if 0
+	dprintf(0, "\nIODC option start #%ld : hpa=%lx spa=%lx layers=%lx ", option, hpa, spa, layers);
+	dprintf(0, "result=%p arg5=0x%x arg6=0x%x arg7=0x%x\n", result, ARG5, ARG6, ARG7);
+#endif
 	/* console I/O */
 	if (hpa == DINO_UART_HPA || hpa == LASI_UART_HPA)
 	switch (option) {
@@ -223,9 +225,45 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 	dprintf(0, "ARG4=%x ARG5=%x ARG6=%x ARG7=%x\n", ARG4, ARG5, ARG6, ARG7);
 #endif
 	switch (proc) {
+	case PDC_POW_FAIL:
+		break;
 	case PDC_CHASSIS: /* chassis functions */
 		// dprintf(0, "\n\nUnimplemented PDC_CHASSIS function %d %x %x %x %x\n", ARG1, ARG2, ARG3, ARG4, ARG5);
 		return PDC_BAD_PROC;
+	case PDC_PIM:
+		break;
+	case PDC_MODEL: /* model information */
+		switch (option) {
+		case PDC_MODEL_INFO:
+			memcpy(result, model, sizeof(model));
+			return PDC_OK;
+		case PDC_MODEL_CAPABILITIES:
+			*result = PDC_MODEL_OS32 | PDC_MODEL_NVA_UNSUPPORTED; // PARISC_CAPABILITIES
+			return PDC_OK;
+		}
+		dprintf(0, "\n\nUnimplemented PDC_MODEL function %d %x %x %x %x\n", ARG1, ARG2, ARG3, ARG4, ARG5);
+		return PDC_BAD_OPTION;
+	case PDC_CACHE:
+		switch (option) {
+		case PDC_CACHE_INFO:
+			memcpy(result, cache_info, sizeof(cache_info));
+			return PDC_OK;
+		}
+		dprintf(0, "\n\nUnimplemented PDC_CACHE function %d %x %x %x %x\n", ARG1, ARG2, ARG3, ARG4, ARG5);
+		return PDC_BAD_OPTION;
+	case PDC_HPA:
+		break;
+	case PDC_COPROC:
+		switch (option) {
+		case PDC_COPROC_CFG:
+			memset(result, 0, 32 * sizeof(unsigned long));
+			result[0] = 1; // XXX: num_cpus
+			result[1] = 1;
+			result[17] = 1; // Revision
+			result[18] = 19; // Model
+			return PDC_OK;
+		}
+		return PDC_BAD_OPTION;
 	case PDC_IODC: /* Call IODC functions */
 		switch (option) {
 		case 0:			// Get entry point
@@ -264,36 +302,31 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 		}
 		dprintf(0, "\n\nUnimplemented PDC_IODC function %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
 		return PDC_BAD_OPTION;
-	case PDC_TOD:	/* Time of day */ {
-		return seconds_since_1970();
-		return PDC_OK;
-	}
-	case PDC_MODEL: /* model information */ {
+	case PDC_TOD:	/* Time of day */
 		switch (option) {
-		case PDC_MODEL_INFO:
-			memcpy(result, model, sizeof(model));
-			return PDC_OK;
-		case PDC_MODEL_CAPABILITIES:
-			*result = PDC_MODEL_OS32 | PDC_MODEL_NVA_UNSUPPORTED; // PARISC_CAPABILITIES
-			// PDC_MODEL_IOPDIR_FDC, PDC_MODEL_NVA_MASK ???
+		case PDC_TOD_READ:
+			result[0] = seconds_since_1970();
+			result[1] result[2] = result[3] = 0;
 			return PDC_OK;
 		}
-		dprintf(0, "\n\nUnimplemented PDC_MODEL function %d %x %x %x %x\n", ARG1, ARG2, ARG3, ARG4, ARG5);
-		return PDC_BAD_PROC;
-	}
-	case PDC_CACHE:
-		switch (option) {
-		case PDC_CACHE_INFO:
-			memcpy(result, cache_info, sizeof(cache_info));
-			return PDC_OK;
-		}
-		dprintf(0, "\n\nUnimplemented PDC_CACHE function %d %x %x %x %x\n", ARG1, ARG2, ARG3, ARG4, ARG5);
-		return PDC_BAD_PROC;
+		dprintf(0, "\n\nUnimplemented PDC_TOD function %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
+		return PDC_BAD_OPTION;
 	case PDC_STABLE:
 		return PDC_BAD_OPTION;
 	case PDC_NVOLATILE:
 		return PDC_BAD_PROC;
+	case PDC_ADD_VALID:
+		break;
 	case PDC_INSTR:
+		return PDC_BAD_PROC;
+	case PDC_CONFIG:	/* Obsolete */
+		return PDC_BAD_PROC;
+	case PDC_BLOCK_TLB:	/* not needed on virtual machine */
+		return PDC_BAD_PROC;
+	case PDC_TLB:		/* not used on Linux. Maybe on HP-UX? */
+		return PDC_BAD_PROC;
+	case PDC_MEM:		/* replaced by PDC_SYSTEM_MAP, might be needed for 64-bit */
+		dprintf(0, "\n\nCheck PDC_MEM option %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
 		return PDC_BAD_PROC;
 	case PDC_PSW:	/* Get/Set default System Mask  */
 		if (option > PDC_PSW_SET_DEFAULTS)
@@ -308,10 +341,13 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 			psw_defaults = ARG2;
 		}
 		return PDC_OK;
+	case PDC_SYSTEM_MAP:
+		break; // TODO !!!
 	}
 
-	dprintf(0, "\n\nUnimplemented PDC proc %d option %d %x %x ", ARG0, ARG1, ARG2, ARG3);
-	dprintf(0, "%x %x %x %x\n", ARG4, ARG5, ARG6, ARG7);
+	dprintf(0, "\nUnimplemented PDC proc %s(%d) option %d result=%x ARG3=%x ",
+			pdc_name(ARG0), ARG0, ARG1, ARG2, ARG3);
+	dprintf(0, "ARG4=%x ARG5=%x ARG6=%x ARG7=%x\n", ARG4, ARG5, ARG6, ARG7);
 
 	hlt();
 	return PDC_BAD_PROC;
