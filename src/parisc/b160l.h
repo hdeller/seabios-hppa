@@ -339,6 +339,19 @@ static struct pdc_iodc iodc_data_hpa_fff81000 = {
 #define HPA_fff81000_add_addr 0
 
 #define PARISC_IODC_LIST \
+	&iodc_data_hpa_fff80000,\
+	&iodc_data_hpa_fffbe000,\
+	&iodc_data_hpa_fffbf000,\
+	NULL
+
+#define PARISC_HPA_LIST \
+	0xfff80000,\
+	0xfffbe000,\
+	0xfffbf000,\
+	0UL
+
+#if 0
+#define PARISC_IODC_LIST \
 	&iodc_data_hpa_ffc00000,\
 	&iodc_data_hpa_fff80000,\
 	&iodc_data_hpa_fff83000,\
@@ -379,3 +392,4 @@ static struct pdc_iodc iodc_data_hpa_fff81000 = {
 	0xfffbf000,\
 	0xfff81000,\
 	0UL
+#endif

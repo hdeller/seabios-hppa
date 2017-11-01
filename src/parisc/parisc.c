@@ -64,6 +64,16 @@ static struct drive_s *boot_drive;
 static struct pdc_iodc *iodc_list[] = { PARISC_IODC_LIST };
 static unsigned long hpa_list[] = { PARISC_HPA_LIST };
 
+static int find_hpa_index(unsigned long hpa)
+{
+	int i;
+	for (i = 0; i < (ARRAY_SIZE(hpa_list)-1); i++)
+		if (hpa == hpa_list[i])
+			return i;
+	return -1;
+}
+
+
 #define SERIAL_TIMEOUT 20
 unsigned long parisc_serial_in(char *c, unsigned long maxchars)
 {
@@ -221,6 +231,12 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 	unsigned long proc = ARG0;
 	unsigned long option = ARG1;
 	unsigned long *result = (unsigned long *)ARG2;
+
+	int hpa_index;
+	struct pdc_iodc *iodc_p;
+	struct device_path *devpath;
+	unsigned char *c;
+
 #if 0
 	dprintf(0, "\nSeaBIOS: Start PDC proc %s(%d) option %d result=%x ARG3=%x ", pdc_name(ARG0), ARG0, ARG1, ARG2, ARG3);
 	dprintf(0, "ARG4=%x ARG5=%x ARG6=%x ARG7=%x\n", ARG4, ARG5, ARG6, ARG7);
@@ -281,37 +297,31 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 	case PDC_IODC: /* Call IODC functions */
 		switch (option) {
 		case 0:			// Get entry point
-			switch (ARG3) {
-			case DINO_UART_HPA:
-				if (ARG4 == 0) {
-					memcpy((void*)ARG5, &iodc_data_hpa_fff83000, ARG6);
-					*result = ARG6;
-					return PDC_OK;
-				}
-				if (ARG4 == 3) { // Search next (correct ??, write to ARG7 too?)
-					result[0] = 0;
-					result[1] = CL_DUPLEX;
-					result[2] = 0;
-					result[3] = 0;
-					return PDC_OK;
-					// return PDC_NE_BOOTDEV;
-				}
-				break;
-			case IDE_HPA:
-				if (ARG4 == 0) {
-					memcpy((void*)ARG5, &iodc_data_hpa_fff8c000, ARG6); // FIXME !!!
-					*result = ARG6;
-					return PDC_OK;
-				}
-				if (ARG4 == 3) { // Search next (correct ??, write to ARG7 too?)
-					result[0] = 0;
-					result[1] = CL_RANDOM;
-					result[2] = 0;
-					result[3] = 0;
-					return PDC_OK;
-					// return PDC_NE_BOOTDEV;
-				}
-				break;
+			hpa_index = find_hpa_index(ARG3); // index in hpa list
+			if (hpa_index < 0)
+				return -3; // not found
+			iodc_p = iodc_list[hpa_index];
+
+			if (ARG4 == PDC_IODC_RI_DATA_BYTES) {
+				memcpy((void*) ARG5, iodc_p, ARG6);
+				c = (unsigned char *) ARG5;
+				c[0] = iodc_p->hversion_model; // FIXME.
+				// c[1] = iodc_p->hversion_rev || (iodc_p->hversion << 4);
+				*result = ARG6;
+				return PDC_OK;
+			}
+
+			if (ARG4 == PDC_IODC_RI_INIT) {
+				result[0] = 0;
+				result[1] = (ARG3 == DINO_UART_HPA) ? CL_DUPLEX:
+					    (ARG3 == IDE_HPA) ? CL_RANDOM : 0;
+				result[2] = 0;
+				result[3] = 0;
+				return PDC_OK;
+			}
+
+			if (ARG4 == PDC_IODC_RI_IO) { // Get ENTRY_IO
+				// TODO.
 			}
 		}
 		dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_IODC function %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
@@ -357,13 +367,23 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 		}
 		return PDC_OK;
 	case PDC_SYSTEM_MAP:
-		dprintf(0, "\n\nSeaBIOS: PDC_SYSTEM_MAP function %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
+		// dprintf(0, "\n\nSeaBIOS: Info: PDC_SYSTEM_MAP function %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
 		switch (option) {
 		case PDC_FIND_MODULE:
+			if (ARG4 >= ARRAY_SIZE(hpa_list))
+				return PDC_NE_MOD; // Module not found
+			result[0] = hpa_list[ARG4]; // mod_addr
+			result[1] = 0; // mod_pgs
+			result[2] = 0; // add_addrs
+
+			devpath = (struct device_path *) ARG3;
+			memset(devpath, 0, sizeof(*devpath));
+			devpath->bc[0] = ARG4;
+
 			return PDC_OK;
 		case PDC_FIND_ADDRESS:
 		case PDC_TRANSLATE_PATH:
-			return PDC_OK;
+			break; // return PDC_OK;
 		}
 		break;
 	}
