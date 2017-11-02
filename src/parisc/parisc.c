@@ -295,12 +295,17 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 		}
 		return PDC_BAD_OPTION;
 	case PDC_IODC: /* Call IODC functions */
+		// dprintf(0, "\n\nSeaBIOS: Info PDC_IODC function %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
 		switch (option) {
 		case 0:			// Get entry point
-			hpa_index = find_hpa_index(ARG3); // index in hpa list
-			if (hpa_index < 0)
-				return -3; // not found
-			iodc_p = iodc_list[hpa_index];
+			if (ARG3 == IDE_HPA) {
+				iodc_p = &iodc_data_hpa_fff8c000; // workaround for PCI ATA
+			} else {
+				hpa_index = find_hpa_index(ARG3); // index in hpa list
+				if (hpa_index < 0)
+					return -3; // not found
+				iodc_p = iodc_list[hpa_index];
+			}
 
 			if (ARG4 == PDC_IODC_RI_DATA_BYTES) {
 				memcpy((void*) ARG5, iodc_p, ARG6);
