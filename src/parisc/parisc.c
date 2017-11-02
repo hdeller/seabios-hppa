@@ -386,6 +386,10 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 			break; // return PDC_OK;
 		}
 		break;
+	case PDC_SOFT_POWER: // don't have a soft-power switch
+		return PDC_BAD_PROC;
+	case PDC_PCI_INDEX: // not needed for Dino PCI bridge
+		return PDC_BAD_PROC;
 	}
 
 	dprintf(0, "\nSeaBIOS: Unimplemented PDC proc %s(%d) option %d result=%x ARG3=%x ",
