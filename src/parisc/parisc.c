@@ -326,7 +326,7 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 			}
 
 			if (ARG4 == PDC_IODC_RI_IO) { // Get ENTRY_IO
-				// TODO.
+				// TODO for HP-UX 10.20
 			}
 		}
 		dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_IODC function %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
@@ -356,7 +356,7 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 	case PDC_TLB:		/* not used on Linux. Maybe on HP-UX? */
 		return PDC_BAD_PROC;
 	case PDC_MEM:		/* replaced by PDC_SYSTEM_MAP, might be needed for 64-bit */
-		dprintf(0, "\n\nSeaBIOS: Check PDC_MEM option %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
+		// dprintf(0, "\n\nSeaBIOS: Check PDC_MEM option %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
 		return PDC_BAD_PROC;
 	case PDC_PSW:	/* Get/Set default System Mask  */
 		if (option > PDC_PSW_SET_DEFAULTS)
@@ -393,6 +393,10 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 		break;
 	case PDC_SOFT_POWER: // don't have a soft-power switch
 		return PDC_BAD_PROC;
+	case PDC_BROADCAST_RESET:
+		dprintf(0, "\n\nSeaBIOS: PDC_BROADCAST_RESET (reset system) called with ARG3=%x ARG4=%x\n", ARG3, ARG4);
+		hlt();
+		return PDC_OK;
 	case PDC_PCI_INDEX: // not needed for Dino PCI bridge
 		return PDC_BAD_PROC;
 	}
