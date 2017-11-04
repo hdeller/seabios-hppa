@@ -48,6 +48,9 @@ void cpuid(u32 index, u32 *eax, u32 *ebx, u32 *ecx, u32 *edx)
 
 void wrmsr_smp(u32 index, u64 val) { }
 
+/* zero-page of PA-RISC */
+#define PAGE0 ((volatile struct zeropage *) 0UL)
+
 #define ARG0 arg[7-0]
 #define ARG1 arg[7-1]
 #define ARG2 arg[7-2]
@@ -148,6 +151,23 @@ int __VISIBLE parisc_iodc_entry(unsigned int *arg)
 }
 
 /*********** PDC *******/
+
+#define STABLE_STORAGE_SIZE	256
+static unsigned char stable_storage[STABLE_STORAGE_SIZE];
+
+static void init_stable_storage(void)
+{
+	/* see ENGINEERING NOTE in PDC2.0 doc */
+	memset(&stable_storage, 0, STABLE_STORAGE_SIZE);
+	// no intial paths
+	stable_storage[0x07] = 0xff;
+	stable_storage[0x67] = 0xff;
+	stable_storage[0x87] = 0xff;
+	stable_storage[0xa7] = 0xff;
+	// 0x0e/0x0f => fastsize = all, needed for HPUX
+	stable_storage[0x5f] = 0x0f;
+}
+
 
 /* https://codereview.stackexchange.com/questions/38275/convert-between-date-time-and-time-stamp-without-using-standard-library-routines */
 
@@ -297,7 +317,7 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 	case PDC_IODC: /* Call IODC functions */
 		// dprintf(0, "\n\nSeaBIOS: Info PDC_IODC function %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
 		switch (option) {
-		case 0:			// Get entry point
+		case 0:
 			if (ARG3 == IDE_HPA) {
 				iodc_p = &iodc_data_hpa_fff8c000; // workaround for PCI ATA
 			} else {
@@ -341,12 +361,37 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 		dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_TOD function %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
 		return PDC_BAD_OPTION;
 	case PDC_STABLE:
+		// dprintf(0, "\n\nSeaBIOS: PDC_STABLE function %ld ARG2=%x ARG3=%x ARG4=%x\n", option, ARG2, ARG3, ARG4);
+		switch (option) {
+		case PDC_STABLE_READ:
+			if ((ARG2 + ARG4) > STABLE_STORAGE_SIZE)
+				return PDC_INVALID_ARG;
+			memcpy((unsigned char *) ARG3, &stable_storage[ARG2], ARG4);
+			return PDC_OK;
+		case PDC_STABLE_WRITE:
+			if ((ARG2 + ARG4) > STABLE_STORAGE_SIZE)
+				return PDC_INVALID_ARG;
+			memcpy(&stable_storage[ARG2], (unsigned char *) ARG3, ARG4);
+			return PDC_OK;
+		case PDC_STABLE_RETURN_SIZE:
+			result[0] = STABLE_STORAGE_SIZE;
+			return PDC_OK;
+		case PDC_STABLE_VERIFY_CONTENTS:
+			return PDC_OK;
+		case PDC_STABLE_INITIALIZE:
+			init_stable_storage();
+			return PDC_OK;
+		}
 		return PDC_BAD_OPTION;
 	case PDC_NVOLATILE:
 		return PDC_BAD_PROC;
 	case PDC_ADD_VALID:
-		dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_ADD_VALID function %ld ARG2=%x\n", option, ARG2);
-		return PDC_OK;
+		// dprintf(0, "\n\nSeaBIOS: PDC_ADD_VALID function %ld ARG2=%x called.\n", option, ARG2);
+		if (ARG2 < PAGE0->memc_phsize)
+			return PDC_OK;
+		if ((ARG2 >= FIRMWARE_START) && (ARG2 <= 0xffffffff))
+			return PDC_OK;
+		return PDC_ERROR;
 	case PDC_INSTR:
 		return PDC_BAD_PROC;
 	case PDC_CONFIG:	/* Obsolete */
@@ -513,7 +558,7 @@ static const struct pz_device mem_kbd_boot = {
 
 void hlt(void)
 {
-    printf("SeaBIOS issued HALT SYSTEM.\n\n");
+    printf("SeaBIOS wants SYSTEM HALT.\n\n");
     asm volatile("\t.word 0xffffffff": : :"memory");
 }
 
@@ -522,8 +567,6 @@ void reset(void)
 	hlt(); // TODO: Reset the machine
 }
 
-
-#define PAGE0 ((volatile struct zeropage *) 0UL)
 
 void __VISIBLE start_parisc_firmware(unsigned long ram_size,
 	unsigned long linux_kernel_entry,
@@ -547,6 +590,8 @@ void __VISIBLE start_parisc_firmware(unsigned long ram_size,
 	memcpy((void*)&(PAGE0->mem_cons), &mem_cons_boot, sizeof(mem_cons_boot));
 	memcpy((void*)&(PAGE0->mem_boot), &mem_boot_boot, sizeof(mem_boot_boot));
 //	memcpy((void*)&(PAGE0->mem_kbd),  &mem_kbd_boot, sizeof(mem_kbd_boot));
+
+	init_stable_storage();
 
 	malloc_preinit();
 	if (iodc_list[0] && hpa_list[0]) // avoid warning
