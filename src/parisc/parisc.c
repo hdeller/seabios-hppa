@@ -66,6 +66,8 @@ static struct drive_s *boot_drive;
 
 static struct pdc_iodc *iodc_list[] = { PARISC_IODC_LIST };
 static unsigned long hpa_list[] = { PARISC_HPA_LIST };
+static struct pdc_system_map_mod_info *mod_info_list[] = { PARISC_MOD_INFO_LIST };
+static struct pdc_module_path *mod_path_list[] = { PARISC_MOD_PATH_LIST };
 
 static int find_hpa_index(unsigned long hpa)
 {
@@ -254,9 +256,10 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 
 	int hpa_index;
 	struct pdc_iodc *iodc_p;
-	struct device_path *devpath;
 	unsigned char *c;
 
+	struct pdc_system_map_mod_info *pdc_mod_info;
+	struct pdc_module_path *mod_path;
 #if 0
 	dprintf(0, "\nSeaBIOS: Start PDC proc %s(%d) option %d result=%x ARG3=%x ", pdc_name(ARG0), ARG0, ARG1, ARG2, ARG3);
 	dprintf(0, "ARG4=%x ARG5=%x ARG6=%x ARG7=%x\n", ARG4, ARG5, ARG6, ARG7);
@@ -422,13 +425,23 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 		case PDC_FIND_MODULE:
 			if (ARG4 >= ARRAY_SIZE(hpa_list))
 				return PDC_NE_MOD; // Module not found
-			result[0] = hpa_list[ARG4]; // mod_addr
-			result[1] = 0; // mod_pgs
-			result[2] = 0; // add_addrs
 
-			devpath = (struct device_path *) ARG3;
-			memset(devpath, 0, sizeof(*devpath));
-			devpath->bc[0] = ARG4;
+			pdc_mod_info = (struct pdc_system_map_mod_info *)ARG2;
+			mod_path = (struct pdc_module_path *)ARG3;
+
+			*pdc_mod_info = *mod_info_list[ARG4];
+			*mod_path = *mod_path_list[ARG4];
+
+			// FIXME: Implement additional addresses
+			pdc_mod_info->add_addrs = 0;
+
+			/* Work around firmware bug. Some device like
+			 * "Merlin+ 132 Dino PS/2 Port" don't set hpa.
+			 */
+			if (!pdc_mod_info->mod_addr) {
+				pdc_mod_info->mod_addr = hpa_list[ARG4];
+				mod_path->path.mod = 1;
+			}
 
 			return PDC_OK;
 		case PDC_FIND_ADDRESS:

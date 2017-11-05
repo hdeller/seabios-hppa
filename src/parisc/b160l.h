@@ -522,82 +522,30 @@ static struct pdc_iodc iodc_data_hpa_fff81000 = {
 	&iodc_data_hpa_ffc00000,\
 	&iodc_data_hpa_fff80000,\
 	&iodc_data_hpa_fff83000,\
-	&iodc_data_hpa_fff8c000,\
-	&iodc_data_hpa_ffd00000,\
-	&iodc_data_hpa_ffd05000,\
-	&iodc_data_hpa_ffd06000,\
-	&iodc_data_hpa_ffd07000,\
-	&iodc_data_hpa_ffd02000,\
-	&iodc_data_hpa_ffd04000,\
-	&iodc_data_hpa_ffd08000,\
-	&iodc_data_hpa_ffd08100,\
-	&iodc_data_hpa_fa000000,\
-	&iodc_data_hpa_f4000000,\
-	&iodc_data_hpa_f8000000,\
 	&iodc_data_hpa_fffbe000,\
 	&iodc_data_hpa_fffbf000,\
-	&iodc_data_hpa_fff81000,\
 	NULL
 
 #define PARISC_HPA_LIST \
 	0xffc00000,\
 	0xfff80000,\
 	0xfff83000,\
-	0xfff8c000,\
-	0xffd00000,\
-	0xffd05000,\
-	0xffd06000,\
-	0xffd07000,\
-	0xffd02000,\
-	0xffd04000,\
-	0xffd08000,\
-	0xffd08100,\
-	0xfa000000,\
-	0xf4000000,\
-	0xf8000000,\
 	0xfffbe000,\
 	0xfffbf000,\
-	0xfff81000,\
 	0UL
 
 #define PARISC_MOD_INFO_LIST \
 	&mod_info_hpa_ffc00000,\
 	&mod_info_hpa_fff80000,\
 	&mod_info_hpa_fff83000,\
-	&mod_info_hpa_fff8c000,\
-	&mod_info_hpa_ffd00000,\
-	&mod_info_hpa_ffd05000,\
-	&mod_info_hpa_ffd06000,\
-	&mod_info_hpa_ffd07000,\
-	&mod_info_hpa_ffd02000,\
-	&mod_info_hpa_ffd04000,\
-	&mod_info_hpa_ffd08000,\
-	&mod_info_hpa_ffd08100,\
-	&mod_info_hpa_fa000000,\
-	&mod_info_hpa_f4000000,\
-	&mod_info_hpa_f8000000,\
 	&mod_info_hpa_fffbe000,\
 	&mod_info_hpa_fffbf000,\
-	&mod_info_hpa_fff81000,\
 	NULL
 
 #define PARISC_MOD_PATH_LIST \
 	&mod_path_hpa_ffc00000,\
 	&mod_path_hpa_fff80000,\
 	&mod_path_hpa_fff83000,\
-	&mod_path_hpa_fff8c000,\
-	&mod_path_hpa_ffd00000,\
-	&mod_path_hpa_ffd05000,\
-	&mod_path_hpa_ffd06000,\
-	&mod_path_hpa_ffd07000,\
-	&mod_path_hpa_ffd02000,\
-	&mod_path_hpa_ffd04000,\
-	&mod_path_hpa_ffd08000,\
-	&mod_path_hpa_ffd08100,\
-	&mod_path_hpa_fa000000,\
-	&mod_path_hpa_f4000000,\
-	&mod_path_hpa_f8000000,\
 	&mod_path_hpa_fffbe000,\
 	&mod_path_hpa_fffbf000,\
-	&mod_path_hpa_fff81000,\
 	NULL
