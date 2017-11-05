@@ -21,13 +21,13 @@
 void pci_config_writel(u16 bdf, u32 addr, u32 val)
 {
     outl(0x80000000 | (bdf << 8) | (addr & 0xfc), PORT_PCI_CMD);
-    outl(val, PORT_PCI_DATA);
+    outl(cpu_to_le32(val), PORT_PCI_DATA);
 }
 
 void pci_config_writew(u16 bdf, u32 addr, u16 val)
 {
     outl(0x80000000 | (bdf << 8) | (addr & 0xfc), PORT_PCI_CMD);
-    outw(val, PORT_PCI_DATA + (addr & 2));
+    outw(cpu_to_le16(val), PORT_PCI_DATA + (addr & 2));
 }
 
 void pci_config_writeb(u16 bdf, u32 addr, u8 val)
@@ -39,13 +39,13 @@ void pci_config_writeb(u16 bdf, u32 addr, u8 val)
 u32 pci_config_readl(u16 bdf, u32 addr)
 {
     outl(0x80000000 | (bdf << 8) | (addr & 0xfc), PORT_PCI_CMD);
-    return inl(PORT_PCI_DATA);
+    return le32_to_cpu(inl(PORT_PCI_DATA));
 }
 
 u16 pci_config_readw(u16 bdf, u32 addr)
 {
     outl(0x80000000 | (bdf << 8) | (addr & 0xfc), PORT_PCI_CMD);
-    return inw(PORT_PCI_DATA + (addr & 2));
+    return le16_to_cpu(inw(PORT_PCI_DATA + (addr & 2)));
 }
 
 u8 pci_config_readb(u16 bdf, u32 addr)
