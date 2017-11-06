@@ -305,6 +305,14 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 		dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_CACHE function %d %x %x %x %x\n", ARG1, ARG2, ARG3, ARG4, ARG5);
 		return PDC_BAD_OPTION;
 	case PDC_HPA:
+		switch (option) {
+		case PDC_HPA_PROCESSOR:
+			result[0] = CPU_HPA;
+			result[1] = 0;
+			return PDC_OK;
+		case PDC_HPA_MODULES:
+			return PDC_BAD_OPTION; // all modules on same board as the processor.
+		}
 		break;
 	case PDC_COPROC:
 		switch (option) {
