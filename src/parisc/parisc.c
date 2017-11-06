@@ -581,14 +581,17 @@ void reset(void)
 }
 
 
-void __VISIBLE start_parisc_firmware(unsigned long ram_size,
-	unsigned long linux_kernel_entry,
-	unsigned long cmdline,
-	unsigned long initrd_start,
-	unsigned long initrd_end)
+void __VISIBLE start_parisc_firmware(void)
 {
 	unsigned int cpu_hz;
 	unsigned char *iplstart, *iplend;
+
+	extern unsigned long boot_args[5];
+	unsigned long ram_size		 = boot_args[0];
+	unsigned long linux_kernel_entry = boot_args[1];
+	unsigned long cmdline		 = boot_args[2];
+	unsigned long initrd_start	 = boot_args[3];
+	unsigned long initrd_end	 = boot_args[4];
 
 	/* Initialize PAGE0 */
 	memset((void*)PAGE0, 0, sizeof(*PAGE0));

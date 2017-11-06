@@ -106,6 +106,14 @@ $bss_loop:
 	/* Initialize the global data pointer */
 	loadgp
 
+	/* Save boot args */
+        load32          BOOTADDR(boot_args),%r1
+        stw,ma          %r26,4(%r1)
+        stw,ma          %r25,4(%r1)
+        stw,ma          %r24,4(%r1)
+        stw,ma          %r23,4(%r1)
+        stw,ma          %r22,4(%r1)
+
 	load32	BOOTADDR(start_parisc_firmware),%r3
 	bv	0(%r3)
 	copy	%r0,%r2
@@ -150,3 +158,12 @@ ENTRY(iodc_entry)
 	bv %r0(%rp)
 	ldw -32(%sp),%r27
 END(iodc_entry)
+
+	.data
+ENTRY(boot_args)
+        .word 0 /* arg0: ramsize */
+        .word 0 /* arg1: kernel entry point */
+        .word 0 /* arg2: cmdline */
+        .word 0 /* arg3: initrd_start */
+        .word 0 /* arg4: initrd_end */
+END(boot_args)
