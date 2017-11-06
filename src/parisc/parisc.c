@@ -20,6 +20,10 @@
 #include "parisc/pdc.h"
 #include "parisc/b160l.h"
 
+/*
+ * Various variables which are needed by x86 code.
+ * Defined here to be able to link seabios.
+ */
 int HaveRunPost;
 u8 ExtraStack[BUILD_EXTRA_STACK_SIZE+1] __aligned(8);
 u8 *StackPos;
@@ -48,9 +52,14 @@ void cpuid(u32 index, u32 *eax, u32 *ebx, u32 *ecx, u32 *edx)
 
 void wrmsr_smp(u32 index, u64 val) { }
 
-/* zero-page of PA-RISC */
+/********************************************************
+ * PA-RISC specific constants and functions.
+ ********************************************************/
+
+/* Pointer to zero-page of PA-RISC */
 #define PAGE0 ((volatile struct zeropage *) 0UL)
 
+/* args as handed over for firmware calls */
 #define ARG0 arg[7-0]
 #define ARG1 arg[7-1]
 #define ARG2 arg[7-2]
@@ -60,7 +69,23 @@ void wrmsr_smp(u32 index, u64 val) { }
 #define ARG6 arg[7-6]
 #define ARG7 arg[7-7]
 
-/*********** IODC ******/
+/* size of I/O block used in HP firmware */
+#define FW_BLOCKSIZE    2048
+
+void hlt(void)
+{
+    printf("SeaBIOS wants SYSTEM HALT.\n\n");
+    asm volatile("\t.word 0xffffffff": : :"memory");
+}
+
+void reset(void)
+{
+	hlt(); // TODO: Reset the machine
+}
+
+/********************************************************
+ * FIRMWARE IO Dependent Code (IODC) HANDLER
+ ********************************************************/
 
 static struct drive_s *boot_drive;
 
@@ -80,7 +105,7 @@ static int find_hpa_index(unsigned long hpa)
 
 
 #define SERIAL_TIMEOUT 20
-unsigned long parisc_serial_in(char *c, unsigned long maxchars)
+static unsigned long parisc_serial_in(char *c, unsigned long maxchars)
 {
 	const portaddr_t addr = DINO_UART_HPA+0x800;
 	unsigned long end = timer_calc(SERIAL_TIMEOUT);
@@ -152,7 +177,10 @@ int __VISIBLE parisc_iodc_entry(unsigned int *arg)
 	return PDC_BAD_OPTION;
 }
 
-/*********** PDC *******/
+
+/********************************************************
+ * FIRMWARE PDC HANDLER
+ ********************************************************/
 
 #define STABLE_STORAGE_SIZE	256
 static unsigned char stable_storage[STABLE_STORAGE_SIZE];
@@ -171,7 +199,12 @@ static void init_stable_storage(void)
 }
 
 
-/* https://codereview.stackexchange.com/questions/38275/convert-between-date-time-and-time-stamp-without-using-standard-library-routines */
+/*
+ * Trivial time conversion helper functions.
+ * Not accurate before year 2000 and beyond year 2099.
+ * Taken from:
+ * https://codereview.stackexchange.com/questions/38275/convert-between-date-time-and-time-stamp-without-using-standard-library-routines
+ */
 
 static unsigned short days[4][12] =
 {
@@ -200,7 +233,7 @@ static unsigned long seconds_since_1970(void)
 			*60+second + SECONDS_2000_JAN_1;
 }
 
-char *pdc_name(unsigned long num)
+static const char *pdc_name(unsigned long num)
 {
 	#define DO(x) if (num == x) return #x;
 	DO(PDC_POW_FAIL)
@@ -475,14 +508,14 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 	return PDC_BAD_PROC;
 }
 
-/*********** BOOT MENU *******/
+
+/********************************************************
+ * BOOT MENU
+ ********************************************************/
 
 extern struct drive_s *select_parisc_boot_drive(void);
 
-/* size of I/O block used in HP firmware */
-#define FW_BLOCKSIZE    2048
-
-int parisc_boot_menu(unsigned char **iplstart, unsigned char **iplend)
+static int parisc_boot_menu(unsigned char **iplstart, unsigned char **iplend)
 {
 	int ret;
 	unsigned int *target = (void *)0x60000; // bug in palo: 0xa0000 crashes.
@@ -552,7 +585,9 @@ int parisc_boot_menu(unsigned char **iplstart, unsigned char **iplend)
 }
 
 
-/*********** MAIN *******/
+/********************************************************
+ * FIRMWARE MAIN ENTRY POINT
+ ********************************************************/
 
 extern char pdc_entry;
 extern char iodc_entry;
@@ -577,18 +612,6 @@ static const struct pz_device mem_kbd_boot = {
 	.cl_class = CL_KEYBD,
 };
 
-void hlt(void)
-{
-    printf("SeaBIOS wants SYSTEM HALT.\n\n");
-    asm volatile("\t.word 0xffffffff": : :"memory");
-}
-
-void reset(void)
-{
-	hlt(); // TODO: Reset the machine
-}
-
-
 void __VISIBLE start_parisc_firmware(void)
 {
 	unsigned int cpu_hz;
@@ -605,7 +628,7 @@ void __VISIBLE start_parisc_firmware(void)
 	memset((void*)PAGE0, 0, sizeof(*PAGE0));
 	PAGE0->memc_cont = ram_size;
 	PAGE0->memc_phsize = ram_size;
-	PAGE0->mem_free = 4*4096; // 16k ??
+	PAGE0->mem_free = 0x6000;	// 4*4096; // 16k ??
 	PAGE0->mem_hpa = CPU_HPA; // /* HPA of boot-CPU */
 	PAGE0->mem_pdc = (unsigned long) &pdc_entry;
 	PAGE0->mem_10msec = CPU_CLOCK_MHZ*(1000000ULL/100);
@@ -667,14 +690,50 @@ void __VISIBLE start_parisc_firmware(void)
 		hlt(); /* this ends the emulator */
 	}
 
+	printf("Firmware Version  6.1\n"
+		"\n"
+		"Duplex Console IO Dependent Code (IODC) revision 1\n"
+		"\n"
+		"Memory Test/Initialization Completed\n\n");
+	printf("------------------------------------------------------------------------------\n"
+		"   (c) Copyright 1995-1998, Hewlett-Packard Company, All rights reserved\n"
+		"------------------------------------------------------------------------------\n\n");
+	printf("  Processor   Speed            State           Coprocessor State  Cache Size\n"
+		"  ---------  --------   ---------------------  -----------------  ----------\n"
+		"      0      " __stringify(CPU_CLOCK_MHZ) " MHz    Active                 Functional          64 KB\n"
+		"                                                                    1 MB ext\n\n\n");
+	printf("  Available memory (bytes)    :  %llu\n"
+		"  Good memory required (bytes):  134217728\n\n", (unsigned long long)ram_size);
+	printf("  Primary boot path:    FWSCSI.6.0\n"
+		"  Alternate boot path:  LAN.0.0.0.0.0.0\n"
+		"  Console path:         SERIAL_1.9600.8.none\n"
+		"  Keyboard path:        PS2\n\n");
+#if 0
+	printf("------- Main Menu -------------------------------------------------------------\n\n"
+		"        Command                         Description\n"
+		"        -------                         -----------\n"
+		"        BOot [PRI|ALT|<path>]           Boot from specified path\n"
+		"        PAth [PRI|ALT|CON|KEY] [<path>] Display or modify a path\n"
+		"        SEArch [DIsplay|IPL] [<path>]   Search for boot devices\n\n"
+		"        COnfiguration [<command>]       Access Configuration menu/commands\n"
+		"        INformation [<command>]         Access Information menu/commands\n"
+		"        SERvice [<command>]             Access Service menu/commands\n\n"
+		"        DIsplay                         Redisplay the current menu\n"
+		"        HElp [<menu>|<command>]         Display help for menu or command\n"
+		"        RESET                           Restart the system\n"
+		"-------\n"
+		"Main Menu: Enter command > ");
+#endif
+
 	/* check for bootable drives, and load and start IPL bootloader if possible */
 	if (parisc_boot_menu(&iplstart, &iplend)) {
 		void (*start_ipl)(long interactive, long mem_free);
 
-		printf("\nStarting IPL boot code from boot medium.\n\n");
+		printf("\nBooting...\n"
+			"Boot IO Dependent Code (IODC) revision 153\n\n"
+			"HARD Booted.\n");
 		start_ipl = (void *) iplstart;
 		start_ipl(0, (long)iplend); // first parameter: 1=interactive, 0=non-interactive
-		hlt(); /* this ends the emulator */
 	}
 
 	hlt(); /* this ends the emulator */
