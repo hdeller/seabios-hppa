@@ -492,12 +492,33 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 		break;
 	case PDC_SOFT_POWER: // don't have a soft-power switch
 		return PDC_BAD_PROC;
+	case 26: // PDC_SCSI_PARMS is the architected firmware interface to replace the Hversion PDC_INITIATOR procedure.
+		return PDC_BAD_PROC;
 	case PDC_BROADCAST_RESET:
 		dprintf(0, "\n\nSeaBIOS: PDC_BROADCAST_RESET (reset system) called with ARG3=%x ARG4=%x\n", ARG3, ARG4);
 		hlt();
 		return PDC_OK;
 	case PDC_PCI_INDEX: // not needed for Dino PCI bridge
 		return PDC_BAD_PROC;
+	case PDC_INITIATOR:
+		switch (option) {
+		case PDC_GET_INITIATOR:
+			// ARG3 has hwpath
+			result[0] = 7; // host_id: 7 to 15 ?
+			result[1] = 40; // 1, 2, 5 or 10 for 5, 10, 20 or 40 MT/s
+			result[2] = 0; // ??
+			result[3] = 0; // ??
+			result[4] = 0; // width: 0:"Narrow, 1:"Wide"
+			result[5] = 0; // mode: 0:SMODE_SE, 1:SMODE_HVD, 2:SMODE_LVD
+			return PDC_OK;
+		case PDC_SET_INITIATOR:
+		case PDC_DELETE_INITIATOR:
+		case PDC_RETURN_TABLE_SIZE:
+		case PDC_RETURN_TABLE:
+			break;
+		}
+		dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_INITIATOR function %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
+		return PDC_BAD_OPTION;
 	}
 
 	dprintf(0, "\nSeaBIOS: Unimplemented PDC proc %s(%d) option %d result=%x ARG3=%x ",
