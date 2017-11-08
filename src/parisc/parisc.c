@@ -494,6 +494,13 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 		return PDC_BAD_PROC;
 	case 26: // PDC_SCSI_PARMS is the architected firmware interface to replace the Hversion PDC_INITIATOR procedure.
 		return PDC_BAD_PROC;
+	case PDC_IO:
+		switch (option) {
+		case PDC_IO_RESET:
+		case PDC_IO_RESET_DEVICES:
+			return PDC_OK;
+		}
+		break;
 	case PDC_BROADCAST_RESET:
 		dprintf(0, "\n\nSeaBIOS: PDC_BROADCAST_RESET (reset system) called with ARG3=%x ARG4=%x\n", ARG3, ARG4);
 		hlt();
