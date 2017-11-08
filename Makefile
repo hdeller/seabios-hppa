@@ -1,6 +1,7 @@
-# SeaBIOS build system
+# SeaBIOS build system for PA-RISC
 #
 # Copyright (C) 2008-2012  Kevin O'Connor <kevin@koconnor.net>
+# Copyright (C) 2017  Helge Deller <deller@gmx.de> for PA-RISC
 #
 # This file may be distributed under the terms of the GNU LGPLv3 license.
 
@@ -48,8 +49,16 @@ SRC32FLAT=$(SRCBOTH) post.c e820map.c romfile.c optionroms.c \
     fw/acpi.c fw/mptable.c fw/pirtable.c fw/smbios.c fw/romfile_loader.c \
     hw/virtio-ring.c hw/virtio-pci.c hw/virtio-blk.c hw/virtio-scsi.c \
     hw/tpm_drivers.c hw/nvme.c \
-    version.c parisc/malloc.c parisc/parisc.c
+    version.c parisc/malloc.c parisc/parisc.c parisc/sti.c
 DIRS=src src/hw src/fw vgasrc src/parisc
+
+# VGA src files
+SRCVGA=vgasrc/vgainit.c vgasrc/vgabios.c vgasrc/vgafb.c vgasrc/swcursor.c \
+    vgasrc/vgafonts.c vgasrc/vbe.c \
+    vgasrc/stdvga.c vgasrc/stdvgamodes.c vgasrc/stdvgaio.c \
+    vgasrc/clext.c vgasrc/bochsvga.c  \
+    vgasrc/cbvga.c
+
 
 # Default compiler flags
 cc-option=$(shell if test -z "`$(1) $(2) -S -o /dev/null -xc /dev/null 2>&1`" \
@@ -59,7 +68,7 @@ EXTRAVERSION=
 
 CPPFLAGS = -P -MD -MT $@
 
-COMMONCFLAGS := -I$(OUT) -Isrc -Os -MD -g \
+COMMONCFLAGS := -I$(OUT) -Isrc -Ivgasrc -Os -MD -g \
     -Wall -Wno-strict-aliasing -Wold-style-definition \
     $(call cc-option,$(CC),-Wtype-limits,) \
     -fomit-frame-pointer \
@@ -74,6 +83,7 @@ COMMONCFLAGS += $(call cc-option,$(CC),-mfast-indirect-calls,)
 COMMA := ,
 
 CFLAGS32FLAT := $(COMMONCFLAGS) -DMODE16=0 -DMODESEGMENT=0
+CFLAGS16     := $(CFLAGS32FLAT) -I$(OUT)
 
 # Run with "make V=1" to see the actual compile commands
 ifdef V
@@ -88,9 +98,6 @@ endif
 
 target-y :=
 target-$(CONFIG_QEMU) += $(OUT)bios.bin
-target-$(CONFIG_CSM) += $(OUT)Csm16.bin
-target-$(CONFIG_COREBOOT) += $(OUT)bios.bin.elf
-target-$(CONFIG_BUILD_VGABIOS) += $(OUT)vgabios.bin
 
 all: $(target-y)
 
@@ -148,71 +155,16 @@ $(OUT)asm-offsets.h: $(OUT)src/asm-offsets.s
 	@echo "  Generating offset file $@"
 	$(Q)./scripts/gen-offsets.sh $< $@
 
-$(OUT)ccode32flat.o: $(OUT)autoversion.h $(OUT)autoconf.h $(patsubst %.c, $(OUT)src/%.o,$(SRC32FLAT)) ; $(call whole-compile, $(CFLAGS32FLAT), $(addprefix src/, $(SRC32FLAT)),$@)
+$(OUT)ccode32flat.o: $(OUT)autoversion.h $(OUT)autoconf.h $(patsubst %.c, $(OUT)src/%.o,$(SRC32FLAT)) ; $(call whole-compile, $(CFLAGS32FLAT), $(addprefix src/, $(SRC32FLAT)) $(SRCVGA),$@)
 
 $(OUT)autoversion.h:
 	$(Q)$(PYTHON) ./scripts/buildversion.py -e "$(EXTRAVERSION)" -t "$(CC);$(AS);$(LD);$(OBJCOPY);$(OBJDUMP);$(STRIP)" $(OUT)autoversion.h
 
-$(OUT)bios.bin: $(OUT)head.o $(OUT)ccode32flat.o src/version.c
+$(OUT)bios.bin: $(OUT)autoconf.h $(OUT)head.o $(OUT)ccode32flat.o src/version.c
 	@echo "  Linking $@"
 	$(Q)$(CPP) $(CPPFLAGS) -Isrc -D__ASSEMBLY__ src/parisc/pafirmware.lds.S -o $(OUT)pafirmware.lds
 	$(Q)$(CC) $(CFLAGS32FLAT) -c src/version.c -o $(OUT)version.o
 	$(Q)$(LD) -N -T $(OUT)pafirmware.lds $(OUT)head.o $(OUT)version.o -X -o $@ -e startup --as-needed $(OUT)ccode32flat.o $(LIBGCC)
-
-################ VGA build rules
-
-# VGA src files
-SRCVGA=src/output.c src/string.c src/hw/pci.c src/hw/serialio.c \
-    vgasrc/vgainit.c vgasrc/vgabios.c vgasrc/vgafb.c vgasrc/swcursor.c \
-    vgasrc/vgafonts.c vgasrc/vbe.c \
-    vgasrc/stdvga.c vgasrc/stdvgamodes.c vgasrc/stdvgaio.c \
-    vgasrc/clext.c vgasrc/bochsvga.c vgasrc/geodevga.c \
-    src/fw/coreboot.c vgasrc/cbvga.c
-
-ifeq "$(CONFIG_VGA_FIXUP_ASM)" "y"
-$(OUT)vgaccode16.raw.s: $(OUT)autoconf.h $(patsubst %.c, $(OUT)%.o,$(SRCVGA)) ; $(call whole-compile, $(filter-out -fomit-frame-pointer,$(CFLAGS16)) -fno-omit-frame-pointer -S -Isrc, $(SRCVGA),$@)
-
-$(OUT)vgaccode16.o: $(OUT)vgaccode16.raw.s scripts/vgafixup.py
-	@echo "  Fixup VGA rom assembler"
-	$(Q)$(PYTHON) ./scripts/vgafixup.py $< $(OUT)vgaccode16.s
-	$(Q)$(AS) --32 src/code16gcc.s $(OUT)vgaccode16.s -o $@
-else
-$(OUT)vgaccode16.o: $(OUT)autoconf.h $(patsubst %.c, $(OUT)%.o,$(SRCVGA)) ; $(call whole-compile, $(CFLAGS16) -Isrc, $(SRCVGA),$@)
-endif
-
-$(OUT)vgaentry.o: vgasrc/vgaentry.S $(OUT)autoconf.h $(OUT)asm-offsets.h
-	@echo "  Compiling (16bit) $@"
-	$(Q)$(CC) $(CFLAGS16) -c -D__ASSEMBLY__ $< -o $@
-
-$(OUT)vgarom.o: $(OUT)vgaccode16.o $(OUT)vgaentry.o $(OUT)vgasrc/vgalayout.lds vgasrc/vgaversion.c scripts/buildversion.py
-	@echo "  Linking $@"
-	$(Q)$(PYTHON) ./scripts/buildversion.py -e "$(EXTRAVERSION)" -t "$(CC);$(AS);$(LD);$(OBJCOPY);$(OBJDUMP);$(STRIP)" $(OUT)autovgaversion.h
-	$(Q)$(CC) $(CFLAGS16) -c vgasrc/vgaversion.c -o $(OUT)vgaversion.o
-	$(Q)$(LD) --gc-sections -T $(OUT)vgasrc/vgalayout.lds $(OUT)vgaccode16.o $(OUT)vgaentry.o $(OUT)vgaversion.o -o $@
-
-$(OUT)vgabios.bin.raw: $(OUT)vgarom.o
-	@echo "  Extracting binary $@"
-	$(Q)$(OBJCOPY) -O binary $< $@
-
-$(OUT)vgabios.bin: $(OUT)vgabios.bin.raw scripts/buildrom.py
-	@echo "  Finalizing rom $@"
-	$(Q)$(PYTHON) ./scripts/buildrom.py $< $@
-
-
-################ DSDT build rules
-
-iasl-option=$(shell if test -z "`$(1) $(2) 2>&1 > /dev/null`" \
-    ; then echo "$(2)"; else echo "$(3)"; fi ;)
-
-%.hex: %.dsl ./scripts/acpi_extract_preprocess.py ./scripts/acpi_extract.py
-	@echo "  Compiling IASL $@"
-	$(Q)$(CPP) $(CPPFLAGS) $< -o $(OUT)$*.dsl.i.orig
-	$(Q)$(PYTHON) ./scripts/acpi_extract_preprocess.py $(OUT)$*.dsl.i.orig > $(OUT)$*.dsl.i
-	$(Q)$(IASL) $(call iasl-option,$(IASL),-Pn,) -vs -l -tc -p $(OUT)$* $(OUT)$*.dsl.i
-	$(Q)$(PYTHON) ./scripts/acpi_extract.py $(OUT)$*.lst > $(OUT)$*.off
-	$(Q)cat $(OUT)$*.off > $@
-
-iasl: src/fw/acpi-dsdt.hex src/fw/ssdt-proc.hex src/fw/ssdt-pcihp.hex src/fw/ssdt-misc.hex
 
 ################ Kconfig rules
 

@@ -5,6 +5,7 @@
  */
 
 #include "parisc/hppa_hardware.h"
+#include "autoconf.h"
 
 	/* load 32-bit 'value' into 'reg' compensating for the ldil
 	 * sign-extension when running in wide mode.
@@ -167,3 +168,44 @@ ENTRY(boot_args)
         .word 0 /* arg3: initrd_start */
         .word 0 /* arg4: initrd_end */
 END(boot_args)
+
+
+/****************************************************************
+ * Rom Header for VGA / STI
+ ****************************************************************/
+
+#ifdef CONFIG_BUILD_VGABIOS
+
+        .section .rom.header
+        .global _rom_header, _rom_header_size, _rom_header_checksum
+_rom_header:
+        .word 0xaa55
+_rom_header_size:
+        .byte 0
+_rom_header_entry:
+        .word _optionrom_entry  // b,n ?
+_rom_header_checksum:
+        .byte 0
+_rom_header_other:
+        .space 17
+_rom_header_pcidata:
+#if CONFIG_VGA_PCI == 1
+        .word rom_pci_data
+#else
+        .word 0
+#endif
+_rom_header_pnpdata:
+        .word 0
+_rom_header_other2:
+        .word 0
+_rom_header_signature:
+        .asciz "IBM"
+
+
+ENTRY(_optionrom_entry)
+	.import vga_post
+	load32 BOOTADDR(vga_post), %r1
+	bv,n %r0(%r1)
+END(_optionrom_entry)
+
+#endif /* CONFIG_BUILD_VGABIOS */

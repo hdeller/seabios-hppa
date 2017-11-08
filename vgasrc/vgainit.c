@@ -60,6 +60,7 @@ allocate_extra_stack(void)
         dprintf(1, "Attempting to allocate VGA stack via pmm call to %04x:%04x\n"
                 , entry.seg, entry.offset);
         u16 res1, res2;
+#if !CONFIG_PARISC
         asm volatile(
             "pushl %0\n"
             "pushw $(8|1)\n"            // Permanent low memory request
@@ -71,6 +72,7 @@ allocate_extra_stack(void)
             "cli\n"
             "cld\n"
             : "+r" (entry.segoff), "=a" (res1), "=d" (res2) : : "cc", "memory");
+#endif
         u32 res = res1 | (res2 << 16);
         if (!res || res == PMM_FUNCTION_NOT_SUPPORTED)
             return;
@@ -137,7 +139,11 @@ init_bios_area(void)
 int VgaBDF VAR16 = -1;
 int HaveRunInit VAR16;
 
+#if CONFIG_PARISC
+void __VISIBLE
+#else
 void VISIBLE16
+#endif
 vga_post(struct bregs *regs)
 {
     serial_debug_preinit();

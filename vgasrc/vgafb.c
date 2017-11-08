@@ -190,6 +190,9 @@ gfx_packed(struct gfx_op *op)
 static void
 memcpy_high(void *dest, void *src, u32 len)
 {
+#if CONFIG_PARISC
+    memcpy(dest, src, len);
+#else
     u64 gdt[6];
     gdt[2] = GDT_DATA | GDT_LIMIT(0xfffff) | GDT_BASE((u32)src);
     gdt[3] = GDT_DATA | GDT_LIMIT(0xfffff) | GDT_BASE((u32)dest);
@@ -209,6 +212,7 @@ memcpy_high(void *dest, void *src, u32 len)
         "popl %0\n"
         : "=r" (flags), "+a" (eax), "+S" (si), "+c" (len)
         : : "cc", "memory");
+#endif
 }
 
 static void

@@ -20,6 +20,8 @@
 #include "parisc/pdc.h"
 #include "parisc/b160l.h"
 
+#include "vgabios.h"
+
 /*
  * Various variables which are needed by x86 code.
  * Defined here to be able to link seabios.
@@ -87,18 +89,52 @@ void reset(void)
  * FIRMWARE IO Dependent Code (IODC) HANDLER
  ********************************************************/
 
-static struct drive_s *boot_drive;
+typedef struct {
+	unsigned long hpa;
+	struct pdc_iodc *iodc;
+	struct pdc_system_map_mod_info *mod_info;
+	struct pdc_module_path *mod_path;
+	int num_addr;
+	int add_addr[5];
+} hppa_device_t;
 
-static struct pdc_iodc *iodc_list[] = { PARISC_IODC_LIST };
-static unsigned long hpa_list[] = { PARISC_HPA_LIST };
-static struct pdc_system_map_mod_info *mod_info_list[] = { PARISC_MOD_INFO_LIST };
-static struct pdc_module_path *mod_path_list[] = { PARISC_MOD_PATH_LIST };
+static hppa_device_t parisc_devices[] = { PARISC_DEVICE_LIST };
+
+#define PARISC_KEEP_LIST \
+       0xffc00000,\
+       0xfff80000,\
+       0xfff83000,\
+       0xfffbe000,\
+       0xfffbf000,\
+
+/* drop all devices which are not listed in PARISC_KEEP_LIST */
+static void remove_parisc_devices(void)
+{
+	static unsigned long keep_list[] = { PARISC_KEEP_LIST };
+	int i,p, t;
+	i = p = t = 0;
+	while (keep_list[i] && parisc_devices[p].hpa) {
+		if (parisc_devices[p].hpa == keep_list[i]) {
+			parisc_devices[t++] = parisc_devices[p];
+			i++;
+		}
+		p++;
+	}
+	while (t < ARRAY_SIZE(parisc_devices)) {
+		memset(&parisc_devices[t], 0, sizeof(parisc_devices[0]));
+		t++;
+	}
+}
+
+static struct drive_s *boot_drive;
 
 static int find_hpa_index(unsigned long hpa)
 {
 	int i;
-	for (i = 0; i < (ARRAY_SIZE(hpa_list)-1); i++)
-		if (hpa == hpa_list[i])
+	if (!hpa)
+		return -1;
+	for (i = 0; i < (ARRAY_SIZE(parisc_devices)-1); i++)
+		if (hpa == parisc_devices[i].hpa)
 			return i;
 	return -1;
 }
@@ -368,7 +404,7 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 				hpa_index = find_hpa_index(ARG3); // index in hpa list
 				if (hpa_index < 0)
 					return -3; // not found
-				iodc_p = iodc_list[hpa_index];
+				iodc_p = parisc_devices[hpa_index].iodc;
 			}
 
 			if (ARG4 == PDC_IODC_RI_DATA_BYTES) {
@@ -464,14 +500,16 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 		// dprintf(0, "\n\nSeaBIOS: Info: PDC_SYSTEM_MAP function %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
 		switch (option) {
 		case PDC_FIND_MODULE:
-			if (ARG4 >= ARRAY_SIZE(hpa_list))
+			if (ARG4 >= ARRAY_SIZE(parisc_devices))
+				return PDC_NE_MOD; // Module not found
+			if (!parisc_devices[ARG4].hpa)
 				return PDC_NE_MOD; // Module not found
 
 			pdc_mod_info = (struct pdc_system_map_mod_info *)ARG2;
 			mod_path = (struct pdc_module_path *)ARG3;
 
-			*pdc_mod_info = *mod_info_list[ARG4];
-			*mod_path = *mod_path_list[ARG4];
+			*pdc_mod_info = *parisc_devices[ARG4].mod_info;
+			*mod_path = *parisc_devices[ARG4].mod_path;
 
 			// FIXME: Implement additional addresses
 			pdc_mod_info->add_addrs = 0;
@@ -480,7 +518,7 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 			 * "Merlin+ 132 Dino PS/2 Port" don't set hpa.
 			 */
 			if (!pdc_mod_info->mod_addr) {
-				pdc_mod_info->mod_addr = hpa_list[ARG4];
+				pdc_mod_info->mod_addr = parisc_devices[ARG4].hpa;
 				mod_path->path.mod = 1;
 			}
 
@@ -652,6 +690,9 @@ void __VISIBLE start_parisc_firmware(void)
 	unsigned long initrd_start	 = boot_args[3];
 	unsigned long initrd_end	 = boot_args[4];
 
+	/* Initialize device list */
+	remove_parisc_devices();
+
 	/* Initialize PAGE0 */
 	memset((void*)PAGE0, 0, sizeof(*PAGE0));
 	PAGE0->memc_cont = ram_size;
@@ -669,8 +710,6 @@ void __VISIBLE start_parisc_firmware(void)
 	init_stable_storage();
 
 	malloc_preinit();
-	if (iodc_list[0] && hpa_list[0]) // avoid warning
-		iplstart = 0;
 
 	// set Qemu serial debug port
 	DebugOutputPort = PORT_SERIAL1;
@@ -702,6 +741,11 @@ void __VISIBLE start_parisc_firmware(void)
 	// coreboot_preinit();
 
 	pci_setup();
+
+	// We don't have VGA BIOS, so init now.
+	// vga_post();
+	// vga_set_mode(3,0);
+
 	serial_setup();
 	block_setup();
 

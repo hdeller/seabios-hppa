@@ -518,34 +518,113 @@ static struct pdc_iodc iodc_data_hpa_fff81000 = {
 #define HPA_fff81000_num_addr 0
 #define HPA_fff81000_add_addr 0
 
-#define PARISC_IODC_LIST \
-	&iodc_data_hpa_ffc00000,\
-	&iodc_data_hpa_fff80000,\
-	&iodc_data_hpa_fff83000,\
-	&iodc_data_hpa_fffbe000,\
-	&iodc_data_hpa_fffbf000,\
-	NULL
-
-#define PARISC_HPA_LIST \
-	0xffc00000,\
-	0xfff80000,\
-	0xfff83000,\
-	0xfffbe000,\
-	0xfffbf000,\
-	0UL
-
-#define PARISC_MOD_INFO_LIST \
-	&mod_info_hpa_ffc00000,\
-	&mod_info_hpa_fff80000,\
-	&mod_info_hpa_fff83000,\
-	&mod_info_hpa_fffbe000,\
-	&mod_info_hpa_fffbf000,\
-	NULL
-
-#define PARISC_MOD_PATH_LIST \
-	&mod_path_hpa_ffc00000,\
-	&mod_path_hpa_fff80000,\
-	&mod_path_hpa_fff83000,\
-	&mod_path_hpa_fffbe000,\
-	&mod_path_hpa_fffbf000,\
-	NULL
+#define PARISC_DEVICE_LIST \
+	{	.hpa = 0xffc00000,\
+		.iodc = &iodc_data_hpa_ffc00000,\
+		.mod_info = &mod_info_hpa_ffc00000,\
+		.mod_path = &mod_path_hpa_ffc00000,\
+		.num_addr = HPA_ffc00000_num_addr,\
+		.add_addr = { HPA_ffc00000_add_addr } },\
+	{	.hpa = 0xfff80000,\
+		.iodc = &iodc_data_hpa_fff80000,\
+		.mod_info = &mod_info_hpa_fff80000,\
+		.mod_path = &mod_path_hpa_fff80000,\
+		.num_addr = HPA_fff80000_num_addr,\
+		.add_addr = { HPA_fff80000_add_addr } },\
+	{	.hpa = 0xfff83000,\
+		.iodc = &iodc_data_hpa_fff83000,\
+		.mod_info = &mod_info_hpa_fff83000,\
+		.mod_path = &mod_path_hpa_fff83000,\
+		.num_addr = HPA_fff83000_num_addr,\
+		.add_addr = { HPA_fff83000_add_addr } },\
+	{	.hpa = 0xfff8c000,\
+		.iodc = &iodc_data_hpa_fff8c000,\
+		.mod_info = &mod_info_hpa_fff8c000,\
+		.mod_path = &mod_path_hpa_fff8c000,\
+		.num_addr = HPA_fff8c000_num_addr,\
+		.add_addr = { HPA_fff8c000_add_addr } },\
+	{	.hpa = 0xffd00000,\
+		.iodc = &iodc_data_hpa_ffd00000,\
+		.mod_info = &mod_info_hpa_ffd00000,\
+		.mod_path = &mod_path_hpa_ffd00000,\
+		.num_addr = HPA_ffd00000_num_addr,\
+		.add_addr = { HPA_ffd00000_add_addr } },\
+	{	.hpa = 0xffd05000,\
+		.iodc = &iodc_data_hpa_ffd05000,\
+		.mod_info = &mod_info_hpa_ffd05000,\
+		.mod_path = &mod_path_hpa_ffd05000,\
+		.num_addr = HPA_ffd05000_num_addr,\
+		.add_addr = { HPA_ffd05000_add_addr } },\
+	{	.hpa = 0xffd06000,\
+		.iodc = &iodc_data_hpa_ffd06000,\
+		.mod_info = &mod_info_hpa_ffd06000,\
+		.mod_path = &mod_path_hpa_ffd06000,\
+		.num_addr = HPA_ffd06000_num_addr,\
+		.add_addr = { HPA_ffd06000_add_addr } },\
+	{	.hpa = 0xffd07000,\
+		.iodc = &iodc_data_hpa_ffd07000,\
+		.mod_info = &mod_info_hpa_ffd07000,\
+		.mod_path = &mod_path_hpa_ffd07000,\
+		.num_addr = HPA_ffd07000_num_addr,\
+		.add_addr = { HPA_ffd07000_add_addr } },\
+	{	.hpa = 0xffd02000,\
+		.iodc = &iodc_data_hpa_ffd02000,\
+		.mod_info = &mod_info_hpa_ffd02000,\
+		.mod_path = &mod_path_hpa_ffd02000,\
+		.num_addr = HPA_ffd02000_num_addr,\
+		.add_addr = { HPA_ffd02000_add_addr } },\
+	{	.hpa = 0xffd04000,\
+		.iodc = &iodc_data_hpa_ffd04000,\
+		.mod_info = &mod_info_hpa_ffd04000,\
+		.mod_path = &mod_path_hpa_ffd04000,\
+		.num_addr = HPA_ffd04000_num_addr,\
+		.add_addr = { HPA_ffd04000_add_addr } },\
+	{	.hpa = 0xffd08000,\
+		.iodc = &iodc_data_hpa_ffd08000,\
+		.mod_info = &mod_info_hpa_ffd08000,\
+		.mod_path = &mod_path_hpa_ffd08000,\
+		.num_addr = HPA_ffd08000_num_addr,\
+		.add_addr = { HPA_ffd08000_add_addr } },\
+	{	.hpa = 0xffd08100,\
+		.iodc = &iodc_data_hpa_ffd08100,\
+		.mod_info = &mod_info_hpa_ffd08100,\
+		.mod_path = &mod_path_hpa_ffd08100,\
+		.num_addr = HPA_ffd08100_num_addr,\
+		.add_addr = { HPA_ffd08100_add_addr } },\
+	{	.hpa = 0xfa000000,\
+		.iodc = &iodc_data_hpa_fa000000,\
+		.mod_info = &mod_info_hpa_fa000000,\
+		.mod_path = &mod_path_hpa_fa000000,\
+		.num_addr = HPA_fa000000_num_addr,\
+		.add_addr = { HPA_fa000000_add_addr } },\
+	{	.hpa = 0xf4000000,\
+		.iodc = &iodc_data_hpa_f4000000,\
+		.mod_info = &mod_info_hpa_f4000000,\
+		.mod_path = &mod_path_hpa_f4000000,\
+		.num_addr = HPA_f4000000_num_addr,\
+		.add_addr = { HPA_f4000000_add_addr } },\
+	{	.hpa = 0xf8000000,\
+		.iodc = &iodc_data_hpa_f8000000,\
+		.mod_info = &mod_info_hpa_f8000000,\
+		.mod_path = &mod_path_hpa_f8000000,\
+		.num_addr = HPA_f8000000_num_addr,\
+		.add_addr = { HPA_f8000000_add_addr } },\
+	{	.hpa = 0xfffbe000,\
+		.iodc = &iodc_data_hpa_fffbe000,\
+		.mod_info = &mod_info_hpa_fffbe000,\
+		.mod_path = &mod_path_hpa_fffbe000,\
+		.num_addr = HPA_fffbe000_num_addr,\
+		.add_addr = { HPA_fffbe000_add_addr } },\
+	{	.hpa = 0xfffbf000,\
+		.iodc = &iodc_data_hpa_fffbf000,\
+		.mod_info = &mod_info_hpa_fffbf000,\
+		.mod_path = &mod_path_hpa_fffbf000,\
+		.num_addr = HPA_fffbf000_num_addr,\
+		.add_addr = { HPA_fffbf000_add_addr } },\
+	{	.hpa = 0xfff81000,\
+		.iodc = &iodc_data_hpa_fff81000,\
+		.mod_info = &mod_info_hpa_fff81000,\
+		.mod_path = &mod_path_hpa_fff81000,\
+		.num_addr = HPA_fff81000_num_addr,\
+		.add_addr = { HPA_fff81000_add_addr } },\
+	{ 0, }
