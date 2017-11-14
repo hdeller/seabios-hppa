@@ -87,13 +87,17 @@ screenc(char c)
             break;
         }
     }
-#else
+#endif
     struct bregs br;
-    memset(&br, 0, sizeof(br));
+    // memset(&br, 0, sizeof(br));
     br.flags = F_IF;
     br.ah = 0x0e;
     br.al = c;
     br.bl = 0x07;
+#if CONFIG_PARISC
+    extern void parisc_teletype_output(struct bregs *regs);
+    parisc_teletype_output(&br);
+#else
     call16_int(0x10, &br);
 #endif
 }

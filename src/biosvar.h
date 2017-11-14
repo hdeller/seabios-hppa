@@ -16,25 +16,32 @@
  * Interrupt vector table
  ****************************************************************/
 
-#define GET_IVT(vector)                                         \
-    SEGOFF(0,0)
-#define SET_IVT(vector, segoff)                                 \
-    while (0 && (vector))
+extern struct segoff_s ivt_table[256];
 
-#define FUNC16(func) ({                                 \
-        SEGOFF(0,0);  \
-    })
+#define GET_IVT(vector)		ivt_table[vector]
+#define SET_IVT(vector, segoff)	ivt_table[vector] = (segoff)
+
+#define FUNC16(func) ({ SEGOFF(0, 0); })
 
 
 /****************************************************************
  * Bios Data Area (BDA)
  ****************************************************************/
 
+extern struct bios_data_area_s bios_data_area;
+static inline struct bios_data_area_s *
+get_bda_ptr(void)
+{
+#if CONFIG_PARISC
+	return &bios_data_area;
+#else
+	return MAKE_FLATPTR(SEG_BDA, 0);
+#endif
+}
+
 // Accessor functions
-#define GET_BDA(var) \
-    GET_FARVAR(SEG_BDA, ((struct bios_data_area_s *)0)->var)
-#define SET_BDA(var, val) \
-    SET_FARVAR(SEG_BDA, ((struct bios_data_area_s *)0)->var, (val))
+#define GET_BDA(var)		bios_data_area.var
+#define SET_BDA(var, val)	bios_data_area.var = (val)
 
 // Helper function to set the bits of the equipment_list_flags variable.
 static inline void set_equipment_flags(u16 clear, u16 set) {

@@ -181,7 +181,7 @@ handle_csm_0002(struct bregs *regs)
     enable_vga_console();
 
     // EFI fills this in for us. Zero it for now...
-    struct bios_data_area_s *bda = MAKE_FLATPTR(SEG_BDA, 0);
+    struct bios_data_area_s *bda = get_bda_ptr();
     bda->hdcount = 0;
 
     thread_setup();

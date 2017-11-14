@@ -73,7 +73,7 @@ COMMONCFLAGS := -I$(OUT) -Isrc -Ivgasrc -Os -MD -g \
     $(call cc-option,$(CC),-Wtype-limits,) \
     -fomit-frame-pointer \
     -freg-struct-return -ffreestanding -fno-delete-null-pointer-checks \
-    -ffunction-sections -fdata-sections -fno-common -fno-merge-constants -mdisable-fpregs
+    -fdata-sections -fno-common -fno-merge-constants -mdisable-fpregs
 COMMONCFLAGS += $(call cc-option,$(CC),-nopie,)
 COMMONCFLAGS += $(call cc-option,$(CC),-fno-pie,)
 COMMONCFLAGS += $(call cc-option,$(CC),-fno-stack-protector,)

@@ -44,12 +44,21 @@ struct vgamode_s {
 
 // Custom internal storage in BDA (don't change here without also
 // updating vgaentry.S)
+#if CONFIG_PARISC
+extern struct vga_bda_s vga_bios_data_area;
+#define VGA_CUSTOM_BDA &vga_bios_data_area
+#else
 #define VGA_CUSTOM_BDA 0xb9
+#endif
 
 struct vga_bda_s {
     u8 flags;
     u16 vbe_mode;
+#if CONFIG_PARISC
+    unsigned long vgamode_offset; // important: 32bit!!
+#else
     u16 vgamode_offset;
+#endif
 } PACKED;
 
 #define BF_PM_MASK      0x0f
@@ -57,10 +66,8 @@ struct vga_bda_s {
 #define BF_SWCURSOR     0x20
 #define BF_EXTRA_STACK  0x40
 
-#define GET_BDA_EXT(var) \
-    GET_FARVAR(SEG_BDA, ((struct vga_bda_s *)VGA_CUSTOM_BDA)->var)
-#define SET_BDA_EXT(var, val) \
-    SET_FARVAR(SEG_BDA, ((struct vga_bda_s *)VGA_CUSTOM_BDA)->var, (val))
+#define GET_BDA_EXT(var) 	vga_bios_data_area.var
+#define SET_BDA_EXT(var, val)	vga_bios_data_area.var = (val)
 #define MASK_BDA_EXT(var, off, on)                                      \
     SET_BDA_EXT(var, (GET_BDA_EXT(var) & ~(off)) | (on))
 
@@ -69,7 +76,7 @@ static inline int vga_emulate_text(void) {
 }
 
 // Write to global variables (during "post" phase only)
-#define SET_VGA(var, val) SET_FARVAR(get_global_seg(), (var), (val))
+#define SET_VGA(var, val) var = (val)
 
 // Debug settings
 #define DEBUG_VGA_POST 1

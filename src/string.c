@@ -42,19 +42,6 @@ strlen(const char *s)
     return p-s;
 }
 
-int
-memcmp_far(u16 s1seg, const void *s1, u16 s2seg, const void *s2, size_t n)
-{
-    while (n--) {
-        int d = GET_FARVAR(s1seg, *(u8*)s1) - GET_FARVAR(s2seg, *(u8*)s2);
-        if (d)
-            return d < 0 ? -1 : 1;
-        s1++;
-        s2++;
-    }
-    return 0;
-}
-
 // Compare two areas of memory.
 int
 memcmp(const void *s1, const void *s2, size_t n)
@@ -86,12 +73,14 @@ strcmp(const char *s1, const char *s2)
 inline void
 memset_far(u16 d_seg, void *d_far, u8 c, size_t len)
 {
+	d_far = MAKE_FLATPTR(d_seg, (u32)d_far);
 	memset(d_far, c, len);
 }
 
 inline void
 memset16_far(u16 d_seg, void *s, u16 c, size_t n)
 {
+    s = MAKE_FLATPTR(d_seg, (u32)s);
     while (n)
         ((u16 *)s)[--n] = c;
 }
@@ -112,6 +101,8 @@ void memset_fl(void *ptr, u8 val, size_t size)
 inline void
 memcpy_far(u16 d_seg, void *d, u16 s_seg, const void *s, size_t n)
 {
+    d = MAKE_FLATPTR(d_seg, (u32)d);
+    s = MAKE_FLATPTR(s_seg, (u32)s);
     while (n) {
         ((char *)d)[n] = ((char *)s)[n];
 	--n;

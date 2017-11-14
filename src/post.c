@@ -76,7 +76,7 @@ bda_init(void)
 {
     dprintf(3, "init bda\n");
 
-    struct bios_data_area_s *bda = MAKE_FLATPTR(SEG_BDA, 0);
+    struct bios_data_area_s *bda = get_bda_ptr();
     memset(bda, 0, sizeof(*bda));
 
     int esize = EBDA_SIZE_START;

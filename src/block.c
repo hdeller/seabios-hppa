@@ -242,7 +242,7 @@ void
 map_hd_drive(struct drive_s *drive)
 {
     ASSERT32FLAT();
-    struct bios_data_area_s *bda = MAKE_FLATPTR(SEG_BDA, 0);
+    struct bios_data_area_s *bda = get_bda_ptr();
     int hdid = bda->hdcount;
     dprintf(3, "Mapping hd drive %p to %d\n", drive, hdid);
     add_drive(IDMap[EXTTYPE_HD], &bda->hdcount, drive);
@@ -469,7 +469,6 @@ fill_ata_edd(struct segoff_s edd, struct drive_s *drive_gf)
 int noinline
 fill_edd(struct segoff_s edd, struct drive_s *drive_fl)
 {
-#if 0
     switch (GET_FLATPTR(drive_fl->type)) {
     case DTYPE_ATA:
     case DTYPE_ATA_ATAPI:
@@ -482,7 +481,6 @@ fill_edd(struct segoff_s edd, struct drive_s *drive_fl)
     default:
         return fill_generic_edd(edd, drive_fl, 0, 0, 0, 0);
     }
-#endif
   return 0;
 }
 

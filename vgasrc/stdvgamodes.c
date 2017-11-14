@@ -394,19 +394,11 @@ stdvga_build_video_param(void)
         SET_VGA(vparam_g->slength, calc_page_size(memmodel, width, height));
         struct stdvga_mode_s *stdmode_g = container_of(
             vmode_g, struct stdvga_mode_s, info);
-        memcpy_far(get_global_seg(), vparam_g->sequ_regs
-                   , get_global_seg(), GET_GLOBAL(stdmode_g->sequ_regs)
-                   , ARRAY_SIZE(vparam_g->sequ_regs));
+        memcpy(&vparam_g->sequ_regs, stdmode_g->sequ_regs, sizeof(vparam_g->sequ_regs));
         SET_VGA(vparam_g->miscreg, GET_GLOBAL(stdmode_g->miscreg));
-        memcpy_far(get_global_seg(), vparam_g->crtc_regs
-                   , get_global_seg(), GET_GLOBAL(stdmode_g->crtc_regs)
-                   , ARRAY_SIZE(vparam_g->crtc_regs));
-        memcpy_far(get_global_seg(), vparam_g->actl_regs
-                   , get_global_seg(), GET_GLOBAL(stdmode_g->actl_regs)
-                   , ARRAY_SIZE(vparam_g->actl_regs));
-        memcpy_far(get_global_seg(), vparam_g->grdc_regs
-                   , get_global_seg(), GET_GLOBAL(stdmode_g->grdc_regs)
-                   , ARRAY_SIZE(vparam_g->grdc_regs));
+        memcpy(&vparam_g->crtc_regs, stdmode_g->crtc_regs, sizeof(vparam_g->crtc_regs));
+        memcpy(&vparam_g->actl_regs, stdmode_g->actl_regs, sizeof(vparam_g->actl_regs));
+        memcpy(&vparam_g->grdc_regs, stdmode_g->grdc_regs, sizeof(vparam_g->grdc_regs));
     }
 
     // Fill available legacy modes in video_func_static table
@@ -433,6 +425,7 @@ stdvga_override_crtc(int mode, u8 *crtc)
 static void
 clear_screen(struct vgamode_s *vmode_g)
 {
+return; // memset16_far is broken!
     switch (GET_GLOBAL(vmode_g->memmodel)) {
     case MM_TEXT:
         memset16_far(GET_GLOBAL(vmode_g->sstart), 0, 0x0720, 32*1024);

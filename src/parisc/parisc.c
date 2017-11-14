@@ -13,9 +13,13 @@
 #include "util.h" // serial_setup
 #include "malloc.h" // malloc
 #include "hw/serialio.h" // qemu_debug_port
+#include "hw/pcidevice.h" // foreachpci
+#include "hw/pci.h" // pci_config_readl
+#include "hw/pci_regs.h" // PCI_BASE_ADDRESS_0
 #include "hw/ata.h"
 #include "hw/rtc.h"
 #include "fw/paravirt.h" // PlatformRunningOn
+#include "vgahw.h"
 #include "parisc/hppa_hardware.h" // DINO_UART_BASE
 #include "parisc/pdc.h"
 #include "parisc/b160l.h"
@@ -29,7 +33,7 @@
 int HaveRunPost;
 u8 ExtraStack[BUILD_EXTRA_STACK_SIZE+1] __aligned(8);
 u8 *StackPos;
-u8 __VISIBLE parisc_stack[16*1024] __aligned(64);
+u8 __VISIBLE parisc_stack[32*1024] __aligned(64);
 
 u8 BiosChecksum;
 
@@ -38,6 +42,13 @@ char varlow_start, varlow_end, final_varlow_start;
 char final_readonly_start;
 char code32flat_start, code32flat_end;
 char zonelow_base;
+
+struct bios_data_area_s __VISIBLE bios_data_area;
+struct vga_bda_s	__VISIBLE vga_bios_data_area;
+struct bregs regs;
+unsigned long parisc_vga_mem;
+unsigned long parisc_vga_mmio;
+struct segoff_s ivt_table[256];
 
 void mtrr_setup(void) { }
 void mathcp_setup(void) { }
@@ -49,7 +60,7 @@ void farcall16big(struct bregs *callregs) { }
 
 void cpuid(u32 index, u32 *eax, u32 *ebx, u32 *ecx, u32 *edx)
 {
-	eax = ebx = ecx = edx = 0;
+	*eax = *ebx = *ecx = *edx = 0;
 }
 
 void wrmsr_smp(u32 index, u64 val) { }
@@ -606,7 +617,6 @@ static int parisc_boot_menu(unsigned char **iplstart, unsigned char **iplend)
 		return 0;
 
 	/* read boot sector of disc/CD */
-	target[0] = 0xabcd;
 	disk_op.command = CMD_READ;
 	// printf("blocksize is %d\n", disk_op.drive_fl->blksize);
 	disk_op.count = (FW_BLOCKSIZE / disk_op.drive_fl->blksize);
@@ -678,6 +688,50 @@ static const struct pz_device mem_kbd_boot = {
 	.cl_class = CL_KEYBD,
 };
 
+static void parisc_vga_init(void)
+{
+	extern void vga_post(struct bregs *);
+	struct pci_device *pci;
+
+	foreachpci(pci) {
+		if (!is_pci_vga(pci))
+			continue;
+
+		VgaBDF = pci->bdf;
+
+		parisc_vga_mem = pci_config_readl(pci->bdf, PCI_BASE_ADDRESS_0);
+		parisc_vga_mem &= PCI_BASE_ADDRESS_MEM_MASK;
+		VBE_framebuffer = parisc_vga_mem;
+		parisc_vga_mmio = pci_config_readl(pci->bdf, PCI_BASE_ADDRESS_2);
+		parisc_vga_mmio &= PCI_BASE_ADDRESS_MEM_MASK;
+
+		dprintf(1, "\n");
+
+		regs.ax = VgaBDF;
+		vga_post(&regs);
+
+		// flag = MF_NOCLEARMEM ?
+		//
+		// vga_set_mode(0x119, MF_NOCLEARMEM); // bochs: MM_DIRECT, 1280, 1024, 15, 8, 16,
+		// vga_set_mode(0x105, 0); // bochs:     { 0x105, { MM_PACKED, 1024, 768,  8,  8, 16, SEG_GRAPH } },
+		// vga_set_mode(0x107, 0); // bochs:  { 0x107, { MM_PACKED, 1280, 1024, 8,  8, 16, SEG_GRAPH } },
+		// vga_set_mode(0x11c, 0); // bochs:  { 0x11C, { MM_PACKED, 1600, 1200, 8,  8, 16, SEG_GRAPH } },
+		vga_set_mode(0x11f, 0); // bochs:  { 0x11F, { MM_DIRECT, 1600, 1200, 24, 8, 16, SEG_GRAPH } },
+
+		u32 endian = *(u32 *)(parisc_vga_mmio + 0x0604);
+		dprintf(1, "parisc: VGA at %pP, mem 0x%lx  mmio 0x%lx endian 0x%x found.\n",
+			pci, parisc_vga_mem, parisc_vga_mmio, endian);
+
+		struct vgamode_s *vmode_g = get_current_mode();
+		int bpp = vga_bpp(vmode_g);
+		int linelength = vgahw_get_linelength(vmode_g);
+
+		dprintf(1, "parisc: VGA resolution: %dx%d-%d  memmodel:%d  bpp:%d  linelength:%d\n",
+			    vmode_g->width, vmode_g->height, vmode_g->depth,
+			    vmode_g->memmodel, bpp, linelength);
+        }
+}
+
 void __VISIBLE start_parisc_firmware(void)
 {
 	unsigned int cpu_hz;
@@ -705,7 +759,7 @@ void __VISIBLE start_parisc_firmware(void)
 	PAGE0->imm_max_mem = ram_size;
 	memcpy((void*)&(PAGE0->mem_cons), &mem_cons_boot, sizeof(mem_cons_boot));
 	memcpy((void*)&(PAGE0->mem_boot), &mem_boot_boot, sizeof(mem_boot_boot));
-//	memcpy((void*)&(PAGE0->mem_kbd),  &mem_kbd_boot, sizeof(mem_kbd_boot));
+	memcpy((void*)&(PAGE0->mem_kbd),  &mem_kbd_boot, sizeof(mem_kbd_boot));
 
 	init_stable_storage();
 
@@ -742,12 +796,11 @@ void __VISIBLE start_parisc_firmware(void)
 
 	pci_setup();
 
-	// We don't have VGA BIOS, so init now.
-	// vga_post();
-	// vga_set_mode(3,0);
-
 	serial_setup();
 	block_setup();
+
+	// We don't have VGA BIOS, so init now.
+	parisc_vga_init();
 
 	printf("\n");
 
@@ -768,7 +821,7 @@ void __VISIBLE start_parisc_firmware(void)
 		"\n"
 		"Memory Test/Initialization Completed\n\n");
 	printf("------------------------------------------------------------------------------\n"
-		"   (c) Copyright 1995-1998, Hewlett-Packard Company, All rights reserved\n"
+		"   (c) Copyright 2017 Helge Deller <deller@gmx.de> and SeaBIOS developers.\n"
 		"------------------------------------------------------------------------------\n\n");
 	printf("  Processor   Speed            State           Coprocessor State  Cache Size\n"
 		"  ---------  --------   ---------------------  -----------------  ----------\n"

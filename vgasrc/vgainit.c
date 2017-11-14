@@ -78,8 +78,10 @@ allocate_extra_stack(void)
             return;
         dprintf(1, "VGA stack allocated at %x\n", res);
         SET_VGA(ExtraStackSeg, res >> 4);
+#if !CONFIG_PARISC
         extern void entry_10_extrastack(void);
         SET_IVT(0x10, SEGOFF(get_global_seg(), (u32)entry_10_extrastack));
+#endif
         return;
     }
 }
@@ -147,9 +149,9 @@ void VISIBLE16
 vga_post(struct bregs *regs)
 {
     serial_debug_preinit();
-    dprintf(1, "Start SeaVGABIOS (version %s)\n", VERSION);
+    dprintf(1, "SeaVGABIOS (version %s)\n", VERSION);
     dprintf(1, "VGABUILD: %s\n", BUILDINFO);
-    debug_enter(regs, DEBUG_VGA_POST);
+    // debug_enter(regs, DEBUG_VGA_POST);
 
     if (CONFIG_VGA_PCI && !GET_GLOBAL(HaveRunInit)) {
         u16 bdf = regs->ax;
@@ -174,8 +176,10 @@ vga_post(struct bregs *regs)
     if (CONFIG_VGA_STDVGA_PORTS)
         stdvga_build_video_param();
 
+#if !CONFIG_PARISC
     extern void entry_10(void);
     SET_IVT(0x10, SEGOFF(get_global_seg(), (u32)entry_10));
+#endif
 
     allocate_extra_stack();
 
@@ -183,10 +187,12 @@ vga_post(struct bregs *regs)
 
     SET_VGA(HaveRunInit, 1);
 
+#if !CONFIG_PARISC
     // Fixup checksum
     extern u8 _rom_header_size, _rom_header_checksum;
     SET_VGA(_rom_header_checksum, 0);
     u8 sum = -checksum_far(get_global_seg(), 0,
                            GET_GLOBAL(_rom_header_size) * 512);
     SET_VGA(_rom_header_checksum, sum);
+#endif
 }

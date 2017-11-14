@@ -143,13 +143,21 @@ bochsvga_list_modes(u16 seg, u16 *dest, u16 *last)
 
 static inline u16 dispi_read(u16 reg)
 {
+#if CONFIG_PARISC
+    return le16_to_cpu(*(u16 *)(parisc_vga_mmio + 0x500 + (reg<<1)));
+#else
     outw(reg, VBE_DISPI_IOPORT_INDEX);
     return inw(VBE_DISPI_IOPORT_DATA);
+#endif
 }
 static inline void dispi_write(u16 reg, u16 val)
 {
+#if CONFIG_PARISC
+    *(u16 *)(parisc_vga_mmio + 0x500 + (reg<<1)) = cpu_to_le16(val);
+#else
     outw(reg, VBE_DISPI_IOPORT_INDEX);
     outw(val, VBE_DISPI_IOPORT_DATA);
+#endif
 }
 
 static u8

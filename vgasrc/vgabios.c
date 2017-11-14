@@ -219,6 +219,7 @@ struct saveBDAstate {
 int
 bda_save_restore(int cmd, u16 seg, void *data)
 {
+return 0;
     if (!(cmd & SR_BDA))
         return 0;
     struct saveBDAstate *info = data;
@@ -261,7 +262,7 @@ get_current_mode(void)
 int
 vga_set_mode(int mode, int flags)
 {
-    dprintf(1, "set VGA mode %x\n", mode);
+    dprintf(1, "set VGA mode 0x%x\n", mode);
     struct vgamode_s *vmode_g = vgahw_find_mode(mode);
     if (!vmode_g)
         return VBE_RETURN_STATUS_FAILED;
@@ -502,7 +503,11 @@ handle_100d(struct bregs *regs)
     regs->al = vgafb_read_pixel(regs->cx, regs->dx);
 }
 
+#if CONFIG_PARISC
+void __VISIBLE
+#else
 static void noinline
+#endif
 handle_100e(struct bregs *regs)
 {
     // Ralf Brown Interrupt list is WRONG on bh(page)
@@ -1047,6 +1052,7 @@ struct video_func_static static_functionality VAR16 = {
 static void
 handle_101b(struct bregs *regs)
 {
+return;
     u16 seg = regs->es;
     struct video_func_info *info = (void*)(regs->di+0);
     memset_far(seg, info, 0, sizeof(*info));

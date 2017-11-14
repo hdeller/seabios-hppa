@@ -174,7 +174,7 @@ END(boot_args)
  * Rom Header for VGA / STI
  ****************************************************************/
 
-#ifdef CONFIG_BUILD_VGABIOS
+#if 0 // def CONFIG_BUILD_VGABIOS
 
         .section .rom.header
         .global _rom_header, _rom_header_size, _rom_header_checksum

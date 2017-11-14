@@ -24,19 +24,23 @@ union u64_u32_u {
 #if MODE16 == 1
 typedef u16 portaddr_t;
 #else
-typedef unsigned long portaddr_t;
+typedef unsigned int portaddr_t;
 #endif
 
 // Definition for common 16bit segment/offset pointers.
 struct segoff_s {
     union {
         struct {
-            u16 offset;
+            portaddr_t offset;
             u16 seg;
         };
         u32 segoff;
     };
 };
+
+extern unsigned long parisc_vga_mem;
+extern unsigned long parisc_vga_mmio;
+
 
 #ifdef MANUAL_NO_JUMP_TABLE
 # define default case 775324556: asm(""); default
@@ -107,8 +111,8 @@ extern void __force_link_error__only_in_16bit(void) __noreturn;
 # define VISIBLE32FLAT __section(".text.runtime." UNIQSEC) __VISIBLE
 # define VISIBLE32INIT __section(".text.init." UNIQSEC) __VISIBLE
 # define VISIBLE32SEG
-# define VAR16 __section(".discard.var16." UNIQSEC)
-# define VAR32SEG __section(".discard.var32seg." UNIQSEC)
+# define VAR16 // __section(".discard.var16." UNIQSEC)
+# define VAR32SEG // __section(".discard.var32seg." UNIQSEC)
 # define VARLOW __section(".data.varlow." UNIQSEC) __VISIBLE __weak
 # define VARFSEG __section(".data.varfseg." UNIQSEC) __VISIBLE
 # define VARFSEGFIXED(addr) __section(".fixedaddr." __stringify(addr)) __VISIBLE __aligned(1)

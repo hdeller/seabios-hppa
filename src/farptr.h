@@ -131,12 +131,12 @@ DECL_SEGFUNCS(SS)
 
 // Macros for converting to/from 32bit flat mode pointers to their
 // equivalent 16bit segment/offset values.
-#define FLATPTR_TO_SEG(p) (((u32)(p)) >> 4)
-#define FLATPTR_TO_OFFSET(p) (((u32)(p)) & 0xf)
-#define MAKE_FLATPTR(seg,off) ((void*)(((u32)(seg)<<4)+(u32)(off)))
+#define FLATPTR_TO_SEG(p) (((u32)(p)) >> 16)
+#define FLATPTR_TO_OFFSET(p) (((u32)(p)) & 0xffff)
 
+#define MAKE_FLATPTR(seg,off) ((void*)(unsigned long)(off))
 
-#if (MODESEGMENT == 1) && !defined(CONFIG_PARISC)
+#if (MODESEGMENT == 1) && !CONFIG_PARISC
 
 // Definitions when using segmented mode.
 #define GET_FARVAR(seg, var) __GET_FARVAR((seg), (var))
@@ -176,10 +176,9 @@ static inline void outsl_fl(u16 port, void *ptr_fl, u16 count) {
 #else
 
 // In 32-bit flat mode there is no need to mess with the segments.
-#define GET_FARVAR(seg, var) \
-    (*((typeof(&(var)))MAKE_FLATPTR((seg), &(var))))
-#define SET_FARVAR(seg, var, val) \
-    do { GET_FARVAR((seg), (var)) = (val); } while (0)
+#define GET_FARVAR(seg, var)		GET_VAR(seg, var)
+#define SET_FARVAR(seg, var, val)	SET_VAR(seg, var, val)
+
 #define GET_VAR(seg, var) (var)
 #define SET_VAR(seg, var, val) do { (var) = (val); } while (0)
 #define SET_SEG(SEG, value) ((void)(value))
