@@ -330,14 +330,14 @@ static inline void insb(portaddr_t port, u8 *data, u32 count) {
 static inline void insw(portaddr_t port, u16 *data, u32 count) {
     while (count--)
 	if (pci_ioport_addr(port))
-		*data++ = le16_to_cpu(inw(port));
+		*data++ = be16_to_cpu(inw(port));
 	else
 		*data++ = inw(port);
 }
 static inline void insl(portaddr_t port, u32 *data, u32 count) {
     while (count--)
 	if (pci_ioport_addr(port))
-		*data++ = le32_to_cpu(inl(port));
+		*data++ = be32_to_cpu(inl(port));
 	else
 		*data++ = inl(port);
 }
@@ -349,7 +349,7 @@ static inline void outsb(portaddr_t port, u8 *data, u32 count) {
 static inline void outsw(portaddr_t port, u16 *data, u32 count) {
     while (count--) {
 	if (pci_ioport_addr(port))
-		outw(cpu_to_le16(*data), port);
+		outw(cpu_to_be16(*data), port);
 	else
 		outw(*data, port);
 	data++;
@@ -358,7 +358,7 @@ static inline void outsw(portaddr_t port, u16 *data, u32 count) {
 static inline void outsl(portaddr_t port, u32 *data, u32 count) {
     while (count--) {
 	if (pci_ioport_addr(port))
-		outl(cpu_to_le32(*data), port);
+		outl(cpu_to_be32(*data), port);
 	else
 		outl(*data, port);
 	data++;
