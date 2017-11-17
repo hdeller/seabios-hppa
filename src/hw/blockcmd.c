@@ -24,7 +24,6 @@ static int
 cdb_get_inquiry(struct disk_op_s *op, struct cdbres_inquiry *data)
 {
     struct cdb_request_sense cmd;
- dprintf(1, "JETZT: %s\n", __FUNCTION__);
     memset(&cmd, 0, sizeof(cmd));
     cmd.command = CDB_CMD_INQUIRY;
     cmd.length = sizeof(*data);
@@ -41,7 +40,6 @@ static int
 cdb_get_sense(struct disk_op_s *op, struct cdbres_request_sense *data)
 {
     struct cdb_request_sense cmd;
- dprintf(1, "JETZT: %s\n", __FUNCTION__);
     memset(&cmd, 0, sizeof(cmd));
     cmd.command = CDB_CMD_REQUEST_SENSE;
     cmd.length = sizeof(*data);
@@ -58,7 +56,6 @@ static int
 cdb_test_unit_ready(struct disk_op_s *op)
 {
     struct cdb_request_sense cmd;
- dprintf(1, "JETZT: %s\n", __FUNCTION__);
     memset(&cmd, 0, sizeof(cmd));
     cmd.command = CDB_CMD_TEST_UNIT_READY;
     op->command = CMD_SCSI;
@@ -74,7 +71,6 @@ static int
 cdb_read_capacity(struct disk_op_s *op, struct cdbres_read_capacity *data)
 {
     struct cdb_read_capacity cmd;
- dprintf(1, "JETZT: %s\n", __FUNCTION__);
     memset(&cmd, 0, sizeof(cmd));
     cmd.command = CDB_CMD_READ_CAPACITY;
     op->command = CMD_SCSI;
@@ -90,7 +86,6 @@ static int
 cdb_mode_sense_geom(struct disk_op_s *op, struct cdbres_mode_sense_geom *data)
 {
     struct cdb_mode_sense cmd;
- dprintf(1, "JETZT: %s\n", __FUNCTION__);
     memset(&cmd, 0, sizeof(cmd));
     cmd.command = CDB_CMD_MODE_SENSE;
     cmd.flags = 8; /* DBD */
@@ -113,15 +108,19 @@ cdb_mode_sense_geom(struct disk_op_s *op, struct cdbres_mode_sense_geom *data)
 int
 scsi_fill_cmd(struct disk_op_s *op, void *cdbcmd, int maxcdb)
 {
+    // Important for PA-RISC: Take care of alignment, e.g. do not write u64 to not-aligned address.
+    struct cdb_rwdata_10 cmd;
+
     switch (op->command) {
     case CMD_READ:
     case CMD_WRITE: ;
-        struct cdb_rwdata_10 *cmd = cdbcmd;
-        memset(cmd, 0, maxcdb);
-        cmd->command = (op->command == CMD_READ ? CDB_CMD_READ_10
+        memset(cdbcmd, 0, maxcdb);
+        memset(&cmd, 0, sizeof(cmd));
+        cmd.command = (op->command == CMD_READ ? CDB_CMD_READ_10
                         : CDB_CMD_WRITE_10);
-        cmd->lba = cpu_to_be32(op->lba);
-        cmd->count = cpu_to_be16(op->count);
+        cmd.lba = cpu_to_be32(op->lba);
+        cmd.count = cpu_to_be16(op->count);
+        memcpy(cdbcmd, &cmd, sizeof(cmd));
         return GET_FLATPTR(op->drive_fl->blksize);
     case CMD_SCSI:
         if (MODESEGMENT)
@@ -237,7 +236,6 @@ int scsi_rep_luns_scan(struct drive_s *tmp_drive, scsi_add_lun add_lun)
 
     ASSERT32FLAT();
 
-dprintf(1, "Starte %s\n", __FUNCTION__);
     while (1) {
         op.blocksize = sizeof(struct cdbres_report_luns) +
             maxluns * sizeof(struct scsi_lun);
@@ -248,11 +246,9 @@ dprintf(1, "Starte %s\n", __FUNCTION__);
         }
 
         cdb.length = cpu_to_be32(op.blocksize);
-dprintf(1, "Aktuell %s  length = %d\n", __FUNCTION__, cdb.length);
         if (process_op(&op) != DISK_RET_SUCCESS)
             goto out;
 
-dprintf(1, "Aktuell %s  FOUND DISK_RET_SUCCESS\n", __FUNCTION__);
         resp = op.buf_fl;
         nluns = be32_to_cpu(resp->length) / sizeof(struct scsi_lun);
         if (nluns <= maxluns)
@@ -269,7 +265,6 @@ dprintf(1, "Aktuell %s  FOUND DISK_RET_SUCCESS\n", __FUNCTION__);
         ret += !add_lun((u32)lun, tmp_drive);
     }
 out:
-dprintf(1, "Beende %s\n", __FUNCTION__);
     free(op.buf_fl);
     return ret;
 }
@@ -281,10 +276,8 @@ int scsi_sequential_scan(struct drive_s *tmp_drive, u32 maxluns,
     int ret;
     u32 lun;
 
-dprintf(1, "Starte %s\n", __FUNCTION__);
     for (lun = 0, ret = 0; lun < maxluns; lun++)
         ret += !add_lun(lun, tmp_drive);
-dprintf(1, "Beende %s\n", __FUNCTION__);
     return ret;
 }
 
@@ -297,9 +290,7 @@ scsi_drive_setup(struct drive_s *drive, const char *s, int prio)
     memset(&dop, 0, sizeof(dop));
     dop.drive_fl = drive;
     struct cdbres_inquiry data;
- dprintf(1, "JETZT: %s\n", __FUNCTION__);
     int ret = cdb_get_inquiry(&dop, &data);
- dprintf(1, "inquiry: %s   ret = %d\n", __FUNCTION__, ret);
     if (ret)
         return ret;
     char vendor[sizeof(data.vendor)+1], product[sizeof(data.product)+1];

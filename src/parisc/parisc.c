@@ -17,6 +17,7 @@
 #include "hw/pci.h" // pci_config_readl
 #include "hw/pci_regs.h" // PCI_BASE_ADDRESS_0
 #include "hw/ata.h"
+#include "hw/blockcmd.h" // scsi_is_ready()
 #include "hw/rtc.h"
 #include "fw/paravirt.h" // PlatformRunningOn
 #include "vgahw.h"
@@ -611,12 +612,19 @@ static int parisc_boot_menu(unsigned char **iplstart, unsigned char **iplend)
 	}
 
 	/* seek to beginning of disc/CD */
+	disk_op.drive_fl = boot_drive;
 	ret = process_op(&disk_op);
 	// printf("DISK_SEEK returned %d\n", ret);
 	if (ret)
 		return 0;
 
+	disk_op.drive_fl = boot_drive;
+	ret = scsi_is_ready(&disk_op);
+	// printf("DISK_READY returned %d\n", ret);
+
 	/* read boot sector of disc/CD */
+	disk_op.drive_fl = boot_drive;
+	disk_op.buf_fl = target;
 	disk_op.command = CMD_READ;
 	// printf("blocksize is %d\n", disk_op.drive_fl->blksize);
 	disk_op.count = (FW_BLOCKSIZE / disk_op.drive_fl->blksize);
@@ -631,12 +639,15 @@ static int parisc_boot_menu(unsigned char **iplstart, unsigned char **iplend)
 	unsigned int ipl_entry= be32_to_cpu(target[0xf8/sizeof(int)]);
 
 	/* check LIF header of bootblock */
-	// printf("boot magic is 0x%x (should be 0x8000)\n", target[0]>>16);
-	// printf("ipl  start at 0x%x, size %d, entry 0x%x\n", ipl_addr, ipl_size, ipl_entry);
-
+	if ((target[0]>>16) != 0x8000) {
+		printf("Not a PA-RISC boot image. LIF magic is 0x%x, should be 0x8000.\n", target[0]>>16);
+		return 0;
+	}
+	// printf("ipl start at 0x%x, size %d, entry 0x%x\n", ipl_addr, ipl_size, ipl_entry);
 	// TODO: check ipl values, out of range, ... ?
 
 	/* seek to beginning of IPL */
+	disk_op.drive_fl = boot_drive;
 	disk_op.command = CMD_SEEK;
 	disk_op.count = 0; // (ipl_size / disk_op.drive_fl->blksize);
 	disk_op.lba = (ipl_addr / disk_op.drive_fl->blksize);
@@ -644,6 +655,8 @@ static int parisc_boot_menu(unsigned char **iplstart, unsigned char **iplend)
 	// printf("DISK_SEEK to IPL returned %d\n", ret);
 
 	/* read IPL */
+	disk_op.drive_fl = boot_drive;
+	disk_op.buf_fl = target;
 	disk_op.command = CMD_READ;
 	disk_op.count = (ipl_size / disk_op.drive_fl->blksize);
 	disk_op.lba = (ipl_addr / disk_op.drive_fl->blksize);

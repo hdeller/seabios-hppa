@@ -78,7 +78,7 @@ static inline u64 be64_to_cpu(u64 x) {
 static inline void convert_to_le32(u32 *script, unsigned long bytes)
 {
     while (bytes > 0) {
-	*script = le32_to_cpu(*script);
+	*script = cpu_to_le32(*script);
 	script++;
 	bytes -= sizeof(u32);
     }

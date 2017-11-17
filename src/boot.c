@@ -95,7 +95,7 @@ glob_prefix(const char *glob, const char *str)
 static int
 find_prio(const char *glob)
 {
-    dprintf(1, "Searching bootorder for: %s\n", glob);
+    // dprintf(1, "Searching bootorder for: %s\n", glob);
     int i;
     for (i = 0; i < BootorderCount; i++)
         if (glob_prefix(glob, Bootorder[i]))
@@ -547,7 +547,9 @@ struct drive_s *select_parisc_boot_drive(void)
 
     /* try each boot device */
     hlist_for_each_entry(pos, &BootList, node) {
-	if (pos->type == IPL_TYPE_CDROM) { //IPL_TYPE_HARDDISK) // IPL_TYPE_CDROM)
+	// if (pos->type == IPL_TYPE_CDROM) { //IPL_TYPE_HARDDISK) // IPL_TYPE_CDROM)
+	if (pos->type == IPL_TYPE_CDROM) {
+	// if (pos->type == IPL_TYPE_HARDDISK) {
                 printf("\nBooting from %s\n",pos->description);
 		return pos->drive;
 	}

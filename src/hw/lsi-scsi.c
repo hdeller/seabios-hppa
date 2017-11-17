@@ -60,7 +60,7 @@ lsi_scsi_process_op(struct disk_op_s *op)
         container_of(op->drive_fl, struct lsi_lun_s, drive);
     u16 target = GET_GLOBALFLAT(llun_gf->target);
     u16 lun = GET_GLOBALFLAT(llun_gf->lun);
-    u8 cdbcmd[16], nr;
+    u8 cdbcmd[16];
     int blocksize = scsi_fill_cmd(op, cdbcmd, sizeof(cdbcmd));
     if (blocksize < 0)
         return default_process_op(op);
@@ -106,16 +106,15 @@ lsi_scsi_process_op(struct disk_op_s *op)
     };
     u32 dsp = (u32)MAKE_FLATPTR(GET_SEG(SS), &script);
 
-dprintf(1, "Starte lsi_scsi_process_op()\n");
-
     /* convert to little endian for PCI */
     convert_to_le32(script, sizeof(script));
-    convert_to_le32(&dma, sizeof(dma));
-    // convert_to_le32(&dma, sizeof(dma));
-dprintf(1, "Von SEABIOS  cdbcmd = ");
-for (nr=0; nr<16; nr++)
-   dprintf(1, "0x%x  ", cdbcmd[nr]);
-dprintf(1, "\n");
+
+#if 0
+ int nr;
+ dprintf(1, "Data from SEABIOS  cdbcmd = ");
+ for (nr=0; nr<15; nr++) dprintf(1, "0x%x  ", cdbcmd[nr]);
+ dprintf(1, "\n");
+#endif
 
     outb(dsp         & 0xff, iobase + LSI_REG_DSP0);
     outb((dsp >>  8) & 0xff, iobase + LSI_REG_DSP1);
@@ -134,14 +133,12 @@ dprintf(1, "\n");
         }
         usleep(5);
     }
-dprintf(1, "Beende lsi_scsi_process_op()\n");
 
     if (msgin == 0 && status == 0) {
         return DISK_RET_SUCCESS;
     }
 
 fail:
-dprintf(1, "FAIL: Beende lsi_scsi_process_op()\n");
     return DISK_RET_EBADTRACK;
 }
 
@@ -168,7 +165,6 @@ lsi_scsi_add_lun(u32 lun, struct drive_s *tmpl_drv)
         warn_noalloc();
         return -1;
     }
-    dprintf(1, "Starte %s\n", __FUNCTION__);
     lsi_scsi_init_lun(llun, tmpl_llun->pci, tmpl_llun->iobase,
                       tmpl_llun->target, lun);
 
@@ -179,11 +175,9 @@ lsi_scsi_add_lun(u32 lun, struct drive_s *tmpl_drv)
     free(name);
     if (ret)
         goto fail;
-    dprintf(1, "Beende OK %s\n", __FUNCTION__);
     return 0;
 
 fail:
-    dprintf(1, "Beende FAIL %s\n", __FUNCTION__);
     free(llun);
     return -1;
 }
@@ -193,10 +187,8 @@ lsi_scsi_scan_target(struct pci_device *pci, u32 iobase, u8 target)
 {
     struct lsi_lun_s llun0;
 
-    dprintf(1, "Starte init_lin\n");
     lsi_scsi_init_lun(&llun0, pci, iobase, target, 0);
 
-    dprintf(1, "Starte rep\n");
     if (scsi_rep_luns_scan(&llun0.drive, lsi_scsi_add_lun) < 0)
         scsi_sequential_scan(&llun0.drive, 8, lsi_scsi_add_lun);
 }

@@ -104,8 +104,8 @@ memcpy_far(u16 d_seg, void *d, u16 s_seg, const void *s, size_t n)
     d = MAKE_FLATPTR(d_seg, (u32)d);
     s = MAKE_FLATPTR(s_seg, (u32)s);
     while (n) {
-        ((char *)d)[n] = ((char *)s)[n];
 	--n;
+	((char *)d)[n] = ((char *)s)[n];
     }
 }
 
