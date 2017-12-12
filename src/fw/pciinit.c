@@ -515,8 +515,7 @@ static void mch_mem_addr_setup(struct pci_device *dev, void *arg)
 static int dino_pci_slot_get_irq(struct pci_device *pci, int pin)
 {
     int slot = pci_bdf_to_dev(pci->bdf);
-    // dprintf(1, "%s: PCI slot %d IRQ %d\n", __FUNCTION__, slot, 10 + slot);
-    return 10 + slot;
+    return slot & 0x03;
 }
 
 static void dino_mem_addr_setup(struct pci_device *dev, void *arg)

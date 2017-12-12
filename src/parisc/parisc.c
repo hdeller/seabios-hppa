@@ -328,6 +328,8 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 {
 	static unsigned long psw_defaults = PDC_PSW_ENDIAN_BIT;
 	static unsigned long cache_info[] = { PARISC_PDC_CACHE_INFO };
+	static struct pdc_cache_info *machine_cache_info
+				= (struct pdc_cache_info *) &cache_info;
 	static unsigned long model[] = { PARISC_PDC_MODEL };
 	static const char model_str[] = PARISC_MODEL;
 
@@ -380,6 +382,13 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 	case PDC_CACHE:
 		switch (option) {
 		case PDC_CACHE_INFO:
+			if (sizeof(cache_info) != sizeof(*machine_cache_info))
+				hlt();
+			// XXX: number of TLB entries should be aligned with qemu
+			machine_cache_info->it_size = 256;
+			machine_cache_info->dt_size = 256;
+			machine_cache_info->it_loop = 1;
+			machine_cache_info->dt_loop = 1;
 			memcpy(result, cache_info, sizeof(cache_info));
 			return PDC_OK;
 		}
@@ -618,8 +627,14 @@ static int parisc_boot_menu(unsigned char **iplstart, unsigned char **iplend)
 	if (ret)
 		return 0;
 
+	// printf("Boot disc type is 0x%x\n", boot_drive->type);
 	disk_op.drive_fl = boot_drive;
-	ret = scsi_is_ready(&disk_op);
+	if (boot_drive->type == DTYPE_ATA_ATAPI) {
+		disk_op.command = CMD_ISREADY;
+		ret = process_op(&disk_op);
+	} else {
+		ret = scsi_is_ready(&disk_op);
+	}
 	// printf("DISK_READY returned %d\n", ret);
 
 	/* read boot sector of disc/CD */
