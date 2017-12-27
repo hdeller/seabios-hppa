@@ -531,7 +531,7 @@ interactive_bootmenu(void)
 }
 
 #if CONFIG_PARISC
-struct drive_s *select_parisc_boot_drive(void)
+struct drive_s *select_parisc_boot_drive(char bootdrive)
 {
     printf("Available boot devices:\n");
 
@@ -548,8 +548,8 @@ struct drive_s *select_parisc_boot_drive(void)
     /* try each boot device */
     hlist_for_each_entry(pos, &BootList, node) {
 	// if (pos->type == IPL_TYPE_CDROM) { //IPL_TYPE_HARDDISK) // IPL_TYPE_CDROM)
-	if (pos->type == IPL_TYPE_CDROM) {
-	// if (pos->type == IPL_TYPE_HARDDISK) {
+	if (((bootdrive == 'd') && (pos->type == IPL_TYPE_CDROM)) ||
+	    ((bootdrive != 'd') && (pos->type == IPL_TYPE_HARDDISK))) {
                 printf("\nBooting from %s\n",pos->description);
 		return pos->drive;
 	}

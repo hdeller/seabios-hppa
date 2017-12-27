@@ -218,8 +218,8 @@ int __VISIBLE parisc_iodc_entry(unsigned int *arg)
 		return PDC_OK;
 	}
 
-	dprintf(0, "\nIODC option #%ld called: hpa=%lx spa=%lx layers=%lx ", option, hpa, spa, layers);
-	dprintf(0, "result=%p arg5=%x arg6=%x arg7=%x\n", result, ARG5, ARG6, ARG7);
+	dprintf(0, "\nIODC option #%ld called: hpa=0x%lx spa=0x%lx layers=0x%lx ", option, hpa, spa, layers);
+	dprintf(0, "result=0x%p arg5=0x%x arg6=0x%x arg7=0x%x\n", result, ARG5, ARG6, ARG7);
 
 	hlt();
 	return PDC_BAD_OPTION;
@@ -344,8 +344,8 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 	struct pdc_system_map_mod_info *pdc_mod_info;
 	struct pdc_module_path *mod_path;
 #if 0
-	dprintf(0, "\nSeaBIOS: Start PDC proc %s(%d) option %d result=%x ARG3=%x ", pdc_name(ARG0), ARG0, ARG1, ARG2, ARG3);
-	dprintf(0, "ARG4=%x ARG5=%x ARG6=%x ARG7=%x\n", ARG4, ARG5, ARG6, ARG7);
+	dprintf(0, "\nSeaBIOS: Start PDC proc %s(%d) option %d result=0x%x ARG3=0x%x ", pdc_name(ARG0), ARG0, ARG1, ARG2, ARG3);
+	dprintf(0, "ARG4=0x%x ARG5=0x%x ARG6=0x%x ARG7=0x%x\n", ARG4, ARG5, ARG6, ARG7);
 #endif
 	switch (proc) {
 	case PDC_POW_FAIL:
@@ -600,9 +600,10 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
  * BOOT MENU
  ********************************************************/
 
-extern struct drive_s *select_parisc_boot_drive(void);
+extern struct drive_s *select_parisc_boot_drive(char bootdrive);
 
-static int parisc_boot_menu(unsigned char **iplstart, unsigned char **iplend)
+static int parisc_boot_menu(unsigned char **iplstart, unsigned char **iplend,
+		char bootdrive)
 {
 	int ret;
 	unsigned int *target = (void *)0x60000; // bug in palo: 0xa0000 crashes.
@@ -613,7 +614,7 @@ static int parisc_boot_menu(unsigned char **iplstart, unsigned char **iplend)
 		.lba = 0,
 	};
 
-	boot_drive = select_parisc_boot_drive();
+	boot_drive = select_parisc_boot_drive(bootdrive);
 	disk_op.drive_fl = boot_drive;
 	if (boot_drive == NULL) {
 		printf("SeaBIOS: No boot device.\n");
@@ -629,7 +630,8 @@ static int parisc_boot_menu(unsigned char **iplstart, unsigned char **iplend)
 
 	// printf("Boot disc type is 0x%x\n", boot_drive->type);
 	disk_op.drive_fl = boot_drive;
-	if (boot_drive->type == DTYPE_ATA_ATAPI) {
+	if (boot_drive->type == DTYPE_ATA_ATAPI ||
+	    boot_drive->type == DTYPE_ATA) {
 		disk_op.command = CMD_ISREADY;
 		ret = process_op(&disk_op);
 	} else {
@@ -641,9 +643,9 @@ static int parisc_boot_menu(unsigned char **iplstart, unsigned char **iplend)
 	disk_op.drive_fl = boot_drive;
 	disk_op.buf_fl = target;
 	disk_op.command = CMD_READ;
-	// printf("blocksize is %d\n", disk_op.drive_fl->blksize);
 	disk_op.count = (FW_BLOCKSIZE / disk_op.drive_fl->blksize);
 	disk_op.lba = 0;
+	// printf("blocksize is %d, count is %d\n", disk_op.drive_fl->blksize, disk_op.count);
 	ret = process_op(&disk_op);
 	// printf("DISK_READ(count=%d) = %d\n", disk_op.count, ret);
 	if (ret)
@@ -772,6 +774,9 @@ void __VISIBLE start_parisc_firmware(void)
 	unsigned long initrd_start	 = boot_args[3];
 	unsigned long initrd_end	 = boot_args[4];
 
+	unsigned long interactive = (linux_kernel_entry == 1) ? 1:0;
+	char bootdrive = (char) cmdline; // c = hdd, d = CD/DVD
+
 	/* Initialize device list */
 	remove_parisc_devices();
 
@@ -833,7 +838,7 @@ void __VISIBLE start_parisc_firmware(void)
 	printf("\n");
 
 	/* directly start Linux kernel if it was given on qemu command line. */
-	if (linux_kernel_entry) {
+	if (linux_kernel_entry > 1) {
 		void (*start_kernel)(unsigned long mem_free, unsigned long cmdline,
 			unsigned long rdstart, unsigned long rdend);
 
@@ -879,14 +884,14 @@ void __VISIBLE start_parisc_firmware(void)
 #endif
 
 	/* check for bootable drives, and load and start IPL bootloader if possible */
-	if (parisc_boot_menu(&iplstart, &iplend)) {
+	if (parisc_boot_menu(&iplstart, &iplend, bootdrive)) {
 		void (*start_ipl)(long interactive, long mem_free);
 
 		printf("\nBooting...\n"
 			"Boot IO Dependent Code (IODC) revision 153\n\n"
 			"HARD Booted.\n");
 		start_ipl = (void *) iplstart;
-		start_ipl(0, (long)iplend); // first parameter: 1=interactive, 0=non-interactive
+		start_ipl(interactive, (long)iplend);
 	}
 
 	hlt(); /* this ends the emulator */

@@ -529,6 +529,10 @@ static int
 process_op_both(struct disk_op_s *op)
 {
     switch (GET_FLATPTR(op->drive_fl->type)) {
+#if CONFIG_PARISC
+    case DTYPE_ATA:
+        return ata_process_op(op);
+#endif
     case DTYPE_ATA_ATAPI:
         return ata_atapi_process_op(op);
     case DTYPE_USB:
