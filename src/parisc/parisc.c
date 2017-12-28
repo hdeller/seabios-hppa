@@ -267,10 +267,11 @@ static inline int rtc_from_bcd(int a)
 	return ((a >> 4) * 10) + (a & 0x0f);
 }
 
+#define SECONDS_2000_JAN_1 946684800
+/* assumption: only dates between 01/01/2000 and 31/12/2099 */
+
 static unsigned long seconds_since_1970(void)
 {
-	#define SECONDS_2000_JAN_1 946684800
-	/* assumption: only dates between 01/01/2000 and 31/12/2099 */
 	unsigned int second = rtc_from_bcd(rtc_read(CMOS_RTC_SECONDS));
 	unsigned int minute = rtc_from_bcd(rtc_read(CMOS_RTC_MINUTES));
 	unsigned int hour   = rtc_from_bcd(rtc_read(CMOS_RTC_HOURS));
@@ -279,6 +280,49 @@ static unsigned long seconds_since_1970(void)
 	unsigned int year   = rtc_from_bcd(rtc_read(CMOS_RTC_YEAR));
 	return (((year/4*(365*4+1)+days[year%4][month]+day)*24+hour)*60+minute)
 			*60+second + SECONDS_2000_JAN_1;
+}
+
+static inline int rtc_to_bcd(int a)
+{
+	return ((a / 10) << 4) | (a % 10);
+}
+
+void epoch_to_date_time(unsigned long epoch)
+{
+    epoch -= SECONDS_2000_JAN_1;
+
+    unsigned int second = epoch%60; epoch /= 60;
+    unsigned int minute = epoch%60; epoch /= 60;
+    unsigned int hour   = epoch%24; epoch /= 24;
+
+    unsigned int years = epoch/(365*4+1)*4; epoch %= 365*4+1;
+
+    unsigned int year;
+    for (year=3; year>0; year--)
+    {
+        if (epoch >= days[year][0])
+            break;
+    }
+
+    unsigned int month;
+    for (month=11; month>0; month--)
+    {
+        if (epoch >= days[year][month])
+            break;
+    }
+
+    year  = years + year;
+    month = month + 1;
+    unsigned int day;
+    day   = epoch - days[year][month] + 1;
+
+    /* set date into RTC */
+    rtc_write(CMOS_RTC_SECONDS, rtc_to_bcd(second));
+    rtc_write(CMOS_RTC_MINUTES, rtc_to_bcd(minute));
+    rtc_write(CMOS_RTC_HOURS, rtc_to_bcd(hour));
+    rtc_write(CMOS_RTC_DAY_MONTH, rtc_to_bcd(day));
+    rtc_write(CMOS_RTC_MONTH, rtc_to_bcd(month));
+    rtc_write(CMOS_RTC_YEAR, rtc_to_bcd(year));
 }
 
 static const char *pdc_name(unsigned long num)
@@ -384,11 +428,13 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 		case PDC_CACHE_INFO:
 			if (sizeof(cache_info) != sizeof(*machine_cache_info))
 				hlt();
+#if 1
 			// XXX: number of TLB entries should be aligned with qemu
 			machine_cache_info->it_size = 256;
 			machine_cache_info->dt_size = 256;
 			machine_cache_info->it_loop = 1;
 			machine_cache_info->dt_loop = 1;
+#endif
 			memcpy(result, cache_info, sizeof(cache_info));
 			return PDC_OK;
 		}
@@ -458,8 +504,12 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 			result[0] = seconds_since_1970();
 			result[1] = result[2] = result[3] = 0;
 			return PDC_OK;
+		case PDC_TOD_WRITE:
+			/* we ignore the usecs in ARG3 */
+			epoch_to_date_time(ARG2);
+			return PDC_OK;
 		}
-		dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_TOD function %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
+		dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_TOD function %ld ARG2=%x ARG3=%x ARG4=%x\n", option, ARG2, ARG3, ARG4);
 		return PDC_BAD_OPTION;
 	case PDC_STABLE:
 		// dprintf(0, "\n\nSeaBIOS: PDC_STABLE function %ld ARG2=%x ARG3=%x ARG4=%x\n", option, ARG2, ARG3, ARG4);
