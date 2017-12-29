@@ -406,7 +406,7 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 			return PDC_OK;
 		case PDC_MODEL_VERSIONS:
 			if (ARG3 == 0) {
-				result[0] =  PARISC_PDC_VERSION;
+				result[0] = PARISC_PDC_VERSION;
 				return PDC_OK;
 			}
 			return -4; // invalid c_index
@@ -600,7 +600,14 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 		}
 		break;
 	case PDC_SOFT_POWER: // don't have a soft-power switch
-		return PDC_BAD_PROC;
+		switch (option) {
+		case PDC_SOFT_POWER_ENABLE:
+			if (ARG3 == 0) // put soft power button under hardware control.
+				hlt();
+			return PDC_OK;
+		}
+		return PDC_BAD_OPTION;
+		dprintf(0, "\n\nSeaBIOS: PDC_SOFT_POWER called with ARG2=%x ARG3=%x ARG4=%x\n", ARG2, ARG3, ARG4);
 	case 26: // PDC_SCSI_PARMS is the architected firmware interface to replace the Hversion PDC_INITIATOR procedure.
 		return PDC_BAD_PROC;
 	case PDC_IO:
@@ -796,7 +803,9 @@ static void parisc_vga_init(void)
 		// vga_set_mode(0x105, 0); // bochs:     { 0x105, { MM_PACKED, 1024, 768,  8,  8, 16, SEG_GRAPH } },
 		// vga_set_mode(0x107, 0); // bochs:  { 0x107, { MM_PACKED, 1280, 1024, 8,  8, 16, SEG_GRAPH } },
 		// vga_set_mode(0x11c, 0); // bochs:  { 0x11C, { MM_PACKED, 1600, 1200, 8,  8, 16, SEG_GRAPH } },
-		vga_set_mode(0x11f, 0); // bochs:  { 0x11F, { MM_DIRECT, 1600, 1200, 24, 8, 16, SEG_GRAPH } },
+		// vga_set_mode(0x11f, 0); // bochs:  { 0x11F, { MM_DIRECT, 1600, 1200, 24, 8, 16, SEG_GRAPH } },
+		// vga_set_mode(0x101, 0); // bochs:  { 0x101, { MM_PACKED, 640,  480,  8,  8, 16, SEG_GRAPH } },
+		vga_set_mode(0x100, 0); // bochs:  { 0x100, { MM_PACKED, 640,  400,  8,  8, 16, SEG_GRAPH } },
 
 		u32 endian = *(u32 *)(parisc_vga_mmio + 0x0604);
 		dprintf(1, "parisc: VGA at %pP, mem 0x%lx  mmio 0x%lx endian 0x%x found.\n",
@@ -838,6 +847,8 @@ void __VISIBLE start_parisc_firmware(void)
 	PAGE0->mem_hpa = CPU_HPA; // /* HPA of boot-CPU */
 	PAGE0->mem_pdc = (unsigned long) &pdc_entry;
 	PAGE0->mem_10msec = CPU_CLOCK_MHZ*(1000000ULL/100);
+
+	memcpy((char*)&PAGE0->pad0, "SeaBIOS", 8); /* QEMU/SeaBIOS marker */
 
 	PAGE0->imm_max_mem = ram_size;
 	memcpy((void*)&(PAGE0->mem_cons), &mem_cons_boot, sizeof(mem_cons_boot));
