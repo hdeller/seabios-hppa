@@ -94,6 +94,7 @@ void hlt(void)
 
 void reset(void)
 {
+	PAGE0->imm_soft_boot = 1;
 	hlt(); // TODO: Reset the machine
 }
 
@@ -659,11 +660,11 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 
 extern struct drive_s *select_parisc_boot_drive(char bootdrive);
 
-static int parisc_boot_menu(unsigned char **iplstart, unsigned char **iplend,
+static int parisc_boot_menu(unsigned long *iplstart, unsigned long *iplend,
 		char bootdrive)
 {
 	int ret;
-	unsigned int *target = (void *)0x60000; // bug in palo: 0xa0000 crashes.
+	unsigned int *target = (void *)(PAGE0->mem_free + 32*1024);
 	struct disk_op_s disk_op = {
 		.buf_fl = target,
 		.command = CMD_SEEK,
@@ -741,9 +742,9 @@ static int parisc_boot_menu(unsigned char **iplstart, unsigned char **iplend,
 
 	/* execute IPL */
 	// TODO: flush D- and I-cache, not needed in emulation ?
-	*iplstart = *iplend = (unsigned char *) target;
+	*iplstart = *iplend = (unsigned long) target;
 	*iplstart += ipl_entry;
-	*iplend += ipl_size;
+	*iplend += ALIGN(ipl_size, sizeof(unsigned long));
 	return 1;
 }
 
@@ -824,7 +825,7 @@ static void parisc_vga_init(void)
 void __VISIBLE start_parisc_firmware(void)
 {
 	unsigned int cpu_hz;
-	unsigned char *iplstart, *iplend;
+	unsigned long iplstart, iplend;
 
 	extern unsigned long boot_args[5];
 	unsigned long ram_size		 = boot_args[0];
@@ -843,13 +844,14 @@ void __VISIBLE start_parisc_firmware(void)
 	memset((void*)PAGE0, 0, sizeof(*PAGE0));
 	PAGE0->memc_cont = ram_size;
 	PAGE0->memc_phsize = ram_size;
-	PAGE0->mem_free = 0x6000;	// 4*4096; // 16k ??
-	PAGE0->mem_hpa = CPU_HPA; // /* HPA of boot-CPU */
+	PAGE0->mem_free = 0x4000; // min PAGE_SIZE
+	PAGE0->mem_hpa = CPU_HPA; // HPA of boot-CPU
 	PAGE0->mem_pdc = (unsigned long) &pdc_entry;
 	PAGE0->mem_10msec = CPU_CLOCK_MHZ*(1000000ULL/100);
 
 	memcpy((char*)&PAGE0->pad0, "SeaBIOS", 8); /* QEMU/SeaBIOS marker */
 
+	// PAGE0->imm_hpa = XXX; TODO?
 	PAGE0->imm_max_mem = ram_size;
 	memcpy((void*)&(PAGE0->mem_cons), &mem_cons_boot, sizeof(mem_cons_boot));
 	memcpy((void*)&(PAGE0->mem_boot), &mem_boot_boot, sizeof(mem_boot_boot));
@@ -868,18 +870,6 @@ void __VISIBLE start_parisc_firmware(void)
 	printf("PARISC SeaBIOS Firmware, 1 x PA7300LC (PCX-L2) at %d.%06d MHz, %lu MB RAM.\n",
 		cpu_hz / 1000000, cpu_hz % 1000000,
 		ram_size/1024/1024);
-
-	// mdelay(1000); // test: "wait 1 second"
-	// test endianess functions
-	// printf("0xdeadbeef %x %x\n", cpu_to_le16(0xdeadbeef),cpu_to_le32(0xdeadbeef));
-	// printf("0xdeadbeef %x %x\n", le16_to_cpu(0xefbe),le32_to_cpu(0xefbeadde));
-
-#if 0
-	printf("SeaBIOS: Current date %d-%d-%d\n", rtc_from_bcd(rtc_read(CMOS_RTC_YEAR)),
-		rtc_from_bcd(rtc_read(CMOS_RTC_MONTH)),
-		rtc_from_bcd(rtc_read(CMOS_RTC_DAY_MONTH)));
-	printf("SeaBIOS: Current seconds %lu\n", seconds_since_1970());
-#endif
 
 	// handle_post();
 	serial_debug_preinit();
@@ -921,8 +911,9 @@ void __VISIBLE start_parisc_firmware(void)
 		"  ---------  --------   ---------------------  -----------------  ----------\n"
 		"      0      " __stringify(CPU_CLOCK_MHZ) " MHz    Active                 Functional          64 KB\n"
 		"                                                                    1 MB ext\n\n\n");
-	printf("  Available memory (bytes)    :  %llu\n"
-		"  Good memory required (bytes):  134217728\n\n", (unsigned long long)ram_size);
+	printf("  Available memory:     %llu MB\n"
+		"  Good memory required: 64 MB\n\n",
+		(unsigned long long)ram_size/1024/1024);
 	printf("  Primary boot path:    FWSCSI.6.0\n"
 		"  Alternate boot path:  LAN.0.0.0.0.0.0\n"
 		"  Console path:         SERIAL_1.9600.8.none\n"
@@ -946,13 +937,13 @@ void __VISIBLE start_parisc_firmware(void)
 
 	/* check for bootable drives, and load and start IPL bootloader if possible */
 	if (parisc_boot_menu(&iplstart, &iplend, bootdrive)) {
-		void (*start_ipl)(long interactive, long mem_free);
+		void (*start_ipl)(long interactive, long iplend);
 
 		printf("\nBooting...\n"
 			"Boot IO Dependent Code (IODC) revision 153\n\n"
-			"HARD Booted.\n");
+			"%s Booted.\n", PAGE0->imm_soft_boot ? "SOFT":"HARD");
 		start_ipl = (void *) iplstart;
-		start_ipl(interactive, (long)iplend);
+		start_ipl(interactive, iplend);
 	}
 
 	hlt(); /* this ends the emulator */
