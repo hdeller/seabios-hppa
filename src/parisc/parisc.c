@@ -509,6 +509,13 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 			/* we ignore the usecs in ARG3 */
 			epoch_to_date_time(ARG2);
 			return PDC_OK;
+		case 2: /* PDC_TOD_CALIBRATE_TIMERS */
+			/* double-precision floating-point with frequency of Interval Timer in megahertz: */
+			*(double*)&result[0] = (double)CPU_CLOCK_MHZ;
+			/* unsigned 64-bit integers representing  clock accuracy in parts per billion: */
+			result[2] = 0x5a6c; /* TOD_acc */
+			result[3] = 0x5a6c; /* CR_acc (interval timer) */
+			return PDC_OK;
 		}
 		dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_TOD function %ld ARG2=%x ARG3=%x ARG4=%x\n", option, ARG2, ARG3, ARG4);
 		return PDC_BAD_OPTION;
