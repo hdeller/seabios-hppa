@@ -7,8 +7,6 @@ SECTIONS
 {
 	. = FIRMWARE_START;
 
-	/* keep __gp below 0x1000000 */
-
 	/* align on next page boundary */
 	. = ALIGN(4096);
 	.text :	{
