@@ -143,7 +143,7 @@ END(pdc_entry)
 ENTRY(iodc_entry)
 	.import parisc_iodc_entry
 	stw %rp,-20(%sp)
-	stw %r27,-32(%sp)
+	stw %dp,-32(%sp)
 	stw %arg0,-36(%sp)
 	stw %arg1,-40(%sp)
 	stw %arg2,-44(%sp)
@@ -157,7 +157,7 @@ ENTRY(iodc_entry)
 	ldo -FRAME_SIZE(%sp),%sp
 	ldw -20(%sp),%rp
 	bv %r0(%rp)
-	ldw -32(%sp),%r27
+	ldw -32(%sp),%dp
 END(iodc_entry)
 
 	.data
