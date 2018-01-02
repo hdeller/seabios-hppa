@@ -86,16 +86,20 @@ void wrmsr_smp(u32 index, u64 val) { }
 /* size of I/O block used in HP firmware */
 #define FW_BLOCKSIZE    2048
 
-void hlt(void)
+void __noreturn hlt(void)
 {
     printf("SeaBIOS wants SYSTEM HALT.\n\n");
-    asm volatile("\t.word 0xffffffff": : :"memory");
+    asm volatile("\t.word 0xfffdead0": : :"memory"); /* new opcode */
+    asm volatile("\t.word 0xffffffff": : :"memory"); /* old */
+    while (1);
 }
 
-void reset(void)
+void __noreturn reset(void)
 {
-	PAGE0->imm_soft_boot = 1;
-	hlt(); // TODO: Reset the machine
+    printf("SeaBIOS wants SYSTEM RESET.\n\n");
+    PAGE0->imm_soft_boot = 1;
+    asm volatile("\t.word 0xfffdead1": : :"memory");
+    while (1);
 }
 
 /********************************************************
@@ -627,7 +631,7 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 		break;
 	case PDC_BROADCAST_RESET:
 		dprintf(0, "\n\nSeaBIOS: PDC_BROADCAST_RESET (reset system) called with ARG3=%x ARG4=%x\n", ARG3, ARG4);
-		hlt();
+		reset();
 		return PDC_OK;
 	case PDC_PCI_INDEX: // not needed for Dino PCI bridge
 		return PDC_BAD_PROC;
