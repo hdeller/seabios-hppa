@@ -89,8 +89,7 @@ void wrmsr_smp(u32 index, u64 val) { }
 void __noreturn hlt(void)
 {
     printf("SeaBIOS wants SYSTEM HALT.\n\n");
-    asm volatile("\t.word 0xfffdead0": : :"memory"); /* new opcode */
-    asm volatile("\t.word 0xffffffff": : :"memory"); /* old */
+    asm volatile("\t.word 0xfffdead0": : :"memory");
     while (1);
 }
 
