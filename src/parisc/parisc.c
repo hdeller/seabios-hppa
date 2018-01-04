@@ -277,14 +277,20 @@ static inline int rtc_from_bcd(int a)
 
 static unsigned long seconds_since_1970(void)
 {
+	unsigned long ret;
 	unsigned int second = rtc_from_bcd(rtc_read(CMOS_RTC_SECONDS));
 	unsigned int minute = rtc_from_bcd(rtc_read(CMOS_RTC_MINUTES));
 	unsigned int hour   = rtc_from_bcd(rtc_read(CMOS_RTC_HOURS));
 	unsigned int day    = rtc_from_bcd(rtc_read(CMOS_RTC_DAY_MONTH)) - 1;
 	unsigned int month  = rtc_from_bcd(rtc_read(CMOS_RTC_MONTH)) - 1;
 	unsigned int year   = rtc_from_bcd(rtc_read(CMOS_RTC_YEAR));
-	return (((year/4*(365*4+1)+days[year%4][month]+day)*24+hour)*60+minute)
+	ret = (((year/4*(365*4+1)+days[year%4][month]+day)*24+hour)*60+minute)
 			*60+second + SECONDS_2000_JAN_1;
+
+	if (year >= 100)
+		dprintf(0, "\nSeaBIOS WARNING: READ RTC_YEAR=%d is above year 2100.\n", year);
+
+	return ret;
 }
 
 static inline int rtc_to_bcd(int a)
@@ -316,18 +322,20 @@ void epoch_to_date_time(unsigned long epoch)
             break;
     }
 
-    year  = years + year;
-    month = month + 1;
-    unsigned int day;
-    day   = epoch - days[year][month] + 1;
+    unsigned int rtc_year  = years + year;
+    unsigned int rtc_month = month + 1;
+    unsigned int rtc_day   = epoch - days[year][month] + 1;
 
     /* set date into RTC */
     rtc_write(CMOS_RTC_SECONDS, rtc_to_bcd(second));
     rtc_write(CMOS_RTC_MINUTES, rtc_to_bcd(minute));
     rtc_write(CMOS_RTC_HOURS, rtc_to_bcd(hour));
-    rtc_write(CMOS_RTC_DAY_MONTH, rtc_to_bcd(day));
-    rtc_write(CMOS_RTC_MONTH, rtc_to_bcd(month));
-    rtc_write(CMOS_RTC_YEAR, rtc_to_bcd(year));
+    rtc_write(CMOS_RTC_DAY_MONTH, rtc_to_bcd(rtc_day));
+    rtc_write(CMOS_RTC_MONTH, rtc_to_bcd(rtc_month));
+    rtc_write(CMOS_RTC_YEAR, rtc_to_bcd(rtc_year));
+
+    if (rtc_year >= 100)
+	dprintf(0, "\nSeaBIOS WARNING: WRITE RTC_YEAR=%d above year 2100.\n", rtc_year);
 }
 
 static const char *pdc_name(unsigned long num)
