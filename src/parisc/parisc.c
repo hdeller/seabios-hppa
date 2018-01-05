@@ -889,6 +889,13 @@ void __VISIBLE start_parisc_firmware(void)
 		cpu_hz / 1000000, cpu_hz % 1000000,
 		ram_size/1024/1024);
 
+	if (ram_size < 16*1024*1024) {
+		printf("\nSeaBIOS: Machine configured with too little "
+			"memory (%ld MB), minimum is 16 MB.\n\n",
+			ram_size/1024/1024);
+		hlt();
+	}
+
 	// handle_post();
 	serial_debug_preinit();
 	debug_banner();
