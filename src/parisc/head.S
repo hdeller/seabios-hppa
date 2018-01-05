@@ -1,11 +1,12 @@
 /*
  * Startup glue code for parisc firmware
  *
- *   (C) 2017 Helge Deller <deller@gmx.de>
+ *   (C) 2017-2018 Helge Deller <deller@gmx.de>
  */
 
 #include "parisc/hppa_hardware.h"
 #include "autoconf.h"
+#include "autoversion.h"
 
 	/* load 32-bit 'value' into 'reg' compensating for the ldil
 	 * sign-extension when running in wide mode.
@@ -69,8 +70,12 @@ name:
 	.section ".head.text","ax"
 	 .level 1.1
 
-ENTRY(startup)
+	/* file identification */
+	.stringz "PA-RISC/HPPA PDC Firmware (SeaBIOS fork)"
+	.stringz "https://github.com/hdeller/seabios-hppa"
+	.stringz BUILD_VERSION
 
+ENTRY(startup)
 	/* Make sure space registers are set to zero */
 	mtsp    %r0,%sr0
 	mtsp    %r0,%sr1

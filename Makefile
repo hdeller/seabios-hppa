@@ -98,7 +98,7 @@ endif
 -include $(KCONFIG_CONFIG)
 
 target-y :=
-target-$(CONFIG_QEMU) += $(OUT)bios.bin
+target-$(CONFIG_QEMU) += $(OUT)hppa-firmware.img
 
 all: $(target-y)
 
@@ -161,7 +161,7 @@ $(OUT)ccode32flat.o: $(OUT)autoversion.h $(OUT)autoconf.h $(patsubst %.c, $(OUT)
 $(OUT)autoversion.h:
 	$(Q)$(PYTHON) ./scripts/buildversion.py -e "$(EXTRAVERSION)" -t "$(CC);$(AS);$(LD);$(OBJCOPY);$(OBJDUMP);$(STRIP)" $(OUT)autoversion.h
 
-$(OUT)bios.bin: $(OUT)autoconf.h $(OUT)head.o $(OUT)ccode32flat.o src/version.c
+$(OUT)hppa-firmware.img: $(OUT)autoconf.h $(OUT)head.o $(OUT)ccode32flat.o src/version.c
 	@echo "  Linking $@"
 	$(Q)$(CPP) $(CPPFLAGS) -Isrc -D__ASSEMBLY__ src/parisc/pafirmware.lds.S -o $(OUT)pafirmware.lds
 	$(Q)$(CC) $(CFLAGS32FLAT) -c src/version.c -o $(OUT)version.o
