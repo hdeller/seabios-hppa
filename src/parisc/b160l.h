@@ -434,17 +434,17 @@ static struct pdc_iodc iodc_data_hpa_f8000000 = {
 #define HPA_f8000000_num_addr 1
 #define HPA_f8000000_add_addr 0xf0011000, 
 
-#define HPA_fffbe000_DESCRIPTION "Merlin L2 160 (9000/778/B160L)"
-static struct pdc_system_map_mod_info mod_info_hpa_fffbe000 = {
-	.mod_addr = 0xfffbe000,
+#define HPA_fff10000_DESCRIPTION "Merlin L2 160 (9000/778/B160L)"
+static struct pdc_system_map_mod_info mod_info_hpa_fff10000 = {
+	.mod_addr = 0xfff10000,
 	.mod_pgs = 0x1,
 	.add_addrs = 0x0,
 };
-static struct pdc_module_path mod_path_hpa_fffbe000 = {
+static struct pdc_module_path mod_path_hpa_fff10000 = {
 	.path = { .flags = 0x0, .bc = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff }, .mod = 0x3e  },
 	.layers = { 0x0, 0x0, 0x0, 0x0, 0x0, 0x0 }
 };
-static struct pdc_iodc iodc_data_hpa_fffbe000 = {
+static struct pdc_iodc iodc_data_hpa_fff10000 = {
 	.hversion_model = 0x0050,
 	.hversion = 0x0020,
 	.spa = 0x0000,
@@ -459,8 +459,8 @@ static struct pdc_iodc iodc_data_hpa_fffbe000 = {
 	.length = 0x0000,
 	/* pad: 0x0000, 0x0000 */
 };
-#define HPA_fffbe000_num_addr 0
-#define HPA_fffbe000_add_addr 0
+#define HPA_fff10000_num_addr 0
+#define HPA_fff10000_add_addr 0
 
 #define HPA_fffbf000_DESCRIPTION "Memory"
 static struct pdc_system_map_mod_info mod_info_hpa_fffbf000 = {
@@ -609,12 +609,12 @@ static struct pdc_iodc iodc_data_hpa_fff81000 = {
 		.mod_path = &mod_path_hpa_f8000000,\
 		.num_addr = HPA_f8000000_num_addr,\
 		.add_addr = { HPA_f8000000_add_addr } },\
-	{	.hpa = 0xfffbe000,\
-		.iodc = &iodc_data_hpa_fffbe000,\
-		.mod_info = &mod_info_hpa_fffbe000,\
-		.mod_path = &mod_path_hpa_fffbe000,\
-		.num_addr = HPA_fffbe000_num_addr,\
-		.add_addr = { HPA_fffbe000_add_addr } },\
+	{	.hpa = 0xfff10000,\
+		.iodc = &iodc_data_hpa_fff10000,\
+		.mod_info = &mod_info_hpa_fff10000,\
+		.mod_path = &mod_path_hpa_fff10000,\
+		.num_addr = HPA_fff10000_num_addr,\
+		.add_addr = { HPA_fff10000_add_addr } },\
 	{	.hpa = 0xfffbf000,\
 		.iodc = &iodc_data_hpa_fffbf000,\
 		.mod_info = &mod_info_hpa_fffbf000,\

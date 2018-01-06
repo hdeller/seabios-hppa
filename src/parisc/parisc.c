@@ -114,32 +114,69 @@ typedef struct {
 	int add_addr[5];
 } hppa_device_t;
 
-static hppa_device_t parisc_devices[] = { PARISC_DEVICE_LIST };
+static hppa_device_t parisc_devices[HPPA_MAX_CPUS+10] = { PARISC_DEVICE_LIST };
 
 #define PARISC_KEEP_LIST \
        0xffc00000,\
        0xfff80000,\
        0xfff83000,\
-       0xfffbe000,\
+       CPU_HPA,\
        0xfffbf000,\
 
-/* drop all devices which are not listed in PARISC_KEEP_LIST */
-static void remove_parisc_devices(void)
+/* Rebuild hardware list and drop all devices which are not listed in
+ * PARISC_KEEP_LIST. Generate num_cpus CPUs. */
+static void remove_parisc_devices(unsigned int num_cpus)
 {
 	static unsigned long keep_list[] = { PARISC_KEEP_LIST };
+	static struct pdc_system_map_mod_info modinfo[HPPA_MAX_CPUS] = { {1,}, };
+	static struct pdc_module_path modpath[HPPA_MAX_CPUS] = { {{1,}} };
+	hppa_device_t *cpu_dev = NULL;
 	int i,p, t;
+
+	/* already initialized? */
+	if (!keep_list[0])
+		return;
+
 	i = p = t = 0;
 	while (keep_list[i] && parisc_devices[p].hpa) {
 		if (parisc_devices[p].hpa == keep_list[i]) {
-			parisc_devices[t++] = parisc_devices[p];
+			parisc_devices[t] = parisc_devices[p];
+			if (parisc_devices[t].hpa == CPU_HPA)
+				cpu_dev = &parisc_devices[t];
+			t++;
 			i++;
 		}
 		p++;
 	}
+
+	/* Generate CPU list */
+	for (i = 1; i < num_cpus; i++) {
+		unsigned long hpa = CPU_HPA + i*0x1000;
+
+		parisc_devices[t] = *cpu_dev;
+		parisc_devices[t].hpa = hpa;
+
+		modinfo[i] = *cpu_dev->mod_info;
+		modinfo[i].mod_addr = hpa;
+		parisc_devices[t].mod_info = &modinfo[i];
+
+		modpath[i] = *cpu_dev->mod_path;
+		modpath[i].path.mod = 128 + i;
+		parisc_devices[t].mod_path = &modpath[i];
+
+		t++;
+	}
+
+	if (t > ARRAY_SIZE(parisc_devices))
+		hlt();
+
 	while (t < ARRAY_SIZE(parisc_devices)) {
 		memset(&parisc_devices[t], 0, sizeof(parisc_devices[0]));
 		t++;
 	}
+
+	/* do not initialize again. */
+	keep_list[0] = 0;
 }
 
 static struct drive_s *boot_drive;
@@ -845,18 +882,22 @@ void __VISIBLE start_parisc_firmware(void)
 	unsigned int cpu_hz;
 	unsigned long iplstart, iplend;
 
-	extern unsigned long boot_args[5];
+	extern unsigned long boot_args[];
 	unsigned long ram_size		 = boot_args[0];
 	unsigned long linux_kernel_entry = boot_args[1];
 	unsigned long cmdline		 = boot_args[2];
 	unsigned long initrd_start	 = boot_args[3];
 	unsigned long initrd_end	 = boot_args[4];
+	unsigned long smp_cpus		 = boot_args[5];
 
 	unsigned long interactive = (linux_kernel_entry == 1) ? 1:0;
 	char bootdrive = (char) cmdline; // c = hdd, d = CD/DVD
 
+	if (smp_cpus > HPPA_MAX_CPUS)
+		smp_cpus = HPPA_MAX_CPUS;
+
 	/* Initialize device list */
-	remove_parisc_devices();
+	remove_parisc_devices(smp_cpus);
 
 	/* Initialize PAGE0 */
 	memset((void*)PAGE0, 0, sizeof(*PAGE0));
@@ -885,8 +926,8 @@ void __VISIBLE start_parisc_firmware(void)
 
 	cpu_hz = 100 * PAGE0->mem_10msec; /* Hz of this PARISC */
 	printf("\n");
-	printf("PARISC SeaBIOS Firmware, 1 x PA7300LC (PCX-L2) at %d.%06d MHz, %lu MB RAM.\n",
-		cpu_hz / 1000000, cpu_hz % 1000000,
+	printf("PARISC SeaBIOS Firmware, %ld x PA7300LC (PCX-L2) at %d.%06d MHz, %lu MB RAM.\n",
+		smp_cpus, cpu_hz / 1000000, cpu_hz % 1000000,
 		ram_size/1024/1024);
 
 	if (ram_size < 16*1024*1024) {

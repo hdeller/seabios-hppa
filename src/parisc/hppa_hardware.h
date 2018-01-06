@@ -19,7 +19,7 @@
 #define LASI_PS2KBD_HPA	0xffd08000
 #define LASI_PS2MOU_HPA	0xffd08100
 #define LASI_GFX_HPA	0xf8000000
-#define CPU_HPA		0xfffbe000
+#define CPU_HPA		0xfff10000
 #define MEMORY_HPA	0xfffbf000
 
 #define PCI_HPA         DINO_HPA        /* PCI bus */
@@ -36,8 +36,10 @@
 #define PORT_SERIAL1    (DINO_UART_HPA + 0x800)
 #define PORT_SERIAL2    (LASI_UART_HPA + 0x800)
 
+#define HPPA_MAX_CPUS   32      /* max. number of SMP CPUs */
 #define CPU_CLOCK_MHZ   250     /* emulate a 250 MHz CPU */
 
+#define CR_IVA_SMP      29      /* HACK: CR29 (TR 5) as SMP IRQ entry? */
 
 #if 0
 [    2.160168] 1. Phantom PseudoBC GSC+ Port at 0xffc00000 [8] { 7, 0x0, 0x504, 0x00000 }

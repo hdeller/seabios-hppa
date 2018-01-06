@@ -89,13 +89,58 @@ ENTRY(startup)
 #define PSW_W_SM	0x200
 #define PSW_W_BIT       36
 
-	;! nuke the W bit, saving original value
+	;! nuke the W bit
 	.level 2.0
 	rsm	PSW_W_SM, %r0
 	.level 1.1
 
-	/* Clear BSS */
+	/* qemu will look up IRQ handler in IVA.. */
+	mtctl	%r0, CR_IVA_SMP
 
+	/* branch if this is the monarch cpu */
+	load32 CPU_HPA,%r1
+	comb,= %r5,%r1,$is_monarch_cpu
+	nop
+
+	/* IDLE LOOP for SMP CPUs */
+	copy	%r5,%r26 /* SMP CPU HPA */
+
+	/* ignore IVA and give IRQ handler addr. */
+	load32	BOOTADDR($smp_exit_loop),%r1
+	mtctl	%r1, CR_IVA_SMP
+
+	/* enable CPU local interrupts */
+#define CR_EIEM 15
+	ldi	-1, %r1	/* allow IRQ0 (Timer) */
+	mtctl	%r1, CR_EIEM
+	ssm	1, %r0
+
+	/* endless idle loop, exits to $smp_exit_loop by IRQ only */
+$smp_idle_loop:
+	b $smp_idle_loop
+	or %r10,%r10,%r10
+
+$smp_exit_loop:
+	mtctl	%r0, CR_EIEM
+	mtctl	%r0, CR_IVA_SMP
+	// ssm	0, %r0
+
+	/* jump to rendevouz */
+	ldw	0x10(%r0),%r3	/* MEM_RENDEZ */
+	/* ldw	0x28(%r0),%r0	MEM_RENDEZ_HI - assume addr < 4GB */
+	bv	0(%r3)
+	copy	%r0,%r2
+
+
+$is_monarch_cpu:
+	/* Initialize stack pointer */
+	load32	BOOTADDR(parisc_stack),%r1
+	ldo	FRAME_SIZE(%r1),%sp
+
+	/* Initialize the global data pointer */
+	loadgp
+
+	/* Clear BSS on monarch CPU */
 	.import _bss,data
 	.import _ebss,data
 
@@ -105,13 +150,6 @@ $bss_loop:
 	cmpb,<<,n %r3,%r4,$bss_loop
 	stw,ma	%r0,4(%r3)
 
-	/* Initialize stack pointer */
-	load32	BOOTADDR(parisc_stack),%r1
-	ldo	FRAME_SIZE(%r1),%sp
-
-	/* Initialize the global data pointer */
-	loadgp
-
 	/* Save boot args */
         load32          BOOTADDR(boot_args),%r1
         stw,ma          %r26,4(%r1)
@@ -119,6 +157,7 @@ $bss_loop:
         stw,ma          %r24,4(%r1)
         stw,ma          %r23,4(%r1)
         stw,ma          %r22,4(%r1)
+        stw,ma          %r21,4(%r1)
 
 	load32	BOOTADDR(start_parisc_firmware),%r3
 	bv	0(%r3)
@@ -172,6 +211,7 @@ ENTRY(boot_args)
         .word 0 /* arg2: cmdline */
         .word 0 /* arg3: initrd_start */
         .word 0 /* arg4: initrd_end */
+        .word 0 /* arg5: num CPUs */
 END(boot_args)
 
 
