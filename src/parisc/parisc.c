@@ -1,6 +1,6 @@
 // Glue code for parisc architecture
 //
-// Copyright (C) 2017  Helge Deller <deller@gmx.de>
+// Copyright (C) 2017-2018  Helge Deller <deller@gmx.de>
 //
 // This file may be distributed under the terms of the GNU LGPLv3 license.
 
@@ -85,6 +85,8 @@ void wrmsr_smp(u32 index, u64 val) { }
 
 /* size of I/O block used in HP firmware */
 #define FW_BLOCKSIZE    2048
+
+#define MIN_RAM_SIZE	(16*1024*1024) // 16 MB
 
 void __noreturn hlt(void)
 {
@@ -477,13 +479,25 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 		case PDC_CACHE_INFO:
 			if (sizeof(cache_info) != sizeof(*machine_cache_info))
 				hlt();
-#if 1
+
 			// XXX: number of TLB entries should be aligned with qemu
 			machine_cache_info->it_size = 256;
 			machine_cache_info->dt_size = 256;
 			machine_cache_info->it_loop = 1;
 			machine_cache_info->dt_loop = 1;
-#endif
+
+			#if 0
+			dprintf(0, "\n\nCACHE  IC: %ld %ld  DC: %ld %ld\n",
+				machine_cache_info->ic_count, machine_cache_info->ic_loop,
+				machine_cache_info->dc_count, machine_cache_info->dc_loop);
+			#endif
+			machine_cache_info->ic_size = 0; /* no instruction cache */
+			machine_cache_info->ic_count = 0;
+			machine_cache_info->ic_loop = 0;
+			machine_cache_info->dc_size = 0; /* no data cache */
+			machine_cache_info->dc_count = 0;
+			machine_cache_info->dc_loop = 0;
+
 			memcpy(result, cache_info, sizeof(cache_info));
 			return PDC_OK;
 		}
@@ -879,7 +893,7 @@ static void parisc_vga_init(void)
 
 void __VISIBLE start_parisc_firmware(void)
 {
-	unsigned int cpu_hz;
+	unsigned int i, cpu_hz;
 	unsigned long iplstart, iplend;
 
 	extern unsigned long boot_args[];
@@ -908,7 +922,9 @@ void __VISIBLE start_parisc_firmware(void)
 	PAGE0->mem_pdc = (unsigned long) &pdc_entry;
 	PAGE0->mem_10msec = CPU_CLOCK_MHZ*(1000000ULL/100);
 
-	memcpy((char*)&PAGE0->pad0, "SeaBIOS", 8); /* QEMU/SeaBIOS marker */
+	/* Put QEMU/SeaBIOS marker in PAGE0.
+	 * The Linux kernel will search for it. */
+	memcpy((char*)&PAGE0->pad0, "SeaBIOS", 8);
 
 	// PAGE0->imm_hpa = XXX; TODO?
 	PAGE0->imm_max_mem = ram_size;
@@ -930,10 +946,10 @@ void __VISIBLE start_parisc_firmware(void)
 		smp_cpus, cpu_hz / 1000000, cpu_hz % 1000000,
 		ram_size/1024/1024);
 
-	if (ram_size < 16*1024*1024) {
+	if (ram_size < MIN_RAM_SIZE) {
 		printf("\nSeaBIOS: Machine configured with too little "
-			"memory (%ld MB), minimum is 16 MB.\n\n",
-			ram_size/1024/1024);
+			"memory (%ld MB), minimum is %d MB.\n\n",
+			ram_size/1024/1024, MIN_RAM_SIZE/1024/1024);
 		hlt();
 	}
 
@@ -953,37 +969,40 @@ void __VISIBLE start_parisc_firmware(void)
 	parisc_vga_init();
 
 	printf("\n");
+	printf("Firmware SeaBIOS Version 6.1\n"
+		"\n"
+		"Duplex Console IO Dependent Code (IODC) revision 1\n"
+		"\n"
+		"Memory Test/Initialization Completed\n\n");
+	printf("------------------------------------------------------------------------------\n"
+		"  (c) Copyright 2017-2018 Helge Deller <deller@gmx.de> and SeaBIOS developers.\n"
+		"------------------------------------------------------------------------------\n\n");
+	printf( "  Processor   Speed            State           Coprocessor State  Cache Size\n"
+		"  ---------  --------   ---------------------  -----------------  ----------\n");
+	for (i = 0; i < smp_cpus; i++)
+	  printf("      %d      " __stringify(CPU_CLOCK_MHZ)
+			" MHz    Active                 Functional           0 KB\n", i);
+	printf("\n\n");
+	printf("  Available memory:     %llu MB\n"
+		"  Good memory required: %d MB\n\n",
+		(unsigned long long)ram_size/1024/1024, MIN_RAM_SIZE/1024/1024);
+	printf("  Primary boot path:    FWSCSI.6.0\n"
+		"  Alternate boot path:  LAN.0.0.0.0.0.0\n"
+		"  Console path:         SERIAL_1.9600.8.none\n"
+		"  Keyboard path:        PS2\n\n");
+
 
 	/* directly start Linux kernel if it was given on qemu command line. */
 	if (linux_kernel_entry > 1) {
 		void (*start_kernel)(unsigned long mem_free, unsigned long cmdline,
 			unsigned long rdstart, unsigned long rdend);
 
-		printf("Starting Linux kernel which was loaded by qemu.\n\n");
+		printf("Autobooting Linux kernel which was loaded by qemu...\n\n");
 		start_kernel = (void *) linux_kernel_entry;
 		start_kernel(PAGE0->mem_free, cmdline, initrd_start, initrd_end);
 		hlt(); /* this ends the emulator */
 	}
 
-	printf("Firmware Version  6.1\n"
-		"\n"
-		"Duplex Console IO Dependent Code (IODC) revision 1\n"
-		"\n"
-		"Memory Test/Initialization Completed\n\n");
-	printf("------------------------------------------------------------------------------\n"
-		"   (c) Copyright 2017 Helge Deller <deller@gmx.de> and SeaBIOS developers.\n"
-		"------------------------------------------------------------------------------\n\n");
-	printf("  Processor   Speed            State           Coprocessor State  Cache Size\n"
-		"  ---------  --------   ---------------------  -----------------  ----------\n"
-		"      0      " __stringify(CPU_CLOCK_MHZ) " MHz    Active                 Functional          64 KB\n"
-		"                                                                    1 MB ext\n\n\n");
-	printf("  Available memory:     %llu MB\n"
-		"  Good memory required: 64 MB\n\n",
-		(unsigned long long)ram_size/1024/1024);
-	printf("  Primary boot path:    FWSCSI.6.0\n"
-		"  Alternate boot path:  LAN.0.0.0.0.0.0\n"
-		"  Console path:         SERIAL_1.9600.8.none\n"
-		"  Keyboard path:        PS2\n\n");
 #if 0
 	printf("------- Main Menu -------------------------------------------------------------\n\n"
 		"        Command                         Description\n"
