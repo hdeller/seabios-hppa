@@ -75,6 +75,11 @@ name:
 	.stringz "https://github.com/hdeller/seabios-hppa"
 	.stringz BUILD_VERSION
 
+
+/*******************************************************
+	Firmware startup code
+ *******************************************************/
+
 ENTRY(startup)
 	/* Make sure space registers are set to zero */
 	mtsp    %r0,%sr0
@@ -94,26 +99,25 @@ ENTRY(startup)
 	rsm	PSW_W_SM, %r0
 	.level 1.1
 
-	/* qemu will look up IRQ handler in IVA.. */
-	mtctl	%r0, CR_IVA_SMP
-
 	/* branch if this is the monarch cpu */
 	load32 CPU_HPA,%r1
 	comb,= %r5,%r1,$is_monarch_cpu
 	nop
 
 	/* IDLE LOOP for SMP CPUs */
-	copy	%r5,%r26 /* SMP CPU HPA */
+	copy	%r5,%r26 /* CPU HPA */
 
-	/* ignore IVA and give IRQ handler addr. */
-	load32	BOOTADDR($smp_exit_loop),%r1
-	mtctl	%r1, CR_IVA_SMP
+	/* Load IVT for SMT tiny loop exit */
+#define CR_IVA 14
+	load32	BOOTADDR(smp_ivt),%r1
+	mtctl	%r1, CR_IVA
 
 	/* enable CPU local interrupts */
 #define CR_EIEM 15
+#define PSW_I 1
 	ldi	-1, %r1	/* allow IRQ0 (Timer) */
 	mtctl	%r1, CR_EIEM
-	ssm	1, %r0
+	ssm	PSW_I, %r9
 
 	/* endless idle loop, exits to $smp_exit_loop by IRQ only */
 $smp_idle_loop:
@@ -121,9 +125,8 @@ $smp_idle_loop:
 	or %r10,%r10,%r10
 
 $smp_exit_loop:
+	mtsm	%r9
 	mtctl	%r0, CR_EIEM
-	mtctl	%r0, CR_IVA_SMP
-	// ssm	0, %r0
 
 	/* jump to rendevouz */
 	ldw	0x10(%r0),%r3	/* MEM_RENDEZ */
@@ -164,6 +167,29 @@ $bss_loop:
 	copy	%r0,%r2
 END(startup)
 
+
+/*******************************************************
+	SMP Interrupt vector table (IVT)
+ *******************************************************/
+
+	.macro  DEF_IVA_ENTRY
+	.align 32
+	load32 BOOTADDR($smp_exit_loop),%r1
+	bv	0(%r1)
+	nop
+	.endm
+
+	.align 32	/* should be 4k but qemu does not check */
+ENTRY(smp_ivt)
+	.rept 32
+	DEF_IVA_ENTRY
+	.endr
+END(smp_ivt)
+
+
+/*******************************************************
+	PDC and IODC entry
+ *******************************************************/
 
 ENTRY(pdc_entry)
 	stw %rp,-20(%sp)

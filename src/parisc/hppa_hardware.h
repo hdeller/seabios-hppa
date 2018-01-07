@@ -39,7 +39,6 @@
 #define HPPA_MAX_CPUS   32      /* max. number of SMP CPUs */
 #define CPU_CLOCK_MHZ   250     /* emulate a 250 MHz CPU */
 
-#define CR_IVA_SMP      29      /* HACK: CR29 (TR 5) as SMP IRQ entry? */
 
 #if 0
 [    2.160168] 1. Phantom PseudoBC GSC+ Port at 0xffc00000 [8] { 7, 0x0, 0x504, 0x00000 }
