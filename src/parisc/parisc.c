@@ -980,8 +980,9 @@ void __VISIBLE start_parisc_firmware(void)
 	printf( "  Processor   Speed            State           Coprocessor State  Cache Size\n"
 		"  ---------  --------   ---------------------  -----------------  ----------\n");
 	for (i = 0; i < smp_cpus; i++)
-	  printf("      %d      " __stringify(CPU_CLOCK_MHZ)
-			" MHz    Active                 Functional           0 KB\n", i);
+	  printf("     %s%d      " __stringify(CPU_CLOCK_MHZ)
+			" MHz    %s                 Functional            0 KB\n",
+			i < 10 ? " ":"", i, i?"Idle  ":"Active");
 	printf("\n\n");
 	printf("  Available memory:     %llu MB\n"
 		"  Good memory required: %d MB\n\n",
