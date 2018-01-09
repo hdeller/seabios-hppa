@@ -824,9 +824,9 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 		return PDC_BAD_OPTION;
 	case 26: // PDC_SCSI_PARMS is the architected firmware interface to replace the Hversion PDC_INITIATOR procedure.
 		return PDC_BAD_PROC;
-	case 64: // Unknown function. HP-UX 11 calls it during boot.
-	case 65: // Unknown function. HP-UX 11 calls it during boot.
-		dprintf(0, "\n\nSeaBIOS: UNKNOWN PDC OPTION %lu called with ARG2=%x ARG3=%x ARG4=%x\n", option, ARG2, ARG3, ARG4);
+	case 64: // Unknown function. HP-UX 11 bootcd calls it during boot.
+	case 65: // Unknown function. HP-UX 11 bootcd calls it during boot.
+		dprintf(0, "\n\nSeaBIOS: UNKNOWN PDC proc %lu OPTION %lu called with ARG2=%x ARG3=%x ARG4=%x\n", proc, option, ARG2, ARG3, ARG4);
 		return PDC_BAD_PROC;
 	case PDC_IO:
 		switch (option) {
