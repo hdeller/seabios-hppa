@@ -213,8 +213,19 @@ ENTRY(pdc_entry)
 	ldw -32(%sp),%dp
 END(pdc_entry)
 
+ENTRY(iodc_entry_table)
+	load32 parisc_iodc_ENTRY_INIT,   %r1
+	load32 parisc_iodc_ENTRY_IO,     %r1
+	load32 parisc_iodc_ENTRY_SPA,    %r1
+	load32 parisc_iodc_ENTRY_CONFIG, %r1
+	load32 parisc_iodc_ENTRY_TLB,    %r1
+	load32 parisc_iodc_ENTRY_TEST,   %r1
+	load32 parisc_iodc_ENTRY_TLB,    %r1
+END(iodc_entry_table)
+
 ENTRY(iodc_entry)
-	.import parisc_iodc_entry
+	load32 parisc_iodc_ENTRY_IO, %r1
+
 	stw %rp,-20(%sp)
 	stw %dp,-32(%sp)
 	stw %arg0,-36(%sp)
@@ -224,9 +235,10 @@ ENTRY(iodc_entry)
 	ldo -FRAME_SIZE(%sp),%arg0
 
 	loadgp
-	b,l parisc_iodc_entry, %rp
+	load32 .iodc_ret, %rp
+	bv %r0(%r1)
 	ldo FRAME_SIZE(%sp),%sp
-
+.iodc_ret:
 	ldo -FRAME_SIZE(%sp),%sp
 	ldw -20(%sp),%rp
 	bv %r0(%rp)

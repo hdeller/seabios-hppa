@@ -82,6 +82,10 @@ extern unsigned long boot_args[];
 #define initrd_end		(boot_args[4])
 #define smp_cpus		(boot_args[5])
 
+extern char pdc_entry;
+extern char iodc_entry;
+extern char iodc_entry_table;
+
 /* args as handed over for firmware calls */
 #define ARG0 arg[7-0]
 #define ARG1 arg[7-1]
@@ -96,6 +100,8 @@ extern unsigned long boot_args[];
 #define FW_BLOCKSIZE    2048
 
 #define MIN_RAM_SIZE	(16*1024*1024) // 16 MB
+
+static unsigned long GoldenMemory = MIN_RAM_SIZE;
 
 void __noreturn hlt(void)
 {
@@ -223,18 +229,30 @@ static unsigned long parisc_serial_in(char *c, unsigned long maxchars)
 	return count;
 }
 
-int __VISIBLE parisc_iodc_entry(unsigned int *arg)
+void print_iodc_err(unsigned int *arg, const char *func)
 {
 	unsigned long hpa = ARG0;
 	unsigned long option = ARG1;
 	unsigned long spa = ARG2;
-	unsigned long layers = ARG3;
+	unsigned long layers = ARG3; /* ID_addr */
+	unsigned long *result = (unsigned long *)ARG4;
+	dprintf(0, "\nIODC %s option #%ld called: hpa=0x%lx spa=0x%lx layers=0x%lx ", func, option, hpa, spa, layers);
+	dprintf(0, "result=0x%p arg5=0x%x arg6=0x%x arg7=0x%x\n", result, ARG5, ARG6, ARG7);
+}
+
+
+int __VISIBLE parisc_iodc_ENTRY_IO(unsigned int *arg)
+{
+	unsigned long hpa = ARG0;
+	unsigned long option = ARG1;
 	unsigned long *result = (unsigned long *)ARG4;
 	int ret, len;
 	char *c;
 	struct disk_op_s disk_op;
 
 #if 0
+	unsigned long spa = ARG2;
+	unsigned long layers = ARG3; /* ID_addr */
 	dprintf(0, "\nIODC option start #%ld : hpa=%lx spa=%lx layers=%lx ", option, hpa, spa, layers);
 	dprintf(0, "result=%p arg5=0x%x arg6=0x%x arg7=0x%x\n", result, ARG5, ARG6, ARG7);
 #endif
@@ -270,13 +288,63 @@ int __VISIBLE parisc_iodc_entry(unsigned int *arg)
 		return PDC_OK;
 	}
 
-	dprintf(0, "\nIODC option #%ld called: hpa=0x%lx spa=0x%lx layers=0x%lx ", option, hpa, spa, layers);
-	dprintf(0, "result=0x%p arg5=0x%x arg6=0x%x arg7=0x%x\n", result, ARG5, ARG6, ARG7);
+	if (option == ENTRY_IO_CLOSE)
+		return PDC_OK;
+
+	print_iodc_err(arg, __FUNCTION__);
 
 	hlt();
 	return PDC_BAD_OPTION;
 }
 
+
+int __VISIBLE parisc_iodc_ENTRY_INIT(unsigned int *arg)
+{
+	unsigned long option = ARG1;
+	unsigned long *result = (unsigned long *)ARG4;
+
+	switch (option) {
+	case 4:	/* Init & test mod & dev */
+		result[0] = 0; /* module status */
+		result[1] = (ARG3 == DINO_UART_HPA) ? CL_DUPLEX:
+			    (ARG3 == IDE_HPA) ? CL_RANDOM : 0;
+		result[2] = result[3] = 0; /* TODO?: MAC of network card. */
+		return PDC_OK;
+	}
+	print_iodc_err(arg, __FUNCTION__);
+	return PDC_BAD_OPTION;
+}
+
+int __VISIBLE parisc_iodc_ENTRY_SPA(unsigned int *arg)
+{
+	print_iodc_err(arg, __FUNCTION__);
+	return PDC_BAD_OPTION;
+}
+
+int __VISIBLE parisc_iodc_ENTRY_CONFIG(unsigned int *arg)
+{
+	print_iodc_err(arg, __FUNCTION__);
+	return PDC_BAD_OPTION;
+}
+
+int __VISIBLE parisc_iodc_ENTRY_TEST(unsigned int *arg)
+{
+	print_iodc_err(arg, __FUNCTION__);
+	return PDC_BAD_OPTION;
+}
+
+int __VISIBLE parisc_iodc_ENTRY_TLB(unsigned int *arg)
+{
+	unsigned long option = ARG1;
+	unsigned long *result = (unsigned long *)ARG4;
+
+	if (option == 0) {
+		*result = 0; /* no TLB */
+		return PDC_OK;
+	}
+	print_iodc_err(arg, __FUNCTION__);
+	return PDC_BAD_OPTION;
+}
 
 /********************************************************
  * FIRMWARE PDC HANDLER
@@ -385,6 +453,11 @@ void epoch_to_date_time(unsigned long epoch)
 	dprintf(0, "\nSeaBIOS WARNING: WRITE RTC_YEAR=%d above year 2100.\n", rtc_year);
 }
 
+/* values in PDC_CHASSIS */
+const char * const systat[] =
+	{ "Off", "Fault", "Test", "Initialize",
+	  "Shutdown", "Warning", "Run", "All On" };
+
 static const char *pdc_name(unsigned long num)
 {
 	#define DO(x) if (num == x) return #x;
@@ -455,9 +528,35 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 	case PDC_POW_FAIL:
 		break;
 	case PDC_CHASSIS: /* chassis functions */
+		switch (option) {
+		case PDC_CHASSIS_DISP:
+			ARG3 = ARG2;
+			result = (unsigned long *)&ARG4; // do not write to ARG2, use &ARG4 instead
+			// fall through
+		case PDC_CHASSIS_DISPWARN:
+			ARG4 = (ARG3 >> 17) & 7;
+			dprintf(0, "\nSeaBIOS: PDC_CHASSIS sysstat = %s (%d), blank = %d, CHASSIS  %0x\n",
+				systat[ARG4], ARG4, (ARG3>>16)&1, ARG3 & 0xffffffff);
+			// fall through
+		case PDC_CHASSIS_WARN:
+			result[0] = 0;
+			return PDC_OK;
+		}
 		// dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_CHASSIS function %d %x %x %x %x\n", ARG1, ARG2, ARG3, ARG4, ARG5);
 		return PDC_BAD_PROC;
 	case PDC_PIM:
+		switch (option) {
+		case PDC_PIM_HPMC:
+			break;
+		case PDC_PIM_RETURN_SIZE:
+			*result = sizeof(struct pdc_hpmc_pim_11); // FIXME 64bit!
+			return PDC_OK;
+		case PDC_PIM_LPMC:
+		case PDC_PIM_SOFT_BOOT:
+			return PDC_BAD_OPTION;
+		case PDC_PIM_TOC:
+			break;
+		}
 		break;
 	case PDC_MODEL: /* model information */
 		switch (option) {
@@ -515,7 +614,7 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 	case PDC_HPA:
 		switch (option) {
 		case PDC_HPA_PROCESSOR:
-			result[0] = CPU_HPA;
+			result[0] = CPU_HPA; // XXX: NEED TO FIX FOR SMP?
 			result[1] = 0;
 			return PDC_OK;
 		case PDC_HPA_MODULES:
@@ -537,6 +636,8 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 		// dprintf(0, "\n\nSeaBIOS: Info PDC_IODC function %ld ARG3=%x ARG4=%x ARG5=%x ARG6=%x\n", option, ARG3, ARG4, ARG5, ARG6);
 		switch (option) {
 		case PDC_IODC_READ:
+			if (!ARG3)
+				return -4; // not valid
 			if (ARG3 == IDE_HPA) {
 				iodc_p = &iodc_data_hpa_fff8c000; // workaround for PCI ATA
 			} else {
@@ -546,7 +647,7 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 				iodc_p = parisc_devices[hpa_index].iodc;
 			}
 
-			if (ARG4 == PDC_IODC_RI_DATA_BYTES) {
+			if (ARG4 == PDC_IODC_INDEX_DATA) {
 				memcpy((void*) ARG5, iodc_p, ARG6);
 				c = (unsigned char *) ARG5;
 				c[0] = iodc_p->hversion_model; // FIXME.
@@ -555,23 +656,29 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 				return PDC_OK;
 			}
 
-			if (ARG4 == PDC_IODC_RI_INIT) {
-				result[0] = 0;
-				result[1] = (ARG3 == DINO_UART_HPA) ? CL_DUPLEX:
-					    (ARG3 == IDE_HPA) ? CL_RANDOM : 0;
-				result[2] = 0;
-				result[3] = 0;
-				return PDC_OK;
-			}
+			// ARG4 is IODC function to copy.
+			if (ARG4 < PDC_IODC_RI_INIT || ARG4 > PDC_IODC_RI_TLB)
+				return PDC_IODC_INVALID_INDEX;
 
-			if (ARG4 == PDC_IODC_RI_IO) { // Get ENTRY_IO
-				// TODO for HP-UX 10.20
-			}
+			*result = 512; /* max size of function iodc_entry */
+			if (ARG6 < *result)
+				return PDC_IODC_COUNT;
+			memcpy((void*) ARG5, &iodc_entry, *result);
+			c = (unsigned char *) &iodc_entry_table;
+			/* calculate offset into jump table. */
+			c += (ARG4 - PDC_IODC_RI_INIT) * 2 * sizeof(unsigned int);
+			memcpy((void*) ARG5, c, 2 * sizeof(unsigned int));
+			return PDC_OK;
 			break;
 		case PDC_IODC_NINIT:	/* non-destructive init */
 		case PDC_IODC_DINIT:	/* destructive init */
-		case PDC_IODC_MEMERR:
 			break;
+		case PDC_IODC_MEMERR:
+			result[0] = 0;
+			result[1] = 0;
+			result[2] = 0;
+			result[3] = 0;
+			return PDC_OK;
 		}
 		dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_IODC function %ld ARG3=%x ARG4=%x ARG5=%x ARG6=%x\n", option, ARG3, ARG4, ARG5, ARG6);
 		return PDC_BAD_OPTION;
@@ -622,10 +729,14 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 		return PDC_BAD_PROC;
 	case PDC_ADD_VALID:
 		// dprintf(0, "\n\nSeaBIOS: PDC_ADD_VALID function %ld ARG2=%x called.\n", option, ARG2);
-		if (ARG2 < PAGE0->memc_phsize)
+		if (option != 0)
+			return PDC_BAD_OPTION;
+		// if (ARG2 < PAGE_SIZE) return PDC_ERROR;
+		if (ARG2 < ram_size)
 			return PDC_OK;
 		if ((ARG2 >= FIRMWARE_START) && (ARG2 <= 0xffffffff))
 			return PDC_OK;
+		dprintf(0, "\n\nSeaBIOS: FAILED!!!! PDC_ADD_VALID function %ld ARG2=%x called.\n", option, ARG2);
 		return PDC_ERROR;
 	case PDC_INSTR:
 		return PDC_BAD_PROC;
@@ -635,8 +746,27 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 		return PDC_BAD_PROC;
 	case PDC_TLB:		/* not used on Linux. Maybe on HP-UX? */
 		return PDC_BAD_PROC;
-	case PDC_MEM:		/* replaced by PDC_SYSTEM_MAP, might be needed for 64-bit */
-		// dprintf(0, "\n\nSeaBIOS: Check PDC_MEM option %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
+	case PDC_MEM:
+		// only implemented on 64bit! ??
+		if (sizeof(unsigned long) == sizeof(unsigned int))
+			return PDC_BAD_PROC;
+
+		switch (option) {
+		case PDC_MEM_MEMINFO:
+			result[0] = 0;	// no PDT entries
+			result[1] = 0;	// page entries
+			result[2] = 0;	// PDT status
+			result[3] = (unsigned long)-1ULL; // dbe_loc
+			result[4] = GoldenMemory; // good_mem
+			return PDC_OK;
+		case PDC_MEM_READ_PDT:
+			result[0] = 0;	// no PDT entries
+			return PDC_OK;
+		case PDC_MEM_GOODMEM:
+			GoldenMemory = ARG3;
+			return PDC_OK;
+		}
+		dprintf(0, "\n\nSeaBIOS: Check PDC_MEM option %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
 		return PDC_BAD_PROC;
 	case PDC_PSW:	/* Get/Set default System Mask  */
 		if (option > PDC_PSW_SET_DEFAULTS)
@@ -690,12 +820,19 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 				hlt();
 			return PDC_OK;
 		}
+		// dprintf(0, "\n\nSeaBIOS: PDC_SOFT_POWER called with ARG2=%x ARG3=%x ARG4=%x\n", ARG2, ARG3, ARG4);
 		return PDC_BAD_OPTION;
-		dprintf(0, "\n\nSeaBIOS: PDC_SOFT_POWER called with ARG2=%x ARG3=%x ARG4=%x\n", ARG2, ARG3, ARG4);
 	case 26: // PDC_SCSI_PARMS is the architected firmware interface to replace the Hversion PDC_INITIATOR procedure.
+		return PDC_BAD_PROC;
+	case 64: // Unknown function. HP-UX 11 calls it during boot.
+	case 65: // Unknown function. HP-UX 11 calls it during boot.
+		dprintf(0, "\n\nSeaBIOS: UNKNOWN PDC OPTION %lu called with ARG2=%x ARG3=%x ARG4=%x\n", option, ARG2, ARG3, ARG4);
 		return PDC_BAD_PROC;
 	case PDC_IO:
 		switch (option) {
+		case PDC_IO_READ_AND_CLEAR_ERRORS:
+			dprintf(0, "\n\nSeaBIOS: PDC_IO called with ARG2=%x ARG3=%x ARG4=%x\n", ARG2, ARG3, ARG4);
+			// return PDC_BAD_OPTION;
 		case PDC_IO_RESET:
 		case PDC_IO_RESET_DEVICES:
 			return PDC_OK;
@@ -835,9 +972,6 @@ static int parisc_boot_menu(unsigned long *iplstart, unsigned long *iplend,
 /********************************************************
  * FIRMWARE MAIN ENTRY POINT
  ********************************************************/
-
-extern char pdc_entry;
-extern char iodc_entry;
 
 static const struct pz_device mem_cons_boot = {
 	.hpa = DINO_UART_HPA,
