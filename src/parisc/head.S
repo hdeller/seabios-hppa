@@ -105,7 +105,7 @@ ENTRY(startup)
 	nop
 
 	/* IDLE LOOP for SMP CPUs */
-	copy	%r5,%r26 /* CPU HPA */
+	copy	%r5,%r25 /* CPU HPA */
 
 	/* Load IVT for SMT tiny loop exit */
 #define CR_IVA 14
@@ -127,6 +127,9 @@ $smp_idle_loop:
 $smp_exit_loop:
 	mtsm	%r9
 	mtctl	%r0, CR_EIEM
+
+	/* on 64bit: Address of PDCE_PROC for each non-monarch processor in GR26. */
+	load32	BOOTADDR(pdc_entry), %r26
 
 	/* jump to rendevouz */
 	ldw	0x10(%r0),%r3	/* MEM_RENDEZ */
