@@ -73,6 +73,15 @@ void wrmsr_smp(u32 index, u64 val) { }
 /* Pointer to zero-page of PA-RISC */
 #define PAGE0 ((volatile struct zeropage *) 0UL)
 
+/* variables provided by qemu */
+extern unsigned long boot_args[];
+#define ram_size		(boot_args[0])
+#define linux_kernel_entry	(boot_args[1])
+#define cmdline			(boot_args[2])
+#define initrd_start		(boot_args[3])
+#define initrd_end		(boot_args[4])
+#define smp_cpus		(boot_args[5])
+
 /* args as handed over for firmware calls */
 #define ARG0 arg[7-0]
 #define ARG1 arg[7-1]
@@ -517,17 +526,17 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 		switch (option) {
 		case PDC_COPROC_CFG:
 			memset(result, 0, 32 * sizeof(unsigned long));
-			result[0] = 1; // XXX: num_cpus
-			result[1] = 1;
+			/* set bit per cpu in ccr_functional and ccr_present: */
+			result[0] = result[1] = (1ULL << smp_cpus) - 1;
 			result[17] = 1; // Revision
 			result[18] = 19; // Model
 			return PDC_OK;
 		}
 		return PDC_BAD_OPTION;
 	case PDC_IODC: /* Call IODC functions */
-		// dprintf(0, "\n\nSeaBIOS: Info PDC_IODC function %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
+		// dprintf(0, "\n\nSeaBIOS: Info PDC_IODC function %ld ARG3=%x ARG4=%x ARG5=%x ARG6=%x\n", option, ARG3, ARG4, ARG5, ARG6);
 		switch (option) {
-		case 0:
+		case PDC_IODC_READ:
 			if (ARG3 == IDE_HPA) {
 				iodc_p = &iodc_data_hpa_fff8c000; // workaround for PCI ATA
 			} else {
@@ -558,8 +567,13 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 			if (ARG4 == PDC_IODC_RI_IO) { // Get ENTRY_IO
 				// TODO for HP-UX 10.20
 			}
+			break;
+		case PDC_IODC_NINIT:	/* non-destructive init */
+		case PDC_IODC_DINIT:	/* destructive init */
+		case PDC_IODC_MEMERR:
+			break;
 		}
-		dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_IODC function %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
+		dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_IODC function %ld ARG3=%x ARG4=%x ARG5=%x ARG6=%x\n", option, ARG3, ARG4, ARG5, ARG6);
 		return PDC_BAD_OPTION;
 	case PDC_TOD:	/* Time of day */
 		switch (option) {
@@ -896,16 +910,8 @@ void __VISIBLE start_parisc_firmware(void)
 	unsigned int i, cpu_hz;
 	unsigned long iplstart, iplend;
 
-	extern unsigned long boot_args[];
-	unsigned long ram_size		 = boot_args[0];
-	unsigned long linux_kernel_entry = boot_args[1];
-	unsigned long cmdline		 = boot_args[2];
-	unsigned long initrd_start	 = boot_args[3];
-	unsigned long initrd_end	 = boot_args[4];
-	unsigned long smp_cpus		 = boot_args[5];
-
 	unsigned long interactive = (linux_kernel_entry == 1) ? 1:0;
-	char bootdrive = (char) cmdline; // c = hdd, d = CD/DVD
+	char bootdrive = (char)cmdline; // c = hdd, d = CD/DVD
 
 	if (smp_cpus > HPPA_MAX_CPUS)
 		smp_cpus = HPPA_MAX_CPUS;
@@ -995,7 +1001,7 @@ void __VISIBLE start_parisc_firmware(void)
 
 	/* directly start Linux kernel if it was given on qemu command line. */
 	if (linux_kernel_entry > 1) {
-		void (*start_kernel)(unsigned long mem_free, unsigned long cmdline,
+		void (*start_kernel)(unsigned long mem_free, unsigned long cline,
 			unsigned long rdstart, unsigned long rdend);
 
 		printf("Autobooting Linux kernel which was loaded by qemu...\n\n");
