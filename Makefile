@@ -31,7 +31,7 @@ LD32BIT_FLAG:=
 
 # Source files
 # misc.c stacks.c system.c resume.c pcibios.c hw/timer.c
-SRCBOTH=output.c string.c block.c cdrom.c disk.c mouse.c kbd.c \
+SRCBOTH=output.c string.c block.c cdrom.c disk.c kbd.c \
     serial.c sercon.c clock.c pnpbios.c vgahooks.c \
     apm.c cp437.c \
     hw/pci.c hw/rtc.c hw/dma.c hw/pic.c hw/ps2port.c hw/serialio.c \

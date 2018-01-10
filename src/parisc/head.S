@@ -164,6 +164,7 @@ $bss_loop:
         stw,ma          %r23,4(%r1)
         stw,ma          %r22,4(%r1)
         stw,ma          %r21,4(%r1)
+        stw,ma          %r20,4(%r1)
 
 	load32	BOOTADDR(start_parisc_firmware),%r3
 	bv	0(%r3)
@@ -253,6 +254,7 @@ ENTRY(boot_args)
         .word 0 /* arg3: initrd_start */
         .word 0 /* arg4: initrd_end */
         .word 0 /* arg5: num CPUs */
+        .word 0 /* arg6: pdc_debug */
 END(boot_args)
 
 

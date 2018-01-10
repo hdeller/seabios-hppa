@@ -81,6 +81,7 @@ extern unsigned long boot_args[];
 #define initrd_start		(boot_args[3])
 #define initrd_end		(boot_args[4])
 #define smp_cpus		(boot_args[5])
+#define pdc_debug		(boot_args[6])
 
 extern char pdc_entry;
 extern char iodc_entry;
@@ -112,7 +113,8 @@ void __noreturn hlt(void)
 
 void __noreturn reset(void)
 {
-    printf("SeaBIOS wants SYSTEM RESET.\n\n");
+    printf("SeaBIOS wants SYSTEM RESET.\n"
+	   "***************************\n");
     PAGE0->imm_soft_boot = 1;
     asm volatile("\t.word 0xfffdead1": : :"memory");
     while (1);
@@ -134,11 +136,12 @@ typedef struct {
 static hppa_device_t parisc_devices[HPPA_MAX_CPUS+10] = { PARISC_DEVICE_LIST };
 
 #define PARISC_KEEP_LIST \
-       0xffc00000,\
-       0xfff80000,\
-       0xfff83000,\
+       GSC_HPA,\
+       DINO_HPA,\
+       DINO_UART_HPA,\
+       /* DINO_SCSI_HPA,*/\
        CPU_HPA,\
-       0xfffbf000,\
+       MEMORY_HPA,\
 
 /* Rebuild hardware list and drop all devices which are not listed in
  * PARISC_KEEP_LIST. Generate num_cpus CPUs. */
@@ -245,17 +248,18 @@ int __VISIBLE parisc_iodc_ENTRY_IO(unsigned int *arg)
 {
 	unsigned long hpa = ARG0;
 	unsigned long option = ARG1;
+	unsigned long spa = ARG2;
+	unsigned long layers = ARG3; /* ID_addr */
 	unsigned long *result = (unsigned long *)ARG4;
 	int ret, len;
 	char *c;
 	struct disk_op_s disk_op;
 
-#if 0
-	unsigned long spa = ARG2;
-	unsigned long layers = ARG3; /* ID_addr */
-	dprintf(0, "\nIODC option start #%ld : hpa=%lx spa=%lx layers=%lx ", option, hpa, spa, layers);
-	dprintf(0, "result=%p arg5=0x%x arg6=0x%x arg7=0x%x\n", result, ARG5, ARG6, ARG7);
-#endif
+	if (pdc_debug) {
+		dprintf(0, "\nIODC option start #%ld : hpa=%lx spa=%lx layers=%lx ", option, hpa, spa, layers);
+		dprintf(0, "result=%p arg5=0x%x arg6=0x%x arg7=0x%x\n", result, ARG5, ARG6, ARG7);
+	}
+
 	/* console I/O */
 	if (hpa == DINO_UART_HPA || hpa == LASI_UART_HPA)
 	switch (option) {
@@ -272,7 +276,7 @@ int __VISIBLE parisc_iodc_ENTRY_IO(unsigned int *arg)
 	}
 
 	/* boot medium I/O */
-	if (hpa == IDE_HPA)
+	if (hpa == DINO_SCSI_HPA || hpa == IDE_HPA)
 	switch (option) {
 	case ENTRY_IO_BOOTIN: /* boot medium IN */
 		disk_op.drive_fl = boot_drive;
@@ -307,6 +311,7 @@ int __VISIBLE parisc_iodc_ENTRY_INIT(unsigned int *arg)
 	case 4:	/* Init & test mod & dev */
 		result[0] = 0; /* module status */
 		result[1] = (ARG3 == DINO_UART_HPA) ? CL_DUPLEX:
+			    (ARG3 == DINO_SCSI_HPA) ? CL_RANDOM:
 			    (ARG3 == IDE_HPA) ? CL_RANDOM : 0;
 		result[2] = result[3] = 0; /* TODO?: MAC of network card. */
 		return PDC_OK;
@@ -515,15 +520,17 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 	unsigned long *result = (unsigned long *)ARG2;
 
 	int hpa_index;
+	unsigned long hpa;
 	struct pdc_iodc *iodc_p;
 	unsigned char *c;
 
-	struct pdc_system_map_mod_info *pdc_mod_info;
 	struct pdc_module_path *mod_path;
-#if 0
-	dprintf(0, "\nSeaBIOS: Start PDC proc %s(%d) option %d result=0x%x ARG3=0x%x ", pdc_name(ARG0), ARG0, ARG1, ARG2, ARG3);
-	dprintf(0, "ARG4=0x%x ARG5=0x%x ARG6=0x%x ARG7=0x%x\n", ARG4, ARG5, ARG6, ARG7);
-#endif
+
+	if (pdc_debug) {
+		dprintf(0, "\nSeaBIOS: Start PDC proc %s(%d) option %d result=0x%x ARG3=0x%x ", pdc_name(ARG0), ARG0, ARG1, ARG2, ARG3);
+		dprintf(0, "ARG4=0x%x ARG5=0x%x ARG6=0x%x ARG7=0x%x\n", ARG4, ARG5, ARG6, ARG7);
+	}
+
 	switch (proc) {
 	case PDC_POW_FAIL:
 		break;
@@ -535,8 +542,8 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 			// fall through
 		case PDC_CHASSIS_DISPWARN:
 			ARG4 = (ARG3 >> 17) & 7;
-			dprintf(0, "\nSeaBIOS: PDC_CHASSIS sysstat = %s (%d), blank = %d, CHASSIS  %0x\n",
-				systat[ARG4], ARG4, (ARG3>>16)&1, ARG3 & 0xffffffff);
+			dprintf(0, "\nPDC_CHASSIS: %s (%d), %sCHASSIS  %0x\n",
+				systat[ARG4], ARG4, (ARG3>>16)&1 ? "blank display, ":"", ARG3 & 0xffffffff);
 			// fall through
 		case PDC_CHASSIS_WARN:
 			result[0] = 0;
@@ -636,21 +643,19 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 		// dprintf(0, "\n\nSeaBIOS: Info PDC_IODC function %ld ARG3=%x ARG4=%x ARG5=%x ARG6=%x\n", option, ARG3, ARG4, ARG5, ARG6);
 		switch (option) {
 		case PDC_IODC_READ:
-			if (!ARG3)
-				return -4; // not valid
 			if (ARG3 == IDE_HPA) {
 				iodc_p = &iodc_data_hpa_fff8c000; // workaround for PCI ATA
 			} else {
 				hpa_index = find_hpa_index(ARG3); // index in hpa list
 				if (hpa_index < 0)
-					return -3; // not found
+					return -4; // not found
 				iodc_p = parisc_devices[hpa_index].iodc;
 			}
 
 			if (ARG4 == PDC_IODC_INDEX_DATA) {
 				memcpy((void*) ARG5, iodc_p, ARG6);
 				c = (unsigned char *) ARG5;
-				c[0] = iodc_p->hversion_model; // FIXME.
+				c[0] = iodc_p->hversion_model; // FIXME. BROKEN HERE !!!
 				// c[1] = iodc_p->hversion_rev || (iodc_p->hversion << 4);
 				*result = ARG6;
 				return PDC_OK;
@@ -668,6 +673,7 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 			/* calculate offset into jump table. */
 			c += (ARG4 - PDC_IODC_RI_INIT) * 2 * sizeof(unsigned int);
 			memcpy((void*) ARG5, c, 2 * sizeof(unsigned int));
+			// dprintf(0, "\n\nSeaBIOS: Info PDC_IODC function OK\n");
 			return PDC_OK;
 			break;
 		case PDC_IODC_NINIT:	/* non-destructive init */
@@ -748,8 +754,7 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 		return PDC_BAD_PROC;
 	case PDC_MEM:
 		// only implemented on 64bit! ??
-		if (sizeof(unsigned long) == sizeof(unsigned int))
-			return PDC_BAD_PROC;
+		// if (sizeof(unsigned long) == sizeof(unsigned int)) return PDC_BAD_PROC;
 
 		switch (option) {
 		case PDC_MEM_MEMINFO:
@@ -785,27 +790,22 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 		// dprintf(0, "\n\nSeaBIOS: Info: PDC_SYSTEM_MAP function %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
 		switch (option) {
 		case PDC_FIND_MODULE:
-			if (ARG4 >= ARRAY_SIZE(parisc_devices))
+			hpa_index = ARG4;
+			if (hpa_index >= ARRAY_SIZE(parisc_devices))
 				return PDC_NE_MOD; // Module not found
-			if (!parisc_devices[ARG4].hpa)
+			hpa = parisc_devices[hpa_index].hpa;
+			if (!hpa)
 				return PDC_NE_MOD; // Module not found
 
-			pdc_mod_info = (struct pdc_system_map_mod_info *)ARG2;
 			mod_path = (struct pdc_module_path *)ARG3;
+			if (mod_path)
+				*mod_path = *parisc_devices[hpa_index].mod_path;
 
-			*pdc_mod_info = *parisc_devices[ARG4].mod_info;
-			*mod_path = *parisc_devices[ARG4].mod_path;
-
-			// FIXME: Implement additional addresses
-			pdc_mod_info->add_addrs = 0;
-
-			/* Work around firmware bug. Some device like
-			 * "Merlin+ 132 Dino PS/2 Port" don't set hpa.
-			 */
-			if (!pdc_mod_info->mod_addr) {
-				pdc_mod_info->mod_addr = parisc_devices[ARG4].hpa;
-				mod_path->path.mod = 1;
-			}
+			// *pdc_mod_info = *parisc_devices[hpa_index].mod_info; -> can be dropped.
+			result[0] = hpa; // .mod_addr for PDC_IODC
+			result[1] = 1; // .mod_pgs number of pages (only graphics has more, e.g. 0x2000)
+			// FIXME:
+			result[2] = 0; // no additional addresses
 
 			return PDC_OK;
 		case PDC_FIND_ADDRESS:
@@ -981,7 +981,7 @@ static const struct pz_device mem_cons_boot = {
 
 static const struct pz_device mem_boot_boot = {
 	.dp.flags = PF_AUTOBOOT,
-	.hpa = IDE_HPA,
+	.hpa = IDE_HPA, // DINO_SCSI_HPA,
 	.iodc_io = (unsigned long) &iodc_entry,
 	.cl_class = CL_RANDOM,
 };
@@ -1066,7 +1066,7 @@ void __VISIBLE start_parisc_firmware(void)
 	 * The Linux kernel will search for it. */
 	memcpy((char*)&PAGE0->pad0, "SeaBIOS", 8);
 
-	// PAGE0->imm_hpa = XXX; TODO?
+	PAGE0->imm_hpa = MEMORY_HPA;
 	PAGE0->imm_max_mem = ram_size;
 	memcpy((void*)&(PAGE0->mem_cons), &mem_cons_boot, sizeof(mem_cons_boot));
 	memcpy((void*)&(PAGE0->mem_boot), &mem_boot_boot, sizeof(mem_boot_boot));
@@ -1081,8 +1081,7 @@ void __VISIBLE start_parisc_firmware(void)
 	// PlatformRunningOn = PF_QEMU;  // emulate runningOnQEMU()
 
 	cpu_hz = 100 * PAGE0->mem_10msec; /* Hz of this PARISC */
-	printf("\n");
-	printf("PARISC SeaBIOS Firmware, %ld x PA7300LC (PCX-L2) at %d.%06d MHz, %lu MB RAM.\n",
+	dprintf(1, "\nPARISC SeaBIOS Firmware, %ld x PA7300LC (PCX-L2) at %d.%06d MHz, %lu MB RAM.\n",
 		smp_cpus, cpu_hz / 1000000, cpu_hz % 1000000,
 		ram_size/1024/1024);
 
@@ -1109,7 +1108,7 @@ void __VISIBLE start_parisc_firmware(void)
 	parisc_vga_init();
 
 	printf("\n");
-	printf("Firmware SeaBIOS Version 6.1\n"
+	printf("Firmware Version 6.1\n"
 		"\n"
 		"Duplex Console IO Dependent Code (IODC) revision 1\n"
 		"\n"

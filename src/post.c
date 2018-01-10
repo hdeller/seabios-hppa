@@ -120,7 +120,7 @@ interface_init(void)
     pmm_init();
     pnp_init();
     kbd_init();
-    mouse_init();
+    // mouse_init();
 }
 
 // Initialize hardware devices
