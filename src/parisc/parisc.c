@@ -232,15 +232,12 @@ static unsigned long parisc_serial_in(char *c, unsigned long maxchars)
 	return count;
 }
 
-void print_iodc_err(unsigned int *arg, const char *func)
+void iodc_log_call(unsigned int *arg, const char *func)
 {
-	unsigned long hpa = ARG0;
-	unsigned long option = ARG1;
-	unsigned long spa = ARG2;
-	unsigned long layers = ARG3; /* ID_addr */
-	unsigned long *result = (unsigned long *)ARG4;
-	dprintf(0, "\nIODC %s option #%ld called: hpa=0x%lx spa=0x%lx layers=0x%lx ", func, option, hpa, spa, layers);
-	dprintf(0, "result=0x%p arg5=0x%x arg6=0x%x arg7=0x%x\n", result, ARG5, ARG6, ARG7);
+	if (pdc_debug) {
+		printf("\nIODC %s called: hpa=0x%x option=0x%x arg2=0x%x arg3=0x%x ", func, ARG0, ARG1, ARG2, ARG3);
+		printf("result=0x%x arg5=0x%x arg6=0x%x arg7=0x%x\n", ARG4, ARG5, ARG6, ARG7);
+	}
 }
 
 
@@ -248,17 +245,12 @@ int __VISIBLE parisc_iodc_ENTRY_IO(unsigned int *arg)
 {
 	unsigned long hpa = ARG0;
 	unsigned long option = ARG1;
-	unsigned long spa = ARG2;
-	unsigned long layers = ARG3; /* ID_addr */
 	unsigned long *result = (unsigned long *)ARG4;
 	int ret, len;
 	char *c;
 	struct disk_op_s disk_op;
 
-	if (pdc_debug) {
-		dprintf(0, "\nIODC option start #%ld : hpa=%lx spa=%lx layers=%lx ", option, hpa, spa, layers);
-		dprintf(0, "result=%p arg5=0x%x arg6=0x%x arg7=0x%x\n", result, ARG5, ARG6, ARG7);
-	}
+	iodc_log_call(arg, __FUNCTION__);
 
 	/* console I/O */
 	if (hpa == DINO_UART_HPA || hpa == LASI_UART_HPA)
@@ -284,6 +276,7 @@ int __VISIBLE parisc_iodc_ENTRY_IO(unsigned int *arg)
 		disk_op.command = CMD_READ;
 		disk_op.count = (ARG7 / disk_op.drive_fl->blksize);
 		disk_op.lba = (ARG5 / disk_op.drive_fl->blksize);
+		// ARG8 = maxsize !!!
 		ret = process_op(&disk_op);
 		// dprintf(0, "\nBOOT IO res %d count = %d\n", ret, ARG7);
 		result[0] = ARG7;
@@ -295,7 +288,7 @@ int __VISIBLE parisc_iodc_ENTRY_IO(unsigned int *arg)
 	if (option == ENTRY_IO_CLOSE)
 		return PDC_OK;
 
-	print_iodc_err(arg, __FUNCTION__);
+	iodc_log_call(arg, __FUNCTION__);
 
 	hlt();
 	return PDC_BAD_OPTION;
@@ -307,6 +300,7 @@ int __VISIBLE parisc_iodc_ENTRY_INIT(unsigned int *arg)
 	unsigned long option = ARG1;
 	unsigned long *result = (unsigned long *)ARG4;
 
+	iodc_log_call(arg, __FUNCTION__);
 	switch (option) {
 	case 4:	/* Init & test mod & dev */
 		result[0] = 0; /* module status */
@@ -316,25 +310,24 @@ int __VISIBLE parisc_iodc_ENTRY_INIT(unsigned int *arg)
 		result[2] = result[3] = 0; /* TODO?: MAC of network card. */
 		return PDC_OK;
 	}
-	print_iodc_err(arg, __FUNCTION__);
 	return PDC_BAD_OPTION;
 }
 
 int __VISIBLE parisc_iodc_ENTRY_SPA(unsigned int *arg)
 {
-	print_iodc_err(arg, __FUNCTION__);
+	iodc_log_call(arg, __FUNCTION__);
 	return PDC_BAD_OPTION;
 }
 
 int __VISIBLE parisc_iodc_ENTRY_CONFIG(unsigned int *arg)
 {
-	print_iodc_err(arg, __FUNCTION__);
+	iodc_log_call(arg, __FUNCTION__);
 	return PDC_BAD_OPTION;
 }
 
 int __VISIBLE parisc_iodc_ENTRY_TEST(unsigned int *arg)
 {
-	print_iodc_err(arg, __FUNCTION__);
+	iodc_log_call(arg, __FUNCTION__);
 	return PDC_BAD_OPTION;
 }
 
@@ -343,11 +336,12 @@ int __VISIBLE parisc_iodc_ENTRY_TLB(unsigned int *arg)
 	unsigned long option = ARG1;
 	unsigned long *result = (unsigned long *)ARG4;
 
+	iodc_log_call(arg, __FUNCTION__);
+
 	if (option == 0) {
 		*result = 0; /* no TLB */
 		return PDC_OK;
 	}
-	print_iodc_err(arg, __FUNCTION__);
 	return PDC_BAD_OPTION;
 }
 
@@ -408,7 +402,7 @@ static unsigned long seconds_since_1970(void)
 			*60+second + SECONDS_2000_JAN_1;
 
 	if (year >= 100)
-		dprintf(0, "\nSeaBIOS WARNING: READ RTC_YEAR=%d is above year 2100.\n", year);
+		printf("\nSeaBIOS WARNING: READ RTC_YEAR=%d is above year 2100.\n", year);
 
 	return ret;
 }
@@ -455,7 +449,7 @@ void epoch_to_date_time(unsigned long epoch)
     rtc_write(CMOS_RTC_YEAR, rtc_to_bcd(rtc_year));
 
     if (rtc_year >= 100)
-	dprintf(0, "\nSeaBIOS WARNING: WRITE RTC_YEAR=%d above year 2100.\n", rtc_year);
+	printf("\nSeaBIOS WARNING: WRITE RTC_YEAR=%d above year 2100.\n", rtc_year);
 }
 
 /* values in PDC_CHASSIS */
@@ -527,8 +521,8 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 	struct pdc_module_path *mod_path;
 
 	if (pdc_debug) {
-		dprintf(0, "\nSeaBIOS: Start PDC proc %s(%d) option %d result=0x%x ARG3=0x%x ", pdc_name(ARG0), ARG0, ARG1, ARG2, ARG3);
-		dprintf(0, "ARG4=0x%x ARG5=0x%x ARG6=0x%x ARG7=0x%x\n", ARG4, ARG5, ARG6, ARG7);
+		printf("\nSeaBIOS: Start PDC proc %s(%d) option %d result=0x%x ARG3=0x%x ", pdc_name(ARG0), ARG0, ARG1, ARG2, ARG3);
+		printf("ARG4=0x%x ARG5=0x%x ARG6=0x%x ARG7=0x%x\n", ARG4, ARG5, ARG6, ARG7);
 	}
 
 	switch (proc) {
@@ -542,7 +536,7 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 			// fall through
 		case PDC_CHASSIS_DISPWARN:
 			ARG4 = (ARG3 >> 17) & 7;
-			dprintf(0, "\nPDC_CHASSIS: %s (%d), %sCHASSIS  %0x\n",
+			printf("\nPDC_CHASSIS: %s (%d), %sCHASSIS  %0x\n",
 				systat[ARG4], ARG4, (ARG3>>16)&1 ? "blank display, ":"", ARG3 & 0xffffffff);
 			// fall through
 		case PDC_CHASSIS_WARN:
@@ -594,7 +588,6 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 		case PDC_CACHE_INFO:
 			if (sizeof(cache_info) != sizeof(*machine_cache_info))
 				hlt();
-
 			// XXX: number of TLB entries should be aligned with qemu
 			machine_cache_info->it_size = 256;
 			machine_cache_info->dt_size = 256;
