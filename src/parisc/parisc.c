@@ -1069,6 +1069,35 @@ static void parisc_vga_init(void)
         }
 }
 
+/* Prepare boot paths in PAGE0 and stable memory */
+static void prepare_boot_path(volatile struct pz_device *dest,
+		const struct pz_device *source,
+		unsigned int stable_offset)
+{
+	int hpa_index;
+	unsigned long hpa;
+	struct pdc_module_path *mod_path;
+
+	memcpy((void*)dest, source, sizeof(*source));
+	hpa = source->hpa;
+	hpa_index = find_hpa_index(hpa);
+
+	if (hpa == DINO_SCSI_HPA || hpa == IDE_HPA)
+		mod_path = &mod_path_hpa_fff8c000;
+	else {
+		BUG_ON(hpa_index < 0);
+		mod_path = parisc_devices[hpa_index].mod_path;
+	}
+
+	/* copy device path to entry in PAGE0 */
+	memcpy((void*)&dest->dp, mod_path, sizeof(struct device_path));
+
+	/* copy device path to stable storage */
+	memcpy(&stable_storage[stable_offset], mod_path, sizeof(*mod_path));
+	BUG_ON(sizeof(*mod_path) != 0x20);
+}
+
+
 void __VISIBLE start_parisc_firmware(void)
 {
 	unsigned int i, cpu_hz;
@@ -1121,9 +1150,9 @@ void __VISIBLE start_parisc_firmware(void)
 	init_stable_storage();
 
 	// Initialize boot paths (disc, display & keyboard)
-	memcpy((void*)&(PAGE0->mem_cons), &mem_cons_boot, sizeof(mem_cons_boot));
-	memcpy((void*)&(PAGE0->mem_boot), &mem_boot_boot, sizeof(mem_boot_boot));
-	memcpy((void*)&(PAGE0->mem_kbd),  &mem_kbd_boot, sizeof(mem_kbd_boot));
+	prepare_boot_path(&(PAGE0->mem_cons), &mem_cons_boot, 0x60);
+	prepare_boot_path(&(PAGE0->mem_boot), &mem_boot_boot, 0x0);
+	prepare_boot_path(&(PAGE0->mem_kbd),  &mem_kbd_boot, 0xa0);
 
 	malloc_preinit();
 
