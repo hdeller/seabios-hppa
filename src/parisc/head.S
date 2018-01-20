@@ -70,6 +70,14 @@ name:
 	.section ".head.text","ax"
 	 .level 1.1
 
+	/* On HPMC, the CPUs will start here at 0xf0000000 */
+hpmc_entry:
+	b,n .	/* TODO! */
+
+reset_entry:
+	/* at reset, the CPU begins fetching instructions from address 0xf0000004. */
+	b,n startup
+
 	/* file identification */
 	.stringz "PA-RISC/HPPA PDC Firmware (SeaBIOS fork)"
 	.stringz "https://github.com/hdeller/seabios-hppa"
@@ -213,6 +221,12 @@ ENTRY(pdc_entry)
 	bv %r0(%rp)
 	ldw -32(%sp),%dp
 END(pdc_entry)
+
+/* pdc_entry_table will be copied into low memory. */
+ENTRY(pdc_entry_table)
+	load32 pdc_entry,%r1
+	bv,n %r0(%r1)
+END(pdc_entry_table)
 
 ENTRY(iodc_entry_table)
 	load32 parisc_iodc_ENTRY_INIT,   %r1
