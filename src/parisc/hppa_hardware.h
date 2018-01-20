@@ -5,6 +5,18 @@
 
 #define DEVICE_HPA_LEN	0x00100000
 
+/* ftp://parisc.parisc-linux.org/docs/chips/pcxl2_ers.pdf */
+#define IO_BROADCAST	0xfffc0000
+#define   FLEXID	0x0020
+#define   IO_COMMAND	0x0030
+#define   MIOC_CONTROL	0xf080
+#define   GSC_TIMEOUT	0xf0f0
+#define   GSC15X_CONFIG	0xf7a0
+
+#define LOCAL_COMMAND	0xFFFC0030
+#define GLOBAL_COMMAND	0xFFFE0030
+#define HPPA_CMD_RESET	5
+
 #define GSC_HPA		0xffc00000
 #define DINO_HPA	0xfff80000
 #define DINO_UART_HPA	0xfff83000
