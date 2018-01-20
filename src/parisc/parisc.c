@@ -84,6 +84,7 @@ extern unsigned long boot_args[];
 #define pdc_debug		(boot_args[6])
 
 extern char pdc_entry;
+extern char pdc_entry_table;
 extern char iodc_entry;
 extern char iodc_entry_table;
 
@@ -101,6 +102,8 @@ extern char iodc_entry_table;
 #define FW_BLOCKSIZE    2048
 
 #define MIN_RAM_SIZE	(16*1024*1024) // 16 MB
+
+#define MEM_PDC_ENTRY	0x4800	/* as in a B160L */
 
 static unsigned long GoldenMemory = MIN_RAM_SIZE;
 
@@ -120,6 +123,26 @@ void __noreturn reset(void)
     while (1);
 }
 
+#undef BUG_ON
+#define BUG_ON(cond) \
+	if (unlikely(cond)) \
+	{ printf("ERROR in %s:%d\n", __FUNCTION__, __LINE__); hlt(); }
+
+void flush_data_cache(char *start, size_t length)
+{
+    char *end = start + length;
+
+    do
+    {
+        asm volatile("fdc 0(%0)" : : "r" (start));
+        asm volatile("fic 0(%%sr0,%0)" : : "r" (start));
+        start += 16;
+    } while (start < end);
+    asm volatile("fdc 0(%0)" : : "r" (end));
+
+    asm ("sync");
+}
+
 /********************************************************
  * FIRMWARE IO Dependent Code (IODC) HANDLER
  ********************************************************/
@@ -136,35 +159,50 @@ typedef struct {
 static hppa_device_t parisc_devices[HPPA_MAX_CPUS+10] = { PARISC_DEVICE_LIST };
 
 #define PARISC_KEEP_LIST \
-       GSC_HPA,\
-       DINO_HPA,\
-       DINO_UART_HPA,\
-       /* DINO_SCSI_HPA,*/\
-       CPU_HPA,\
-       MEMORY_HPA,\
+	GSC_HPA,\
+	DINO_HPA,\
+	DINO_UART_HPA,\
+	DINO_SCSI_HPA,\
+	CPU_HPA,\
+	MEMORY_HPA,\
+	0
+
+static int keep_this_hpa(unsigned long hpa)
+{
+	static const unsigned long keep_list[] = { PARISC_KEEP_LIST };
+	int i = 0;
+
+	while (keep_list[i]) {
+		if (keep_list[i] == hpa)
+			return 1;
+		i++;
+	}
+	return 0;
+}
 
 /* Rebuild hardware list and drop all devices which are not listed in
  * PARISC_KEEP_LIST. Generate num_cpus CPUs. */
 static void remove_parisc_devices(unsigned int num_cpus)
 {
-	static unsigned long keep_list[] = { PARISC_KEEP_LIST };
 	static struct pdc_system_map_mod_info modinfo[HPPA_MAX_CPUS] = { {1,}, };
 	static struct pdc_module_path modpath[HPPA_MAX_CPUS] = { {{1,}} };
 	hppa_device_t *cpu_dev = NULL;
-	int i,p, t;
+	unsigned long hpa;
+	int i, p, t;
 
 	/* already initialized? */
-	if (!keep_list[0])
+	static int uninitialized = 1;
+	if (!uninitialized)
 		return;
+	uninitialized = 0;
 
-	i = p = t = 0;
-	while (keep_list[i] && parisc_devices[p].hpa) {
-		if (parisc_devices[p].hpa == keep_list[i]) {
+	p = t = 0;
+	while ((hpa = parisc_devices[p].hpa) != 0) {
+		if (keep_this_hpa(hpa)) {
 			parisc_devices[t] = parisc_devices[p];
-			if (parisc_devices[t].hpa == CPU_HPA)
+			if (hpa == CPU_HPA)
 				cpu_dev = &parisc_devices[t];
 			t++;
-			i++;
 		}
 		p++;
 	}
@@ -187,16 +225,12 @@ static void remove_parisc_devices(unsigned int num_cpus)
 		t++;
 	}
 
-	if (t > ARRAY_SIZE(parisc_devices))
-		hlt();
+	BUG_ON(t > ARRAY_SIZE(parisc_devices));
 
 	while (t < ARRAY_SIZE(parisc_devices)) {
 		memset(&parisc_devices[t], 0, sizeof(parisc_devices[0]));
 		t++;
 	}
-
-	/* do not initialize again. */
-	keep_list[0] = 0;
 }
 
 static struct drive_s *boot_drive;
@@ -206,9 +240,12 @@ static int find_hpa_index(unsigned long hpa)
 	int i;
 	if (!hpa)
 		return -1;
-	for (i = 0; i < (ARRAY_SIZE(parisc_devices)-1); i++)
+	for (i = 0; i < (ARRAY_SIZE(parisc_devices)-1); i++) {
 		if (hpa == parisc_devices[i].hpa)
 			return i;
+		if (!parisc_devices[i].hpa)
+			return -1;
+	}
 	return -1;
 }
 
@@ -240,8 +277,12 @@ void iodc_log_call(unsigned int *arg, const char *func)
 	}
 }
 
+#define FUNC_MANY_ARGS , \
+	int a0, int a1, int a2, int a3,  int a4,  int a5,  int a6, \
+	int a7, int a8, int a9, int a10, int a11, int a12
 
-int __VISIBLE parisc_iodc_ENTRY_IO(unsigned int *arg)
+
+int __VISIBLE parisc_iodc_ENTRY_IO(unsigned int *arg FUNC_MANY_ARGS)
 {
 	unsigned long hpa = ARG0;
 	unsigned long option = ARG1;
@@ -295,7 +336,7 @@ int __VISIBLE parisc_iodc_ENTRY_IO(unsigned int *arg)
 }
 
 
-int __VISIBLE parisc_iodc_ENTRY_INIT(unsigned int *arg)
+int __VISIBLE parisc_iodc_ENTRY_INIT(unsigned int *arg FUNC_MANY_ARGS)
 {
 	unsigned long option = ARG1;
 	unsigned long *result = (unsigned long *)ARG4;
@@ -313,25 +354,25 @@ int __VISIBLE parisc_iodc_ENTRY_INIT(unsigned int *arg)
 	return PDC_BAD_OPTION;
 }
 
-int __VISIBLE parisc_iodc_ENTRY_SPA(unsigned int *arg)
+int __VISIBLE parisc_iodc_ENTRY_SPA(unsigned int *arg FUNC_MANY_ARGS)
 {
 	iodc_log_call(arg, __FUNCTION__);
 	return PDC_BAD_OPTION;
 }
 
-int __VISIBLE parisc_iodc_ENTRY_CONFIG(unsigned int *arg)
+int __VISIBLE parisc_iodc_ENTRY_CONFIG(unsigned int *arg FUNC_MANY_ARGS)
 {
 	iodc_log_call(arg, __FUNCTION__);
 	return PDC_BAD_OPTION;
 }
 
-int __VISIBLE parisc_iodc_ENTRY_TEST(unsigned int *arg)
+int __VISIBLE parisc_iodc_ENTRY_TEST(unsigned int *arg FUNC_MANY_ARGS)
 {
 	iodc_log_call(arg, __FUNCTION__);
 	return PDC_BAD_OPTION;
 }
 
-int __VISIBLE parisc_iodc_ENTRY_TLB(unsigned int *arg)
+int __VISIBLE parisc_iodc_ENTRY_TLB(unsigned int *arg FUNC_MANY_ARGS)
 {
 	unsigned long option = ARG1;
 	unsigned long *result = (unsigned long *)ARG4;
@@ -500,7 +541,7 @@ static const char *pdc_name(unsigned long num)
 	return "UNKNOWN!";
 }
 
-int __VISIBLE parisc_pdc_entry(unsigned int *arg)
+int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
 {
 	static unsigned long psw_defaults = PDC_PSW_ENDIAN_BIT;
 	static unsigned long cache_info[] = { PARISC_PDC_CACHE_INFO };
@@ -537,7 +578,7 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 		case PDC_CHASSIS_DISPWARN:
 			ARG4 = (ARG3 >> 17) & 7;
 			printf("\nPDC_CHASSIS: %s (%d), %sCHASSIS  %0x\n",
-				systat[ARG4], ARG4, (ARG3>>16)&1 ? "blank display, ":"", ARG3 & 0xffffffff);
+				systat[ARG4], ARG4, (ARG3>>16)&1 ? "blank display, ":"", ARG3 & 0xffff);
 			// fall through
 		case PDC_CHASSIS_WARN:
 			result[0] = 0;
@@ -551,6 +592,7 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 			break;
 		case PDC_PIM_RETURN_SIZE:
 			*result = sizeof(struct pdc_hpmc_pim_11); // FIXME 64bit!
+			// B160 returns only "2". Why?
 			return PDC_OK;
 		case PDC_PIM_LPMC:
 		case PDC_PIM_SOFT_BOOT:
@@ -636,19 +678,23 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 		// dprintf(0, "\n\nSeaBIOS: Info PDC_IODC function %ld ARG3=%x ARG4=%x ARG5=%x ARG6=%x\n", option, ARG3, ARG4, ARG5, ARG6);
 		switch (option) {
 		case PDC_IODC_READ:
-			if (ARG3 == IDE_HPA) {
+			hpa = ARG3;
+			if (hpa == DINO_SCSI_HPA || hpa == IDE_HPA) {
 				iodc_p = &iodc_data_hpa_fff8c000; // workaround for PCI ATA
 			} else {
-				hpa_index = find_hpa_index(ARG3); // index in hpa list
+				hpa_index = find_hpa_index(hpa); // index in hpa list
 				if (hpa_index < 0)
 					return -4; // not found
 				iodc_p = parisc_devices[hpa_index].iodc;
 			}
 
 			if (ARG4 == PDC_IODC_INDEX_DATA) {
+				if (hpa == MEMORY_HPA)
+					ARG6 = 2; // Memory modules return 2 bytes of IODC memory (result2 ret[0] = 0x6701f41 HI !!)
 				memcpy((void*) ARG5, iodc_p, ARG6);
 				c = (unsigned char *) ARG5;
-				c[0] = iodc_p->hversion_model; // FIXME. BROKEN HERE !!!
+				// printf("SeaBIOS: PDC_IODC get: hpa = 0x%lx, HV: 0x%x 0x%x IODC_SPA=0x%x  type 0x%x, \n", hpa, c[0], c[1], c[2], c[3]);
+				// c[0] = iodc_p->hversion_model; // FIXME? BROKEN HERE ?
 				// c[1] = iodc_p->hversion_rev || (iodc_p->hversion << 4);
 				*result = ARG6;
 				return PDC_OK;
@@ -667,6 +713,7 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 			c += (ARG4 - PDC_IODC_RI_INIT) * 2 * sizeof(unsigned int);
 			memcpy((void*) ARG5, c, 2 * sizeof(unsigned int));
 			// dprintf(0, "\n\nSeaBIOS: Info PDC_IODC function OK\n");
+			flush_data_cache((char*)ARG5, *result);
 			return PDC_OK;
 			break;
 		case PDC_IODC_NINIT:	/* non-destructive init */
@@ -733,10 +780,12 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 		// if (ARG2 < PAGE_SIZE) return PDC_ERROR;
 		if (ARG2 < ram_size)
 			return PDC_OK;
-		if ((ARG2 >= FIRMWARE_START) && (ARG2 <= 0xffffffff))
+		if (ARG2 < FIRMWARE_END)
+			return 1;
+		if (ARG2 <= 0xffffffff)
 			return PDC_OK;
 		dprintf(0, "\n\nSeaBIOS: FAILED!!!! PDC_ADD_VALID function %ld ARG2=%x called.\n", option, ARG2);
-		return PDC_ERROR;
+		return PDC_REQ_ERR_0; /* Operation completed with a requestor bus error. */
 	case PDC_INSTR:
 		return PDC_BAD_PROC;
 	case PDC_CONFIG:	/* Obsolete */
@@ -746,8 +795,9 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 	case PDC_TLB:		/* not used on Linux. Maybe on HP-UX? */
 		return PDC_BAD_PROC;
 	case PDC_MEM:
-		// only implemented on 64bit! ??
-		// if (sizeof(unsigned long) == sizeof(unsigned int)) return PDC_BAD_PROC;
+		// only implemented on 64bit PDC!
+		if (sizeof(unsigned long) == sizeof(unsigned int))
+			return PDC_BAD_PROC;
 
 		switch (option) {
 		case PDC_MEM_MEMINFO:
@@ -796,9 +846,8 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 
 			// *pdc_mod_info = *parisc_devices[hpa_index].mod_info; -> can be dropped.
 			result[0] = hpa; // .mod_addr for PDC_IODC
-			result[1] = 1; // .mod_pgs number of pages (only graphics has more, e.g. 0x2000)
-			// FIXME:
-			result[2] = 0; // no additional addresses
+			result[1] = 1; // .mod_pgs number of pages (FIXME: only graphics has more, e.g. 0x2000)
+			result[2] = 0; // FIXME: additional addresses
 
 			return PDC_OK;
 		case PDC_FIND_ADDRESS:
@@ -932,7 +981,10 @@ static int parisc_boot_menu(unsigned long *iplstart, unsigned long *iplend,
 		return 0;
 	}
 	// printf("ipl start at 0x%x, size %d, entry 0x%x\n", ipl_addr, ipl_size, ipl_entry);
-	// TODO: check ipl values, out of range, ... ?
+	// TODO: check ipl values for out of range. Rules are:
+	// IPL_ADDR - 2 Kbyte aligned, nonzero.
+	// IPL_SIZE - Multiple of 2 Kbytes, nonzero, less than or equal to 256 Kbytes.
+	// IPL_ENTRY-  Word aligned, less than IPL_SIZE
 
 	/* seek to beginning of IPL */
 	disk_op.drive_fl = boot_drive;
@@ -974,7 +1026,7 @@ static const struct pz_device mem_cons_boot = {
 
 static const struct pz_device mem_boot_boot = {
 	.dp.flags = PF_AUTOBOOT,
-	.hpa = IDE_HPA, // DINO_SCSI_HPA,
+	.hpa = DINO_SCSI_HPA, // IDE_HPA
 	.iodc_io = (unsigned long) &iodc_entry,
 	.cl_class = CL_RANDOM,
 };
@@ -1032,6 +1084,29 @@ static void parisc_vga_init(void)
         }
 }
 
+/* Prepare boot paths in PAGE0 and stable memory */
+static void prepare_boot_path(volatile struct pz_device *dest,
+		const struct pz_device *source,
+		unsigned int stable_offset)
+{
+	int hpa_index;
+	struct pdc_module_path *mod_path;
+
+	memcpy((void*)dest, source, sizeof(*source));
+	hpa_index = find_hpa_index(source->hpa);
+
+	BUG_ON(hpa_index < 0);
+	mod_path = parisc_devices[hpa_index].mod_path;
+
+	/* copy device path to entry in PAGE0 */
+	memcpy((void*)&dest->dp, mod_path, sizeof(struct device_path));
+
+	/* copy device path to stable storage */
+	memcpy(&stable_storage[stable_offset], mod_path, sizeof(*mod_path));
+	BUG_ON(sizeof(*mod_path) != 0x20);
+}
+
+
 void __VISIBLE start_parisc_firmware(void)
 {
 	unsigned int i, cpu_hz;
@@ -1043,27 +1118,47 @@ void __VISIBLE start_parisc_firmware(void)
 	if (smp_cpus > HPPA_MAX_CPUS)
 		smp_cpus = HPPA_MAX_CPUS;
 
+	if (ram_size >= FIRMWARE_START)
+		ram_size = FIRMWARE_START;
+
 	/* Initialize device list */
 	remove_parisc_devices(smp_cpus);
 
+	/* Show list of HPA devices which are still returned by firmware. */
+	if (0) { for (i=0; parisc_devices[i].hpa; i++)
+		printf("Kept #%d at 0x%lx\n", i, parisc_devices[i].hpa);
+	}
+
 	/* Initialize PAGE0 */
 	memset((void*)PAGE0, 0, sizeof(*PAGE0));
+
+	/* copy pdc_entry entry into low memory. */
+	memcpy((void*)MEM_PDC_ENTRY, &pdc_entry_table, 3*4);
+	flush_data_cache((char*)MEM_PDC_ENTRY, 3*4);
+
 	PAGE0->memc_cont = ram_size;
 	PAGE0->memc_phsize = ram_size;
-	PAGE0->mem_free = 0x4000; // min PAGE_SIZE
+	PAGE0->memc_adsize = ram_size;
+	PAGE0->mem_pdc_hi = (MEM_PDC_ENTRY + 0ULL) >> 32;
+	PAGE0->mem_free = 0x6000; // min PAGE_SIZE
 	PAGE0->mem_hpa = CPU_HPA; // HPA of boot-CPU
-	PAGE0->mem_pdc = (unsigned long) &pdc_entry;
+	PAGE0->mem_pdc = MEM_PDC_ENTRY;
 	PAGE0->mem_10msec = CPU_CLOCK_MHZ*(1000000ULL/100);
+
+	BUG_ON(PAGE0->mem_free <= MEM_PDC_ENTRY);
 
 	/* Put QEMU/SeaBIOS marker in PAGE0.
 	 * The Linux kernel will search for it. */
 	memcpy((char*)&PAGE0->pad0, "SeaBIOS", 8);
 
 	PAGE0->imm_hpa = MEMORY_HPA;
+	PAGE0->imm_spa_size = ram_size;
 	PAGE0->imm_max_mem = ram_size;
-	memcpy((void*)&(PAGE0->mem_cons), &mem_cons_boot, sizeof(mem_cons_boot));
-	memcpy((void*)&(PAGE0->mem_boot), &mem_boot_boot, sizeof(mem_boot_boot));
-	memcpy((void*)&(PAGE0->mem_kbd),  &mem_kbd_boot, sizeof(mem_kbd_boot));
+
+	// Initialize boot paths (disc, display & keyboard)
+	prepare_boot_path(&(PAGE0->mem_cons), &mem_cons_boot, 0x60);
+	prepare_boot_path(&(PAGE0->mem_boot), &mem_boot_boot, 0x0);
+	prepare_boot_path(&(PAGE0->mem_kbd),  &mem_kbd_boot, 0xa0);
 
 	init_stable_storage();
 
