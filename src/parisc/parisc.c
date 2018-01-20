@@ -689,8 +689,8 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
 			}
 
 			if (ARG4 == PDC_IODC_INDEX_DATA) {
-				if (hpa == MEMORY_HPA)
-					ARG6 = 2; // Memory modules return 2 bytes of IODC memory (result2 ret[0] = 0x6701f41 HI !!)
+				// if (hpa == MEMORY_HPA)
+				//	ARG6 = 2; // Memory modules return 2 bytes of IODC memory (result2 ret[0] = 0x6701f41 HI !!)
 				memcpy((void*) ARG5, iodc_p, ARG6);
 				c = (unsigned char *) ARG5;
 				// printf("SeaBIOS: PDC_IODC get: hpa = 0x%lx, HV: 0x%x 0x%x IODC_SPA=0x%x  type 0x%x, \n", hpa, c[0], c[1], c[2], c[3]);
