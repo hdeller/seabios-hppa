@@ -525,13 +525,13 @@ static void dino_mem_addr_setup(struct pci_device *dev, void *arg)
 
     /* Setup DINO PCI I/O and mem window */
 
-    outl(DINO_HPA | 1, 0xfffc0020); /* Set Dino Flex (Address) */
+    // outl(DINO_HPA | 1, DINO_HPA + 0x020); /* Set Dino Flex (Address) */
     outl(0x00000080, DINO_HPA + 0x038); /* IO_CONTROL - enable DINO PCI */
-    outl(0x00000000, DINO_HPA + 0x804); /* Set PAMR */
-    outl(0x00000000, DINO_HPA + 0x808); /* Set PAPR */
+    // outl(0x00000000, DINO_HPA + 0x804); /* Set PAMR */
+    // outl(0x00000000, DINO_HPA + 0x808); /* Set PAPR */
     outl(0x7ffffffe, DINO_HPA + 0x060); /* Set DINO_IO_ADDR_EN */
-    outl(0x00000001, DINO_HPA + 0x05c); /* Set IO_FBB_EN */
-    outl(0x0000006f, DINO_HPA + 0x810); /* Set PCICMD */
+    // outl(0x00000001, DINO_HPA + 0x05c); /* Set IO_FBB_EN */
+    // outl(0x0000006f, DINO_HPA + 0x810); /* Set PCICMD */
 #if 0
 m01 ghost_em write1 0xfffc0020 0xff000001      /* Set Flex                 */
 m02 ghost_em write1 0xff000038 0x00000080      /* Set IO_CONTROL           */
