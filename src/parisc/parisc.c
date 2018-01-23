@@ -679,7 +679,7 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
 		switch (option) {
 		case PDC_IODC_READ:
 			hpa = ARG3;
-			if (0 && hpa == IDE_HPA) {
+			if (hpa == IDE_HPA) {
 				iodc_p = &iodc_data_hpa_fff8c000; // workaround for PCI ATA
 			} else {
 				hpa_index = find_hpa_index(hpa);
