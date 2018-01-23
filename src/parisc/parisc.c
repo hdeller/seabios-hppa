@@ -159,35 +159,50 @@ typedef struct {
 static hppa_device_t parisc_devices[HPPA_MAX_CPUS+10] = { PARISC_DEVICE_LIST };
 
 #define PARISC_KEEP_LIST \
-       GSC_HPA,\
-       DINO_HPA,\
-       DINO_UART_HPA,\
-       /* DINO_SCSI_HPA,*/\
-       CPU_HPA,\
-       MEMORY_HPA,\
+	GSC_HPA,\
+	DINO_HPA,\
+	DINO_UART_HPA,\
+	/* DINO_SCSI_HPA, */ \
+	CPU_HPA,\
+	MEMORY_HPA,\
+	0
+
+static int keep_this_hpa(unsigned long hpa)
+{
+	static const unsigned long keep_list[] = { PARISC_KEEP_LIST };
+	int i = 0;
+
+	while (keep_list[i]) {
+		if (keep_list[i] == hpa)
+			return 1;
+		i++;
+	}
+	return 0;
+}
 
 /* Rebuild hardware list and drop all devices which are not listed in
  * PARISC_KEEP_LIST. Generate num_cpus CPUs. */
 static void remove_parisc_devices(unsigned int num_cpus)
 {
-	static unsigned long keep_list[] = { PARISC_KEEP_LIST };
 	static struct pdc_system_map_mod_info modinfo[HPPA_MAX_CPUS] = { {1,}, };
 	static struct pdc_module_path modpath[HPPA_MAX_CPUS] = { {{1,}} };
 	hppa_device_t *cpu_dev = NULL;
-	int i,p, t;
+	unsigned long hpa;
+	int i, p, t;
 
 	/* already initialized? */
-	if (!keep_list[0])
+	static int uninitialized = 1;
+	if (!uninitialized)
 		return;
+	uninitialized = 0;
 
-	i = p = t = 0;
-	while (keep_list[i] && parisc_devices[p].hpa) {
-		if (parisc_devices[p].hpa == keep_list[i]) {
+	p = t = 0;
+	while ((hpa = parisc_devices[p].hpa) != 0) {
+		if (keep_this_hpa(hpa)) {
 			parisc_devices[t] = parisc_devices[p];
-			if (parisc_devices[t].hpa == CPU_HPA)
+			if (hpa == CPU_HPA)
 				cpu_dev = &parisc_devices[t];
 			t++;
-			i++;
 		}
 		p++;
 	}
@@ -210,16 +225,12 @@ static void remove_parisc_devices(unsigned int num_cpus)
 		t++;
 	}
 
-	if (t > ARRAY_SIZE(parisc_devices))
-		hlt();
+	BUG_ON(t > ARRAY_SIZE(parisc_devices));
 
 	while (t < ARRAY_SIZE(parisc_devices)) {
 		memset(&parisc_devices[t], 0, sizeof(parisc_devices[0]));
 		t++;
 	}
-
-	/* do not initialize again. */
-	keep_list[0] = 0;
 }
 
 static struct drive_s *boot_drive;
@@ -229,9 +240,12 @@ static int find_hpa_index(unsigned long hpa)
 	int i;
 	if (!hpa)
 		return -1;
-	for (i = 0; i < (ARRAY_SIZE(parisc_devices)-1); i++)
+	for (i = 0; i < (ARRAY_SIZE(parisc_devices)-1); i++) {
 		if (hpa == parisc_devices[i].hpa)
 			return i;
+		if (!parisc_devices[i].hpa)
+			return -1;
+	}
 	return -1;
 }
 
@@ -664,10 +678,11 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
 		// dprintf(0, "\n\nSeaBIOS: Info PDC_IODC function %ld ARG3=%x ARG4=%x ARG5=%x ARG6=%x\n", option, ARG3, ARG4, ARG5, ARG6);
 		switch (option) {
 		case PDC_IODC_READ:
-			if (ARG3 == IDE_HPA) {
+			hpa = ARG3;
+			if (0 && hpa == IDE_HPA) {
 				iodc_p = &iodc_data_hpa_fff8c000; // workaround for PCI ATA
 			} else {
-				hpa_index = find_hpa_index(ARG3); // index in hpa list
+				hpa_index = find_hpa_index(hpa);
 				if (hpa_index < 0)
 					return -4; // not found
 				iodc_p = parisc_devices[hpa_index].iodc;
