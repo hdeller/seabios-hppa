@@ -191,7 +191,7 @@ END(startup)
 	nop
 	.endm
 
-	.align 32	/* should be 4k but qemu does not check */
+	.align 32	/* should be 4k aligned but qemu does not check */
 ENTRY(smp_ivt)
 	.rept 32
 	DEF_IVA_ENTRY
@@ -233,7 +233,7 @@ ENTRY(iodc_entry_table)
 	load32 parisc_iodc_ENTRY_IO,     %r1
 	load32 parisc_iodc_ENTRY_SPA,    %r1
 	load32 parisc_iodc_ENTRY_CONFIG, %r1
-	load32 parisc_iodc_ENTRY_TLB,    %r1
+	load32 hlt,			 %r1 /* obsolete */
 	load32 parisc_iodc_ENTRY_TEST,   %r1
 	load32 parisc_iodc_ENTRY_TLB,    %r1
 END(iodc_entry_table)

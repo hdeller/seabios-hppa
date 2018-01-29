@@ -107,8 +107,12 @@ extern char iodc_entry_table;
 
 static unsigned long GoldenMemory = MIN_RAM_SIZE;
 
-void __noreturn hlt(void)
+static unsigned int chassis_code = 0;
+
+void __VISIBLE __noreturn hlt(void)
 {
+    if (pdc_debug)
+	printf("HALT initiated from %p\n",  __builtin_return_address(0));
     printf("SeaBIOS wants SYSTEM HALT.\n\n");
     asm volatile("\t.word 0xfffdead0": : :"memory");
     while (1);
@@ -116,6 +120,8 @@ void __noreturn hlt(void)
 
 void __noreturn reset(void)
 {
+    if (pdc_debug)
+	printf("RESET initiated from %p\n",  __builtin_return_address(0));
     printf("SeaBIOS wants SYSTEM RESET.\n"
 	   "***************************\n");
     PAGE0->imm_soft_boot = 1;
@@ -291,7 +297,13 @@ int __VISIBLE parisc_iodc_ENTRY_IO(unsigned int *arg FUNC_MANY_ARGS)
 	char *c;
 	struct disk_op_s disk_op;
 
-	iodc_log_call(arg, __FUNCTION__);
+	if (1 &&
+	   ((hpa == DINO_UART_HPA && option == ENTRY_IO_COUT) ||
+	    (hpa == IDE_HPA       && option == ENTRY_IO_BOOTIN)) ) {
+		/* avoid debug messages */
+	} else {
+		iodc_log_call(arg, __FUNCTION__);
+	}
 
 	/* console I/O */
 	if (hpa == DINO_UART_HPA || hpa == LASI_UART_HPA)
@@ -338,16 +350,16 @@ int __VISIBLE parisc_iodc_ENTRY_IO(unsigned int *arg FUNC_MANY_ARGS)
 
 int __VISIBLE parisc_iodc_ENTRY_INIT(unsigned int *arg FUNC_MANY_ARGS)
 {
+	unsigned long hpa = ARG0;
 	unsigned long option = ARG1;
 	unsigned long *result = (unsigned long *)ARG4;
 
 	iodc_log_call(arg, __FUNCTION__);
 	switch (option) {
 	case 4:	/* Init & test mod & dev */
-		result[0] = 0; /* module status */
-		result[1] = (ARG3 == DINO_UART_HPA) ? CL_DUPLEX:
-			    (ARG3 == DINO_SCSI_HPA) ? CL_RANDOM:
-			    (ARG3 == IDE_HPA) ? CL_RANDOM : 0;
+		result[0] = 0; /* module IO_STATUS */
+		result[1] = (hpa == DINO_UART_HPA || hpa == LASI_UART_HPA) ? CL_DUPLEX:
+			    (hpa == DINO_SCSI_HPA || hpa == IDE_HPA) ? CL_RANDOM : 0;
 		result[2] = result[3] = 0; /* TODO?: MAC of network card. */
 		return PDC_OK;
 	}
@@ -577,8 +589,9 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
 			// fall through
 		case PDC_CHASSIS_DISPWARN:
 			ARG4 = (ARG3 >> 17) & 7;
+			chassis_code = ARG3 & 0xffff;
 			printf("\nPDC_CHASSIS: %s (%d), %sCHASSIS  %0x\n",
-				systat[ARG4], ARG4, (ARG3>>16)&1 ? "blank display, ":"", ARG3 & 0xffff);
+				systat[ARG4], ARG4, (ARG3>>16)&1 ? "blank display, ":"", chassis_code);
 			// fall through
 		case PDC_CHASSIS_WARN:
 			result[0] = 0;
@@ -628,8 +641,7 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
 	case PDC_CACHE:
 		switch (option) {
 		case PDC_CACHE_INFO:
-			if (sizeof(cache_info) != sizeof(*machine_cache_info))
-				hlt();
+			BUG_ON(sizeof(cache_info) != sizeof(*machine_cache_info));
 			// XXX: number of TLB entries should be aligned with qemu
 			machine_cache_info->it_size = 256;
 			machine_cache_info->dt_size = 256;
@@ -641,12 +653,14 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
 				machine_cache_info->ic_count, machine_cache_info->ic_loop,
 				machine_cache_info->dc_count, machine_cache_info->dc_loop);
 			#endif
+			#if 1
 			machine_cache_info->ic_size = 0; /* no instruction cache */
 			machine_cache_info->ic_count = 0;
 			machine_cache_info->ic_loop = 0;
 			machine_cache_info->dc_size = 0; /* no data cache */
 			machine_cache_info->dc_count = 0;
 			machine_cache_info->dc_loop = 0;
+			#endif
 
 			memcpy(result, cache_info, sizeof(cache_info));
 			return PDC_OK;
@@ -679,7 +693,7 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
 		switch (option) {
 		case PDC_IODC_READ:
 			hpa = ARG3;
-			if (hpa == IDE_HPA) {
+			if (hpa == IDE_HPA /* && chassis_code < 0xcee0 */) {
 				iodc_p = &iodc_data_hpa_fff8c000; // workaround for PCI ATA
 			} else {
 				hpa_index = find_hpa_index(hpa);
@@ -720,7 +734,7 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
 		case PDC_IODC_DINIT:	/* destructive init */
 			break;
 		case PDC_IODC_MEMERR:
-			result[0] = 0;
+			result[0] = 0; /* IO_STATUS */
 			result[1] = 0;
 			result[2] = 0;
 			result[3] = 0;
@@ -777,6 +791,8 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
 		// dprintf(0, "\n\nSeaBIOS: PDC_ADD_VALID function %ld ARG2=%x called.\n", option, ARG2);
 		if (option != 0)
 			return PDC_BAD_OPTION;
+		if (0 && ARG2 == 0) // should PAGE0 be valid?  HP-UX asks for it, but maybe due a bug in our code...
+			return 1;
 		// if (ARG2 < PAGE_SIZE) return PDC_ERROR;
 		if (ARG2 < ram_size)
 			return PDC_OK;
@@ -792,7 +808,20 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
 		return PDC_BAD_PROC;
 	case PDC_BLOCK_TLB:	/* not needed on virtual machine */
 		return PDC_BAD_PROC;
-	case PDC_TLB:		/* not used on Linux. Maybe on HP-UX? */
+	case PDC_TLB:		/* hardware TLB not used on Linux, but on HP-UX (if available) */
+		#if 0
+		/* still buggy, let's avoid it to keep things simple. */
+		switch (option) {
+		case PDC_TLB_INFO:
+			result[0] = PAGE_SIZE;
+			result[0] = PAGE_SIZE << 2;
+			return PDC_OK;
+		case PDC_TLB_SETUP:
+			result[0] = ARG5 & 1;
+			result[1] = 0;
+			return PDC_OK;
+		}
+		#endif
 		return PDC_BAD_PROC;
 	case PDC_MEM:
 		// only implemented on 64bit PDC!
@@ -825,7 +854,6 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
 		if (option == PDC_PSW_GET_DEFAULTS)
 			*result = psw_defaults;
 		if (option == PDC_PSW_SET_DEFAULTS) {
-			// if ((ARG2 & PDC_PSW_ENDIAN_BIT) == 0)
 			psw_defaults = ARG2;
 		}
 		return PDC_OK;
@@ -1099,6 +1127,8 @@ static void prepare_boot_path(volatile struct pz_device *dest,
 
 	if (hpa == DINO_SCSI_HPA || hpa == IDE_HPA)
 		mod_path = &mod_path_hpa_fff8c000;
+	else if (hpa == DINO_UART_HPA || hpa == LASI_UART_HPA)
+		mod_path = &mod_path_hpa_fff83000;
 	else {
 		BUG_ON(hpa_index < 0);
 		mod_path = parisc_devices[hpa_index].mod_path;
@@ -1152,6 +1182,7 @@ void __VISIBLE start_parisc_firmware(void)
 	PAGE0->mem_10msec = CPU_CLOCK_MHZ*(1000000ULL/100);
 
 	BUG_ON(PAGE0->mem_free <= MEM_PDC_ENTRY);
+	BUG_ON(smp_cpus < 1 || smp_cpus > HPPA_MAX_CPUS);
 
 	/* Put QEMU/SeaBIOS marker in PAGE0.
 	 * The Linux kernel will search for it. */
@@ -1163,6 +1194,8 @@ void __VISIBLE start_parisc_firmware(void)
 
 	// Initialize stable storage
 	init_stable_storage();
+
+	chassis_code = 0;
 
 	// Initialize boot paths (disc, display & keyboard)
 	prepare_boot_path(&(PAGE0->mem_cons), &mem_cons_boot, 0x60);
@@ -1225,7 +1258,6 @@ void __VISIBLE start_parisc_firmware(void)
 		"  Alternate boot path:  LAN.0.0.0.0.0.0\n"
 		"  Console path:         SERIAL_1.9600.8.none\n"
 		"  Keyboard path:        PS2\n\n");
-
 
 	/* directly start Linux kernel if it was given on qemu command line. */
 	if (linux_kernel_entry > 1) {

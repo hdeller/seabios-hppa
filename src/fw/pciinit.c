@@ -525,7 +525,7 @@ static void dino_mem_addr_setup(struct pci_device *dev, void *arg)
 
     /* Setup DINO PCI I/O and mem window */
 
-    // outl(DINO_HPA | 1, DINO_HPA + 0x020); /* Set Dino Flex (Address) */
+    outl(DINO_HPA | 1, 0xfffc0020); /* Set Dino Flex (Address) */
     outl(0x00000080, DINO_HPA + 0x038); /* IO_CONTROL - enable DINO PCI */
     // outl(0x00000000, DINO_HPA + 0x804); /* Set PAMR */
     // outl(0x00000000, DINO_HPA + 0x808); /* Set PAPR */
