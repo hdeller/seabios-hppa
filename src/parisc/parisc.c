@@ -299,7 +299,8 @@ int __VISIBLE parisc_iodc_ENTRY_IO(unsigned int *arg FUNC_MANY_ARGS)
 
 	if (1 &&
 	   ((hpa == DINO_UART_HPA && option == ENTRY_IO_COUT) ||
-	    (hpa == IDE_HPA       && option == ENTRY_IO_BOOTIN)) ) {
+	    (hpa == IDE_HPA       && option == ENTRY_IO_BOOTIN) ||
+	    (hpa == DINO_SCSI_HPA && option == ENTRY_IO_BOOTIN)) ) {
 		/* avoid debug messages */
 	} else {
 		iodc_log_call(arg, __FUNCTION__);
@@ -341,9 +342,9 @@ int __VISIBLE parisc_iodc_ENTRY_IO(unsigned int *arg FUNC_MANY_ARGS)
 	if (option == ENTRY_IO_CLOSE)
 		return PDC_OK;
 
+	BUG_ON(1);
 	iodc_log_call(arg, __FUNCTION__);
 
-	hlt();
 	return PDC_BAD_OPTION;
 }
 
@@ -873,6 +874,7 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
 				*mod_path = *parisc_devices[hpa_index].mod_path;
 
 			// *pdc_mod_info = *parisc_devices[hpa_index].mod_info; -> can be dropped.
+			memset(result, 0, 32*sizeof(long));
 			result[0] = hpa; // .mod_addr for PDC_IODC
 			result[1] = 1; // .mod_pgs number of pages (FIXME: only graphics has more, e.g. 0x2000)
 			result[2] = 0; // FIXME: additional addresses
@@ -939,7 +941,7 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
 			pdc_name(ARG0), ARG0, ARG1, ARG2, ARG3);
 	dprintf(0, "ARG4=%x ARG5=%x ARG6=%x ARG7=%x\n", ARG4, ARG5, ARG6, ARG7);
 
-	hlt();
+	BUG_ON(1);
 	return PDC_BAD_PROC;
 }
 
@@ -1062,7 +1064,6 @@ static const struct pz_device mem_boot_boot = {
 static const struct pz_device mem_kbd_boot = {
 	.hpa = DINO_UART_HPA,
 	.iodc_io = (unsigned long) &iodc_entry,
-	// .cl_class = CL_DUPLEX,
 	.cl_class = CL_KEYBD,
 };
 
@@ -1121,7 +1122,7 @@ static void prepare_boot_path(volatile struct pz_device *dest,
 	unsigned long hpa;
 	struct pdc_module_path *mod_path;
 
-	memcpy((void*)dest, source, sizeof(*source));
+	*dest = *source;
 	hpa = source->hpa;
 	hpa_index = find_hpa_index(hpa);
 
@@ -1140,6 +1141,7 @@ static void prepare_boot_path(volatile struct pz_device *dest,
 	/* copy device path to stable storage */
 	memcpy(&stable_storage[stable_offset], mod_path, sizeof(*mod_path));
 	BUG_ON(sizeof(*mod_path) != 0x20);
+	BUG_ON(sizeof(struct device_path) != 0x20);
 }
 
 
