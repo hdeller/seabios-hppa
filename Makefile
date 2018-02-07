@@ -143,7 +143,7 @@ $(OUT)%.lds: %.lds.S
 	@echo "  Precompiling $@"
 	$(Q)$(CPP) $(CPPFLAGS) -D__ASSEMBLY__ $< -o $@
 
-$(OUT)head.o: src/parisc/head.S $(OUT)autoconf.h
+$(OUT)head.o: src/parisc/head.S $(OUT)autoconf.h $(OUT)autoversion.h
 	@echo "  Compile checking $@"
 	$(Q)$(CC) $(CFLAGS32FLAT) -c $< -o $@
 
