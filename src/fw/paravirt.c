@@ -121,7 +121,6 @@ qemu_preinit(void)
         kvm_detect();
     }
 
-#if 0
     // On emulators, get memory size from nvram.
     u32 rs = ((rtc_read(CMOS_MEM_EXTMEM2_LOW) << 16)
               | (rtc_read(CMOS_MEM_EXTMEM2_HIGH) << 24));
@@ -131,14 +130,14 @@ qemu_preinit(void)
         rs = (((rtc_read(CMOS_MEM_EXTMEM_LOW) << 10)
                | (rtc_read(CMOS_MEM_EXTMEM_HIGH) << 18))
               + 1 * 1024 * 1024);
-    RamSize = rs;
+    if (CONFIG_X86)
+        RamSize = rs;
     e820_add(0, rs, E820_RAM);
 
     /* reserve 256KB BIOS area at the end of 4 GB */
     e820_add(0xfffc0000, 256*1024, E820_RESERVED);
 
     dprintf(1, "RamSize: 0x%08x [cmos]\n", RamSize);
-#endif
 }
 
 #define MSR_IA32_FEATURE_CONTROL 0x0000003a

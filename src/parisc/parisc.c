@@ -1227,6 +1227,7 @@ void __VISIBLE start_parisc_firmware(void)
 	debug_banner();
 	// maininit();
 	qemu_preinit();
+        RamSize = ram_size;
 	// coreboot_preinit();
 
 	pci_setup();
