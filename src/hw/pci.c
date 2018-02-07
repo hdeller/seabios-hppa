@@ -11,10 +11,10 @@
 #include "util.h" // udelay
 #include "x86.h" // outl
 
-#if !CONFIG_PARISC
+#if CONFIG_X86
 #define PORT_PCI_CMD           0x0cf8
 #define PORT_PCI_DATA          0x0cfc
-#else
+#elif CONFIG_PARISC
 #include "parisc/hppa_hardware.h"
 #endif
 
