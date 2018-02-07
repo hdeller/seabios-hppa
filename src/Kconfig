@@ -24,7 +24,7 @@ choice
     default QEMU
 
     config COREBOOT
-        bool "Build for coreboot" if !PARISC
+        bool "Build for coreboot" if X86
         help
             Configure as a coreboot payload.
 
@@ -35,7 +35,7 @@ choice
             Configure for an emulated machine (QEMU, Xen, KVM, or Bochs).
 
     config CSM
-       bool "Build as Compatibility Support Module for EFI BIOS" if !PARISC
+       bool "Build as Compatibility Support Module for EFI BIOS" if X86
        help
            Configure to be used by EFI firmware as Compatibility Support
            module (CSM) to provide legacy BIOS services.
@@ -50,7 +50,7 @@ endchoice
             running on an emulator.
 
     config XEN
-        depends on QEMU &&& !PARISC
+        depends on QEMU && X86
         bool "Support Xen HVM"
         default y
         help
@@ -355,7 +355,7 @@ menu "Hardware support"
             not to support irq routing.
 
     config USE_SMM
-        depends on QEMU && !PARISC
+        depends on QEMU && X86
         bool "System Management Mode (SMM)"
         default y
         help
@@ -365,7 +365,7 @@ menu "Hardware support"
         depends on USE_SMM
         default y
     config MTRR_INIT
-        depends on QEMU && !PARISC
+        depends on QEMU && X86
         bool "Initialize MTRRs"
         default y
         help
@@ -491,7 +491,7 @@ menu "BIOS interfaces"
 endmenu
 
 menu "BIOS Tables"
-    depends on QEMU && !PARISC
+    depends on QEMU && X86
     config PIRTABLE
         bool "PIR table"
         default y
