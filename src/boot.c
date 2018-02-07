@@ -482,7 +482,7 @@ interactive_bootmenu(void)
     while (get_keystroke(0) >= 0)
         ;
 
-    printf("Available boot devices:\n");
+    printf("Select boot device:\n\n");
     wait_threads();
 
     // Show menu items
