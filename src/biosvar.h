@@ -16,32 +16,52 @@
  * Interrupt vector table
  ****************************************************************/
 
+#if CONFIG_X86
+#define GET_IVT(vector)                                         \
+    GET_FARVAR(SEG_IVT, ((struct rmode_IVT *)0)->ivec[vector])
+#define SET_IVT(vector, segoff)                                         \
+    SET_FARVAR(SEG_IVT, ((struct rmode_IVT *)0)->ivec[vector], segoff)
+
+#define FUNC16(func) ({                                 \
+        ASSERT32FLAT();                                 \
+        extern void func (void);                        \
+        SEGOFF(SEG_BIOS, (u32)func - BUILD_BIOS_ADDR);  \
+    })
+#elif CONFIG_PARISC
 extern struct segoff_s ivt_table[256];
 
 #define GET_IVT(vector)		ivt_table[vector]
 #define SET_IVT(vector, segoff)	ivt_table[vector] = (segoff)
 
 #define FUNC16(func) ({ SEGOFF(0, 0); })
+#endif
 
 
 /****************************************************************
  * Bios Data Area (BDA)
  ****************************************************************/
 
-extern struct bios_data_area_s bios_data_area;
 static inline struct bios_data_area_s *
 get_bda_ptr(void)
 {
 #if CONFIG_PARISC
-	return &bios_data_area;
+    extern struct bios_data_area_s bios_data_area;
+    return &bios_data_area;
 #else
-	return MAKE_FLATPTR(SEG_BDA, 0);
+    return MAKE_FLATPTR(SEG_BDA, 0);
 #endif
 }
 
 // Accessor functions
-#define GET_BDA(var)		bios_data_area.var
-#define SET_BDA(var, val)	bios_data_area.var = (val)
+#if CONFIG_X86
+#define GET_BDA(var) \
+    GET_FARVAR(SEG_BDA, ((struct bios_data_area_s *)0)->var)
+#define SET_BDA(var, val) \
+    SET_FARVAR(SEG_BDA, ((struct bios_data_area_s *)0)->var, (val))
+#elif CONFIG_PARISC
+#define GET_BDA(var)		get_bda_ptr()->var
+#define SET_BDA(var, val)	get_bda_ptr()->var = (val)
+#endif
 
 // Helper function to set the bits of the equipment_list_flags variable.
 static inline void set_equipment_flags(u16 clear, u16 set) {
@@ -102,11 +122,11 @@ static inline u32 __attribute_const get_global_offset(void) {
 static inline u16 get_global_seg(void) {
     return GET_SEG(GLOBAL_SEGREG);
 }
-#if !CONFIG_PARISC
+#if CONFIG_X86
 #define GET_GLOBAL(var)                                                 \
     GET_VAR(GLOBAL_SEGREG, *(typeof(&(var)))((void*)&(var)              \
                                              + get_global_offset()))
-#else
+#elif CONFIG_PARISC
 #define GET_GLOBAL(var) (var)
 #endif
 
