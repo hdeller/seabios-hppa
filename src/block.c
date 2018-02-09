@@ -481,7 +481,7 @@ fill_edd(struct segoff_s edd, struct drive_s *drive_fl)
     default:
         return fill_generic_edd(edd, drive_fl, 0, 0, 0, 0);
     }
-  return 0;
+    return 0;
 }
 
 
@@ -613,8 +613,8 @@ process_op(struct disk_op_s *op)
             , op->count, op->command);
 
     int ret, origcount = op->count;
-    /* on non-x86 there is no problem with large reads/writes above 64kb */
-    if (!CONFIG_PARISC &&
+    /* Only x86 arch has problems with large reads/writes above 64kb */
+    if (CONFIG_X86 &&
 	(origcount * GET_FLATPTR(op->drive_fl->blksize) > 64*1024)) {
         op->count = 0;
         return DISK_RET_EBOUNDARY;

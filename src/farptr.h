@@ -136,7 +136,7 @@ DECL_SEGFUNCS(SS)
 
 #define MAKE_FLATPTR(seg,off) ((void*)(unsigned long)(off))
 
-#if (MODESEGMENT == 1) && !CONFIG_PARISC
+#if MODESEGMENT == 1
 
 // Definitions when using segmented mode.
 #define GET_FARVAR(seg, var) __GET_FARVAR((seg), (var))
@@ -176,8 +176,15 @@ static inline void outsl_fl(u16 port, void *ptr_fl, u16 count) {
 #else
 
 // In 32-bit flat mode there is no need to mess with the segments.
+#if CONFIG_X86
+#define GET_FARVAR(seg, var) \
+    (*((typeof(&(var)))MAKE_FLATPTR((seg), &(var))))
+#define SET_FARVAR(seg, var, val) \
+    do { GET_FARVAR((seg), (var)) = (val); } while (0)
+#elif CONFIG_PARISC
 #define GET_FARVAR(seg, var)		GET_VAR(seg, var)
 #define SET_FARVAR(seg, var, val)	SET_VAR(seg, var, val)
+#endif
 
 #define GET_VAR(seg, var) (var)
 #define SET_VAR(seg, var, val) do { (var) = (val); } while (0)
