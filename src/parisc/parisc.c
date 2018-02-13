@@ -650,11 +650,16 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
 			machine_cache_info->dt_loop = 1;
 
 			#if 0
-			dprintf(0, "\n\nCACHE  IC: %ld %ld  DC: %ld %ld\n",
-				machine_cache_info->ic_count, machine_cache_info->ic_loop,
-				machine_cache_info->dc_count, machine_cache_info->dc_loop);
+			dprintf(0, "\n\nCACHE  IC: %ld %ld %ld DC: %ld %ld %ld\n",
+				machine_cache_info->ic_count, machine_cache_info->ic_loop, machine_cache_info->ic_stride,
+				machine_cache_info->dc_count, machine_cache_info->dc_loop, machine_cache_info->dc_stride);
 			#endif
 			#if 1
+                        /* Increase cc_block from 1 to 11. This increases icache_stride
+                         * and dcache_stride to 32768 bytes. Revisit for HP-UX. */
+			machine_cache_info->dc_conf.cc_block = 11;
+			machine_cache_info->ic_conf.cc_block = 11;
+
 			machine_cache_info->ic_size = 0; /* no instruction cache */
 			machine_cache_info->ic_count = 0;
 			machine_cache_info->ic_loop = 0;
