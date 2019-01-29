@@ -940,6 +940,11 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
 		}
 		dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_INITIATOR function %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
 		return PDC_BAD_OPTION;
+	case PDC_CRASH_PREP:
+		/* This should actually quiesce all I/O and prepare the System for crash dumping.
+		   Ignoring it for now, otherwise the BUG_ON below would quit qemu before we have
+		   a chance to see the kernel panic */
+		return PDC_OK;
 	}
 
 	dprintf(0, "\nSeaBIOS: Unimplemented PDC proc %s(%d) option %d result=%x ARG3=%x ",
