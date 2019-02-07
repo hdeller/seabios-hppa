@@ -677,7 +677,7 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
 		switch (option) {
 		case PDC_HPA_PROCESSOR:
 			result[0] = CPU_HPA; // XXX: NEED TO FIX FOR SMP?
-			result[1] = 0;
+			result[1] = 0;       // XXX: for SMP: 0,1,2,3,4...(num of this cpu)
 			return PDC_OK;
 		case PDC_HPA_MODULES:
 			return PDC_BAD_OPTION; // all modules on same board as the processor.
@@ -901,8 +901,8 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
 		return PDC_BAD_OPTION;
 	case 26: // PDC_SCSI_PARMS is the architected firmware interface to replace the Hversion PDC_INITIATOR procedure.
 		return PDC_BAD_PROC;
-	case 64: // Unknown function. HP-UX 11 bootcd calls it during boot.
-	case 65: // Unknown function. HP-UX 11 bootcd calls it during boot.
+	case 64: // Called by HP-UX 11 bootcd during boot. Probably checks PDC_PAT_CELL (even if we are not PAT firmware)
+	case 65: // Called by HP-UX 11 bootcd during boot. Probably checks PDC_PAT_CHASSIS_LOG (even if we are not PAT firmware)
 		dprintf(0, "\n\nSeaBIOS: UNKNOWN PDC proc %lu OPTION %lu called with ARG2=%x ARG3=%x ARG4=%x\n", proc, option, ARG2, ARG3, ARG4);
 		return PDC_BAD_PROC;
 	case PDC_IO:
