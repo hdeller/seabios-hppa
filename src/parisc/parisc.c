@@ -919,8 +919,27 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
 		dprintf(0, "\n\nSeaBIOS: PDC_BROADCAST_RESET (reset system) called with ARG3=%x ARG4=%x\n", ARG3, ARG4);
 		reset();
 		return PDC_OK;
-	case PDC_PCI_INDEX: // not needed for Dino PCI bridge
-		return PDC_BAD_PROC;
+	case PDC_PCI_INDEX:
+                dprintf(0, "\n\nSeaBIOS: PDC_PCI_INDEX called with ARG2=%x ARG3=%x ARG4=%x\n", ARG2, ARG3, ARG4);
+                switch (option) {
+                case PDC_PCI_INTERFACE_INFO:
+                        memset(result, 0, 32 * sizeof(unsigned long));
+                        result[0] = 2;  /* XXX physical hardware returns those ?!? */
+                        result[16] = 0x60;
+                        result[17] = 0x90;
+                        return PDC_OK;
+                case PDC_PCI_GET_INT_TBL_SIZE:
+                case PDC_PCI_GET_INT_TBL:
+                        memset(result, 0, 32 * sizeof(unsigned long));
+                        result[0] = 2; /* Hardware fills in, even though we return PDC_BAD_OPTION below. */
+                        result[16] = 0x60;
+                        result[17] = 0x90;
+                        return PDC_BAD_OPTION;
+                case PDC_PCI_PCI_PATH_TO_PCI_HPA:
+                        result[0] = DINO_HPA;
+                        return PDC_BAD_OPTION;
+                }
+                break;
 	case PDC_INITIATOR:
 		switch (option) {
 		case PDC_GET_INITIATOR:
