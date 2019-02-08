@@ -534,6 +534,7 @@ static const char *pdc_name(unsigned long num)
 	DO(PDC_PSW)
 	DO(PDC_SYSTEM_MAP)
 	DO(PDC_SOFT_POWER)
+	DO(PDC_CRASH_PREP)
 	DO(PDC_MEM_MAP)
 	DO(PDC_EEPROM)
 	DO(PDC_NVM)
@@ -549,6 +550,7 @@ static const char *pdc_name(unsigned long num)
 	DO(PDC_INTRIGUE)
 	DO(PDC_STI)
 	DO(PDC_PCI_INDEX)
+	DO(PDC_RELOCATE)
 	DO(PDC_INITIATOR)
 	DO(PDC_LINK)
 	return "UNKNOWN!";
@@ -899,6 +901,11 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
 		}
 		// dprintf(0, "\n\nSeaBIOS: PDC_SOFT_POWER called with ARG2=%x ARG3=%x ARG4=%x\n", ARG2, ARG3, ARG4);
 		return PDC_BAD_OPTION;
+	case PDC_CRASH_PREP:
+		/* This should actually quiesce all I/O and prepare the System for crash dumping.
+		   Ignoring it for now, otherwise the BUG_ON below would quit qemu before we have
+		   a chance to see the kernel panic */
+		return PDC_OK;
 	case 26: // PDC_SCSI_PARMS is the architected firmware interface to replace the Hversion PDC_INITIATOR procedure.
 		return PDC_BAD_PROC;
 	case 64: // Called by HP-UX 11 bootcd during boot. Probably checks PDC_PAT_CELL (even if we are not PAT firmware)
@@ -940,6 +947,9 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
                         return PDC_BAD_OPTION;
                 }
                 break;
+	case PDC_RELOCATE:
+                /* We don't want to relocate any firmware. */
+                return PDC_BAD_PROC;
 	case PDC_INITIATOR:
 		switch (option) {
 		case PDC_GET_INITIATOR:
@@ -959,18 +969,13 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
 		}
 		dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_INITIATOR function %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
 		return PDC_BAD_OPTION;
-	case PDC_CRASH_PREP:
-		/* This should actually quiesce all I/O and prepare the System for crash dumping.
-		   Ignoring it for now, otherwise the BUG_ON below would quit qemu before we have
-		   a chance to see the kernel panic */
-		return PDC_OK;
 	}
 
-	dprintf(0, "\nSeaBIOS: Unimplemented PDC proc %s(%d) option %d result=%x ARG3=%x ",
+	printf("\n** WARNING **: SeaBIOS: Unimplemented PDC proc %s(%d) option %d result=%x ARG3=%x ",
 			pdc_name(ARG0), ARG0, ARG1, ARG2, ARG3);
-	dprintf(0, "ARG4=%x ARG5=%x ARG6=%x ARG7=%x\n", ARG4, ARG5, ARG6, ARG7);
+	printf("ARG4=%x ARG5=%x ARG6=%x ARG7=%x\n", ARG4, ARG5, ARG6, ARG7);
 
-	BUG_ON(1);
+	BUG_ON(pdc_debug);
 	return PDC_BAD_PROC;
 }
 
