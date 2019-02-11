@@ -173,6 +173,29 @@ static hppa_device_t parisc_devices[HPPA_MAX_CPUS+10] = { PARISC_DEVICE_LIST };
 	MEMORY_HPA,\
 	0
 
+static const char *hpa_name(unsigned long hpa)
+{
+	#define DO(x) if (hpa == x) return #x;
+	DO(GSC_HPA)
+	DO(DINO_HPA)
+	DO(DINO_UART_HPA)
+	DO(DINO_SCSI_HPA)
+	DO(CPU_HPA)
+	DO(MEMORY_HPA)
+	DO(IDE_HPA)
+	DO(LASI_HPA)
+	DO(LASI_UART_HPA)
+	DO(LASI_SCSI_HPA)
+	DO(LASI_LAN_HPA)
+	DO(LASI_LPT_HPA)
+	DO(LASI_AUDIO_HPA)
+	DO(LASI_PS2KBD_HPA)
+	DO(LASI_PS2MOU_HPA)
+	DO(LASI_GFX_HPA)
+	#undef DO
+	return "UNKNOWN HPA";
+}
+
 static int keep_this_hpa(unsigned long hpa)
 {
 	static const unsigned long keep_list[] = { PARISC_KEEP_LIST };
@@ -278,7 +301,7 @@ static unsigned long parisc_serial_in(char *c, unsigned long maxchars)
 void iodc_log_call(unsigned int *arg, const char *func)
 {
 	if (pdc_debug) {
-		printf("\nIODC %s called: hpa=0x%x option=0x%x arg2=0x%x arg3=0x%x ", func, ARG0, ARG1, ARG2, ARG3);
+		printf("\nIODC %s called: hpa=0x%x (%s) option=0x%x arg2=0x%x arg3=0x%x ", func, ARG0, hpa_name(ARG0), ARG1, ARG2, ARG3);
 		printf("result=0x%x arg5=0x%x arg6=0x%x arg7=0x%x\n", ARG4, ARG5, ARG6, ARG7);
 	}
 }
@@ -408,7 +431,7 @@ static unsigned char stable_storage[STABLE_STORAGE_SIZE];
 
 static void init_stable_storage(void)
 {
-	/* see ENGINEERING NOTE in PDC2.0 doc */
+	/* see ENGINEERING NOTE on page 4-92 in PDC2.0 doc */
 	memset(&stable_storage, 0, STABLE_STORAGE_SIZE);
 	// no intial paths
 	stable_storage[0x07] = 0xff;
@@ -553,6 +576,7 @@ static const char *pdc_name(unsigned long num)
 	DO(PDC_RELOCATE)
 	DO(PDC_INITIATOR)
 	DO(PDC_LINK)
+	#undef DO
 	return "UNKNOWN!";
 }
 
@@ -927,7 +951,7 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
 		reset();
 		return PDC_OK;
 	case PDC_PCI_INDEX:
-                dprintf(0, "\n\nSeaBIOS: PDC_PCI_INDEX called with ARG2=%x ARG3=%x ARG4=%x\n", ARG2, ARG3, ARG4);
+                dprintf(0, "\n\nSeaBIOS: PDC_PCI_INDEX(%lu) called with ARG2=%x ARG3=%x ARG4=%x\n", option, ARG2, ARG3, ARG4);
                 switch (option) {
                 case PDC_PCI_INTERFACE_INFO:
                         memset(result, 0, 32 * sizeof(unsigned long));
@@ -955,7 +979,7 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
 		case PDC_GET_INITIATOR:
 			// ARG3 has hwpath
 			result[0] = 7; // host_id: 7 to 15 ?
-			result[1] = 40; // 1, 2, 5 or 10 for 5, 10, 20 or 40 MT/s
+			result[1] = 10; // 1, 2, 5 or 10 for 5, 10, 20 or 40 MT/s
 			result[2] = 0; // ??
 			result[3] = 0; // ??
 			result[4] = 0; // width: 0:"Narrow, 1:"Wide"
