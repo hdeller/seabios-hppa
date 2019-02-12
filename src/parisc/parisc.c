@@ -1,6 +1,6 @@
 // Glue code for parisc architecture
 //
-// Copyright (C) 2017-2018  Helge Deller <deller@gmx.de>
+// Copyright (C) 2017-2019  Helge Deller <deller@gmx.de>
 //
 // This file may be distributed under the terms of the GNU LGPLv3 license.
 
@@ -81,7 +81,7 @@ extern unsigned long boot_args[];
 #define initrd_start		(boot_args[3])
 #define initrd_end		(boot_args[4])
 #define smp_cpus		(boot_args[5])
-#define pdc_debug		(boot_args[6])
+#define pdc_debug		0 // (boot_args[6])
 
 extern char pdc_entry;
 extern char pdc_entry_table[12];
@@ -148,6 +148,29 @@ void flush_data_cache(char *start, size_t length)
 
     asm ("sync");
 }
+
+void memdump(void *mem, unsigned long len)
+{
+    printf("memdump @ 0x%x : ", (unsigned int) mem);
+    while (len--) {
+        printf("0x%x ", (unsigned int) *(unsigned char *)mem);
+        mem++;
+    }
+    printf("\n");
+}
+
+/********************************************************
+ * Boot drives
+ ********************************************************/
+
+static struct drive_s *boot_drive; // really currently booted drive
+static struct drive_s *parisc_boot_harddisc; // first hard disc
+static struct drive_s *parisc_boot_cdrom;    // first DVD or CD-ROM
+
+static struct pdc_module_path mod_path_emulated_drives = {
+        .path = { .flags = 0x0, .bc = { 0xff, 0xff, 0xff, 0x8, 0x0, 0x0 }, .mod = 0x0  },
+	.layers = { 0xAA, 0xBB, 0x0, 0x0, 0x0, 0x0 } // AA/BB gets replaced
+};
 
 /********************************************************
  * FIRMWARE IO Dependent Code (IODC) HANDLER
@@ -262,8 +285,6 @@ static void remove_parisc_devices(unsigned int num_cpus)
 	}
 }
 
-static struct drive_s *boot_drive;
-
 static int find_hpa_index(unsigned long hpa)
 {
 	int i;
@@ -365,7 +386,7 @@ int __VISIBLE parisc_iodc_ENTRY_IO(unsigned int *arg FUNC_MANY_ARGS)
 	if (option == ENTRY_IO_CLOSE)
 		return PDC_OK;
 
-	BUG_ON(1);
+//	BUG_ON(1);
 	iodc_log_call(arg, __FUNCTION__);
 
 	return PDC_BAD_OPTION;
@@ -426,8 +447,11 @@ int __VISIBLE parisc_iodc_ENTRY_TLB(unsigned int *arg FUNC_MANY_ARGS)
  * FIRMWARE PDC HANDLER
  ********************************************************/
 
-#define STABLE_STORAGE_SIZE	256
+#define STABLE_STORAGE_SIZE	512
 static unsigned char stable_storage[STABLE_STORAGE_SIZE];
+
+#define NVOLATILE_STORAGE_SIZE	512
+static unsigned char nvolatile_storage[NVOLATILE_STORAGE_SIZE];
 
 static void init_stable_storage(void)
 {
@@ -601,7 +625,8 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
 	struct pdc_module_path *mod_path;
 
 	if (pdc_debug) {
-		printf("\nSeaBIOS: Start PDC proc %s(%d) option %d result=0x%x ARG3=0x%x ", pdc_name(ARG0), ARG0, ARG1, ARG2, ARG3);
+		printf("\nSeaBIOS: Start PDC proc %s(%d) option %d result=0x%x ARG3=0x%x %s ",
+                    pdc_name(ARG0), ARG0, ARG1, ARG2, ARG3, (proc == PDC_IODC)?hpa_name(ARG3):"");
 		printf("ARG4=0x%x ARG5=0x%x ARG6=0x%x ARG7=0x%x\n", ARG4, ARG5, ARG6, ARG7);
 	}
 
@@ -621,10 +646,10 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
 				systat[ARG4], ARG4, (ARG3>>16)&1 ? "blank display, ":"", chassis_code);
 			// fall through
 		case PDC_CHASSIS_WARN:
+                        // return warnings regarding fans, batteries and temperature: None!
 			result[0] = 0;
 			return PDC_OK;
 		}
-		// dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_CHASSIS function %d %x %x %x %x\n", ARG1, ARG2, ARG3, ARG4, ARG5);
 		return PDC_BAD_PROC;
 	case PDC_PIM:
 		switch (option) {
@@ -725,7 +750,7 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
 		switch (option) {
 		case PDC_IODC_READ:
 			hpa = ARG3;
-			if (hpa == IDE_HPA /* && chassis_code < 0xcee0 */) {
+			if (hpa == IDE_HPA) { // do NOT check for DINO_SCSI_HPA, breaks Linux which scans IO areas for unlisted io modules
 				iodc_p = &iodc_data_hpa_fff8c000; // workaround for PCI ATA
 			} else {
 				hpa_index = find_hpa_index(hpa);
@@ -818,7 +843,27 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
 		}
 		return PDC_BAD_OPTION;
 	case PDC_NVOLATILE:
-		return PDC_BAD_PROC;
+		switch (option) {
+		case PDC_NVOLATILE_READ:
+			if ((ARG2 + ARG4) > NVOLATILE_STORAGE_SIZE)
+				return PDC_INVALID_ARG;
+			memcpy((unsigned char *) ARG3, &nvolatile_storage[ARG2], ARG4);
+			return PDC_OK;
+		case PDC_NVOLATILE_WRITE:
+			if ((ARG2 + ARG4) > NVOLATILE_STORAGE_SIZE)
+				return PDC_INVALID_ARG;
+			memcpy(&nvolatile_storage[ARG2], (unsigned char *) ARG3, ARG4);
+			return PDC_OK;
+		case PDC_NVOLATILE_RETURN_SIZE:
+			result[0] = NVOLATILE_STORAGE_SIZE;
+			return PDC_OK;
+		case PDC_NVOLATILE_VERIFY_CONTENTS:
+			return PDC_OK;
+		case PDC_NVOLATILE_INITIALIZE:
+			memset(nvolatile_storage, 0, sizeof(nvolatile_storage));
+			return PDC_OK;
+		}
+		return PDC_BAD_OPTION;
 	case PDC_ADD_VALID:
 		// dprintf(0, "\n\nSeaBIOS: PDC_ADD_VALID function %ld ARG2=%x called.\n", option, ARG2);
 		if (option != 0)
@@ -951,7 +996,7 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
 		reset();
 		return PDC_OK;
 	case PDC_PCI_INDEX:
-                dprintf(0, "\n\nSeaBIOS: PDC_PCI_INDEX(%lu) called with ARG2=%x ARG3=%x ARG4=%x\n", option, ARG2, ARG3, ARG4);
+                // dprintf(0, "\n\nSeaBIOS: PDC_PCI_INDEX(%lu) called with ARG2=%x ARG3=%x ARG4=%x\n", option, ARG2, ARG3, ARG4);
                 switch (option) {
                 case PDC_PCI_INTERFACE_INFO:
                         memset(result, 0, 32 * sizeof(unsigned long));
@@ -967,8 +1012,13 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
                         result[17] = 0x90;
                         return PDC_BAD_OPTION;
                 case PDC_PCI_PCI_PATH_TO_PCI_HPA:
-                        result[0] = DINO_HPA;
-                        return PDC_BAD_OPTION;
+                        result[0] = PCI_HPA;
+                        // result[0] = DINO_SCSI_HPA;
+                        // result[0] = IDE_HPA;
+                        return PDC_OK;
+                        // return PDC_BAD_OPTION;
+                case PDC_PCI_PCI_HPA_TO_PCI_PATH:
+                        BUG_ON(1);
                 }
                 break;
 	case PDC_RELOCATE:
@@ -1008,6 +1058,9 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
  * BOOT MENU
  ********************************************************/
 
+extern void find_initial_parisc_boot_drives(
+                struct drive_s **harddisc,
+                struct drive_s **cdrom);
 extern struct drive_s *select_parisc_boot_drive(char bootdrive);
 
 static int parisc_boot_menu(unsigned long *iplstart, unsigned long *iplend,
@@ -1114,7 +1167,7 @@ static const struct pz_device mem_cons_boot = {
 
 static const struct pz_device mem_boot_boot = {
 	.dp.flags = PF_AUTOBOOT,
-	.hpa = IDE_HPA, // DINO_SCSI_HPA,
+	.hpa = IDE_HPA, // DINO_SCSI_HPA,  // IDE_HPA
 	.iodc_io = (unsigned long) &iodc_entry,
 	.cl_class = CL_RANDOM,
 };
@@ -1180,12 +1233,11 @@ static void prepare_boot_path(volatile struct pz_device *dest,
 	unsigned long hpa;
 	struct pdc_module_path *mod_path;
 
-	*dest = *source;
 	hpa = source->hpa;
 	hpa_index = find_hpa_index(hpa);
 
 	if (hpa == DINO_SCSI_HPA || hpa == IDE_HPA)
-		mod_path = &mod_path_hpa_fff8c000;
+		mod_path = &mod_path_emulated_drives;
 	else if (hpa == DINO_UART_HPA || hpa == LASI_UART_HPA)
 		mod_path = &mod_path_hpa_fff83000;
 	else {
@@ -1194,10 +1246,12 @@ static void prepare_boot_path(volatile struct pz_device *dest,
 	}
 
 	/* copy device path to entry in PAGE0 */
+	memcpy((void*)dest, source, sizeof(*source));
 	memcpy((void*)&dest->dp, mod_path, sizeof(struct device_path));
 
 	/* copy device path to stable storage */
 	memcpy(&stable_storage[stable_offset], mod_path, sizeof(*mod_path));
+
 	BUG_ON(sizeof(*mod_path) != 0x20);
 	BUG_ON(sizeof(struct device_path) != 0x20);
 }
@@ -1257,11 +1311,6 @@ void __VISIBLE start_parisc_firmware(void)
 
 	chassis_code = 0;
 
-	// Initialize boot paths (disc, display & keyboard)
-	prepare_boot_path(&(PAGE0->mem_cons), &mem_cons_boot, 0x60);
-	prepare_boot_path(&(PAGE0->mem_boot), &mem_boot_boot, 0x0);
-	prepare_boot_path(&(PAGE0->mem_kbd),  &mem_kbd_boot, 0xa0);
-
 	malloc_preinit();
 
 	// set Qemu serial debug port
@@ -1315,10 +1364,37 @@ void __VISIBLE start_parisc_firmware(void)
 	printf("  Available memory:     %llu MB\n"
 		"  Good memory required: %d MB\n\n",
 		(unsigned long long)ram_size/1024/1024, MIN_RAM_SIZE/1024/1024);
-	printf("  Primary boot path:    FWSCSI.6.0\n"
-		"  Alternate boot path:  LAN.0.0.0.0.0.0\n"
+
+        // search boot devices
+        find_initial_parisc_boot_drives(&parisc_boot_harddisc, &parisc_boot_cdrom);
+
+	printf("  Primary boot path:    FWSCSI.%d.%d\n"
+		"  Alternate boot path:  FWSCSI.%d.%d\n"
 		"  Console path:         SERIAL_1.9600.8.none\n"
-		"  Keyboard path:        PS2\n\n");
+		"  Keyboard path:        PS2\n\n",
+                parisc_boot_harddisc->target, parisc_boot_harddisc->lun,
+                parisc_boot_cdrom->target, parisc_boot_cdrom->lun);
+
+        if (bootdrive == 'c')
+            boot_drive = parisc_boot_harddisc;
+        else
+            boot_drive = parisc_boot_cdrom;
+
+        // Store initial emulated drives path master data
+        mod_path_emulated_drives.layers[0] = parisc_boot_harddisc->target;
+        mod_path_emulated_drives.layers[1] = parisc_boot_harddisc->lun;
+
+	// Initialize boot paths (disc, display & keyboard)
+	prepare_boot_path(&(PAGE0->mem_cons), &mem_cons_boot, 0x60);
+	prepare_boot_path(&(PAGE0->mem_boot), &mem_boot_boot, 0x0);
+	prepare_boot_path(&(PAGE0->mem_kbd),  &mem_kbd_boot, 0xa0);
+        // copy primary boot path to alt boot path
+        memcpy(&stable_storage[0x80], &stable_storage[0], 0x20);
+        stable_storage[0x80 + 11] = parisc_boot_cdrom->target;
+        stable_storage[0x80 + 12] = parisc_boot_cdrom->lun;
+        // currently booted path == CD in PAGE0->mem_boot
+        PAGE0->mem_boot.dp.layers[0] = boot_drive->target;
+        PAGE0->mem_boot.dp.layers[1] = boot_drive->lun;
 
 	/* directly start Linux kernel if it was given on qemu command line. */
 	if (linux_kernel_entry > 1) {
@@ -1351,6 +1427,9 @@ void __VISIBLE start_parisc_firmware(void)
 	/* check for bootable drives, and load and start IPL bootloader if possible */
 	if (parisc_boot_menu(&iplstart, &iplend, bootdrive)) {
 		void (*start_ipl)(long interactive, long iplend);
+
+                PAGE0->mem_boot.dp.layers[0] = boot_drive->target;
+                PAGE0->mem_boot.dp.layers[1] = boot_drive->lun;
 
 		printf("\nBooting...\n"
 			"Boot IO Dependent Code (IODC) revision 153\n\n"

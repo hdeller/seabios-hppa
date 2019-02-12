@@ -61,6 +61,7 @@
 #define PDC_MODEL_GET_BOOT__OP	8	/* returns boot test options	*/
 #define PDC_MODEL_SET_BOOT__OP	9	/* set boot test options	*/
 #define PDC_MODEL_GET_PLATFORM_INFO 10	/* returns platform info	*/
+#define PDC_MODEL_GET_INSTALL_KERNEL 11	/* returns kernel for installation */
 
 #define PA89_INSTRUCTION_SET	0x4	/* capabilities returned	*/
 #define PA90_INSTRUCTION_SET	0x8
@@ -110,6 +111,11 @@
 #define PDC_STABLE_INITIALIZE	4
 
 #define PDC_NVOLATILE	11		/* often not implemented	*/
+#define PDC_NVOLATILE_READ	0
+#define PDC_NVOLATILE_WRITE	1
+#define PDC_NVOLATILE_RETURN_SIZE 2
+#define PDC_NVOLATILE_VERIFY_CONTENTS 3
+#define PDC_NVOLATILE_INITIALIZE 4
 
 #define PDC_ADD_VALID	12		/* Memory validation PDC call	*/
 #define PDC_ADD_VALID_VERIFY	0	/* Make PDC_ADD_VALID verify region */
