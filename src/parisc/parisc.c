@@ -1381,8 +1381,10 @@ void __VISIBLE start_parisc_firmware(void)
             boot_drive = parisc_boot_cdrom;
 
         // Store initial emulated drives path master data
-        mod_path_emulated_drives.layers[0] = parisc_boot_harddisc->target;
-        mod_path_emulated_drives.layers[1] = parisc_boot_harddisc->lun;
+        if (parisc_boot_harddisc) {
+            mod_path_emulated_drives.layers[0] = parisc_boot_harddisc->target;
+            mod_path_emulated_drives.layers[1] = parisc_boot_harddisc->lun;
+        }
 
 	// Initialize boot paths (disc, display & keyboard)
 	prepare_boot_path(&(PAGE0->mem_cons), &mem_cons_boot, 0x60);
@@ -1390,11 +1392,15 @@ void __VISIBLE start_parisc_firmware(void)
 	prepare_boot_path(&(PAGE0->mem_kbd),  &mem_kbd_boot, 0xa0);
         // copy primary boot path to alt boot path
         memcpy(&stable_storage[0x80], &stable_storage[0], 0x20);
-        stable_storage[0x80 + 11] = parisc_boot_cdrom->target;
-        stable_storage[0x80 + 12] = parisc_boot_cdrom->lun;
+        if (parisc_boot_cdrom) {
+            stable_storage[0x80 + 11] = parisc_boot_cdrom->target;
+            stable_storage[0x80 + 12] = parisc_boot_cdrom->lun;
+        }
         // currently booted path == CD in PAGE0->mem_boot
-        PAGE0->mem_boot.dp.layers[0] = boot_drive->target;
-        PAGE0->mem_boot.dp.layers[1] = boot_drive->lun;
+        if (boot_drive) {
+            PAGE0->mem_boot.dp.layers[0] = boot_drive->target;
+            PAGE0->mem_boot.dp.layers[1] = boot_drive->lun;
+        }
 
 	/* directly start Linux kernel if it was given on qemu command line. */
 	if (linux_kernel_entry > 1) {
