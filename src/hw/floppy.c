@@ -146,8 +146,8 @@ addFloppy(int floppyid, int ftype)
 void
 floppy_setup(void)
 {
-   // memcpy(&diskette_param_table, &diskette_param_table2
-   //        , sizeof(diskette_param_table));
+    memcpy(&diskette_param_table, &diskette_param_table2
+           , sizeof(diskette_param_table));
     SET_IVT(0x1E, SEGOFF(SEG_BIOS
                          , (u32)&diskette_param_table2 - BUILD_BIOS_ADDR));
 

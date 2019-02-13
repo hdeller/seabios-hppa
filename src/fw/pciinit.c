@@ -511,7 +511,6 @@ static void mch_mem_addr_setup(struct pci_device *dev, void *arg)
         pci_io_low_end = acpi_pm_base;
 }
 
-
 static int dino_pci_slot_get_irq(struct pci_device *pci, int pin)
 {
     int slot = pci_bdf_to_dev(pci->bdf);
@@ -564,13 +563,14 @@ static void pci_bios_init_platform(void)
 {
     struct pci_device *pci;
 
-    if (CONFIG_PARISC)
-        dino_mem_addr_setup(NULL, NULL);
-    else {
+    if (CONFIG_X86) {
         foreachpci(pci) {
              pci_init_device(pci_platform_tbl, pci, NULL);
         }
     }
+
+    if (CONFIG_PARISC)
+        dino_mem_addr_setup(NULL, NULL);
 }
 
 static u8 pci_find_resource_reserve_capability(u16 bdf)
