@@ -688,6 +688,9 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
                 case PDC_MODEL_CAPABILITIES:
                     result[0] = PARISC_PDC_CAPABILITIES;
                     return PDC_OK;
+                case PDC_MODEL_GET_INSTALL_KERNEL:
+                    // No need to provide a special install kernel during installation of HP-UX
+                    return PDC_BAD_OPTION;
             }
             dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_MODEL function %d %x %x %x %x\n", ARG1, ARG2, ARG3, ARG4, ARG5);
             return PDC_BAD_OPTION;
