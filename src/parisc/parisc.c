@@ -53,6 +53,9 @@ unsigned long parisc_vga_mmio;
 struct segoff_s ivt_table[256];
 
 void mtrr_setup(void) { }
+void mouse_init(void) { }
+void pnp_init(void) { }
+u16  get_pnp_offset(void) { return 0; }
 void mathcp_setup(void) { }
 void smp_setup(void) { }
 void bios32_init(void) { }

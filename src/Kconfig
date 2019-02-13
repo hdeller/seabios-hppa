@@ -419,6 +419,7 @@ menu "BIOS interfaces"
         help
             Support PnP BIOS entry point.
     config OPTIONROMS
+        depends on X86
         bool "Option ROMS"
         default y
         help
