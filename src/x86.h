@@ -2,7 +2,9 @@
 #ifndef __X86_H
 #define __X86_H
 
+#if defined(__hppa__)
 #include "parisc/hppa_hardware.h"
+#endif
 
 // CPU flag bitdefs
 #define F_CF (1<<0)
