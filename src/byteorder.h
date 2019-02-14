@@ -22,7 +22,7 @@ static inline u64 __swab64_constant(u64 val) {
     return ((u64)__swab32_constant(val) << 32) | __swab32_constant(val>>32);
 }
 static inline u32 __swab32(u32 val) {
-#if defined(__x86__)
+#if defined(__x86_64__) || defined(__i386__)
     asm("bswapl %0" : "+r"(val));
 #elif defined(__hppa__)
     unsigned int temp;
