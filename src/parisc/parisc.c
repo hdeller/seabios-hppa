@@ -62,6 +62,8 @@ void bios32_init(void) { }
 void yield_toirq(void) { }
 void farcall16(struct bregs *callregs) { }
 void farcall16big(struct bregs *callregs) { }
+void mutex_lock(struct mutex_s *mutex) { }
+void mutex_unlock(struct mutex_s *mutex) { }
 
 void cpuid(u32 index, u32 *eax, u32 *ebx, u32 *ecx, u32 *edx)
 {

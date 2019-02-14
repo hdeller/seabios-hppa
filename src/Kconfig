@@ -66,6 +66,7 @@ endchoice
     config RELOCATE_INIT
         bool "Copy init code to high memory"
         default y
+        depends on X86
         help
             Support relocating the one time initialization code to high memory.
 
@@ -132,6 +133,7 @@ endchoice
     config MALLOC_UPPERMEMORY
         bool "Allocate memory that needs to be in first Meg above 0xc0000"
         default y
+        depends on X86
         help
             Use the "Upper Memory Block" area (0xc0000-0xf0000) for
             internal "low memory" allocations.  If this is not

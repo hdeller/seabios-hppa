@@ -31,9 +31,16 @@ pmtimer_setup(u16 ioport)
 {
 }
 
+// Return the number of milliseconds in 'ticks' number of timer irqs.
+u32 ticks_to_ms(u32 ticks)
+{
+    return (10 * ticks / PAGE0->mem_10msec);
+}
+
+
 u32 ticks_from_ms(u32 ms)
 {
-    return 0;
+    return (ms * PAGE0->mem_10msec / 10);
 }
 
 
