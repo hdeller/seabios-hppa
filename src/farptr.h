@@ -6,6 +6,7 @@
 #ifndef __FARPTR_H
 #define __FARPTR_H
 
+#include "autoconf.h"
 #include "x86.h" // insb
 
 // Dummy definitions used to make sure gcc understands dependencies

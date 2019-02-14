@@ -2,6 +2,7 @@
 #ifndef __STACKS_H
 #define __STACKS_H
 
+#include "autoconf.h" // CONFIG_*
 #include "types.h" // u32
 
 #define CALL32SMM_CMDID    0xb5

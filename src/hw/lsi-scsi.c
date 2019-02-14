@@ -14,6 +14,7 @@
 #include "block.h" // struct drive_s
 #include "blockcmd.h" // scsi_drive_setup
 #include "config.h" // CONFIG_*
+#include "byteorder.h" // cpu_to_*
 #include "fw/paravirt.h" // runningOnQEMU
 #include "malloc.h" // free
 #include "output.h" // dprintf

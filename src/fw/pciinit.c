@@ -511,6 +511,7 @@ static void mch_mem_addr_setup(struct pci_device *dev, void *arg)
         pci_io_low_end = acpi_pm_base;
 }
 
+#if CONFIG_PARISC
 static int dino_pci_slot_get_irq(struct pci_device *pci, int pin)
 {
     int slot = pci_bdf_to_dev(pci->bdf);
@@ -549,6 +550,7 @@ m10 ghost_em write1 0xff000810 0x0000006f      /* Set PCICMD reset PCI     */
     /* setup io address space */
     pci_io_low_end = 0xa000;
 }
+#endif /* CONFIG_PARISC */
 
 
 static const struct pci_device_id pci_platform_tbl[] = {
@@ -569,8 +571,9 @@ static void pci_bios_init_platform(void)
         }
     }
 
-    if (CONFIG_PARISC)
-        dino_mem_addr_setup(NULL, NULL);
+#if CONFIG_PARISC
+    dino_mem_addr_setup(NULL, NULL);
+#endif
 }
 
 static u8 pci_find_resource_reserve_capability(u16 bdf)
