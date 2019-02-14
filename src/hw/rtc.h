@@ -1,7 +1,7 @@
 #ifndef __RTC_H
 #define __RTC_H
 
-#if defined(CONFIG_PARISC)
+#if CONFIG_PARISC
 #include "parisc/hppa_hardware.h"
 #define PORT_CMOS_INDEX        (IDE_HPA+0x0070)
 #define PORT_CMOS_DATA         (IDE_HPA+0x0071)
