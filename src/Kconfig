@@ -77,7 +77,7 @@ endchoice
         help
             Support an interactive boot menu at end of post.
     config BOOTSPLASH
-        depends on BOOTMENU
+        depends on BOOTMENU && X86
         bool "Graphical boot splash screen"
         default y
         help
@@ -123,6 +123,7 @@ endchoice
     config ENTRY_EXTRASTACK
         bool "Use internal stack for 16bit interrupt entry points"
         default y
+        depends on X86
         help
             Utilize an internal stack for all the legacy 16bit
             interrupt entry points.  This reduces the amount of space
@@ -375,6 +376,7 @@ menu "Hardware support"
     config PMTIMER
         bool "Support ACPI timer"
         default y
+        depends on X86
         help
             Detect and use the ACPI timer for timekeeping.
     config TSC_TIMER

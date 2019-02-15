@@ -649,7 +649,7 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
                 case PDC_CHASSIS_DISPWARN:
                     ARG4 = (ARG3 >> 17) & 7;
                     chassis_code = ARG3 & 0xffff;
-                    printf("\nPDC_CHASSIS: %s (%d), %sCHASSIS  %0x\n",
+                    if (0) printf("\nPDC_CHASSIS: %s (%d), %sCHASSIS  %0x\n",
                             systat[ARG4], ARG4, (ARG3>>16)&1 ? "blank display, ":"", chassis_code);
                     // fall through
                 case PDC_CHASSIS_WARN:
