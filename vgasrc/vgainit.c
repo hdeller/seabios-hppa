@@ -56,8 +56,8 @@ allocate_pmm(u32 size, int highmem, int aligned)
         dprintf(1, "Attempting to allocate %u bytes %s via pmm call to %04x:%04x\n"
                 , size, highmem ? "highmem" : "lowmem"
                 , entry.seg, entry.offset);
-        u16 res1, res2;
 #if !CONFIG_PARISC
+        u16 res1, res2;
         u16 flags = 8 |
             ( highmem ? 2 : 1 )|
             ( aligned ? 4 : 0 );
@@ -74,8 +74,10 @@ allocate_pmm(u32 size, int highmem, int aligned)
             "cld\n"
             : "+r" (entry.segoff), "+r" (size), "+r" (flags),
               "=a" (res1), "=d" (res2) : : "cc", "memory");
-#endif
         u32 res = res1 | (res2 << 16);
+#else
+        u32 res = 0;
+#endif
         if (!res || res == PMM_FUNCTION_NOT_SUPPORTED)
             return 0;
         return res;
@@ -165,7 +167,7 @@ vga_post(struct bregs *regs)
     serial_debug_preinit();
     dprintf(1, "Start SeaVGABIOS (version %s)\n", VERSION);
     dprintf(1, "VGABUILD: %s\n", BUILDINFO);
-    // debug_enter(regs, DEBUG_VGA_POST);
+    debug_enter(regs, DEBUG_VGA_POST);
 
     if (CONFIG_VGA_PCI && !GET_GLOBAL(HaveRunInit)) {
         u16 bdf = regs->ax;
