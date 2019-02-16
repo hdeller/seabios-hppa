@@ -98,10 +98,12 @@ target-$(CONFIG_COREBOOT) += $(OUT)bios.bin.elf
 target-$(CONFIG_BUILD_VGABIOS) += $(OUT)vgabios.bin
 
 all: $(target-y)
-parisc: $(OUT)hppa-firmware.img
+
+parisc: FORCE
+	DIRS="" $(MAKE) -f Makefile.parisc all
 
 # Make definitions
-.PHONY : all clean distclean FORCE
+.PHONY : all clean distclean parisc FORCE
 .DELETE_ON_ERROR:
 
 
@@ -209,9 +211,6 @@ $(OUT)bios.bin.elf: $(OUT)rom.o $(OUT)bios.bin.prep
 $(OUT)hppa-warning.bin:
 	@echo "  Run 'make parisc' to build parisc firmware"
 	@/bin/false
-
-$(OUT)hppa-firmware.img:
-	DIRS="" $(MAKE) -f Makefile.parisc all
 
 ################ VGA build rules
 
