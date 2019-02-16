@@ -50,7 +50,7 @@ endchoice
             running on an emulator.
 
     config XEN
-        depends on QEMU && X86
+        depends on QEMU && !PARISC
         bool "Support Xen HVM"
         default y
         help
@@ -77,7 +77,7 @@ endchoice
         help
             Support an interactive boot menu at end of post.
     config BOOTSPLASH
-        depends on BOOTMENU && X86
+        depends on BOOTMENU && !PARISC
         bool "Graphical boot splash screen"
         default y
         help
@@ -423,7 +423,7 @@ menu "BIOS interfaces"
         help
             Support PnP BIOS entry point.
     config OPTIONROMS
-        depends on X86
+        depends on !PARISC
         bool "Option ROMS"
         default y
         help

@@ -217,7 +217,7 @@ static void mch_isa_bridge_setup(struct pci_device *dev, void *arg)
 
 static void storage_ide_setup(struct pci_device *pci, void *arg)
 {
-    /* On parisc, keep PCI IDE IO ports in PCI space */
+    /* On parisc, keep PCI IDE IO ports in PCI mem space */
     if (CONFIG_PARISC)
 	return;
 

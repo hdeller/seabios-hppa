@@ -4,21 +4,12 @@
 //
 // This file may be distributed under the terms of the GNU LGPLv3 license.
 
-#include "biosvar.h" // GET_LOW
 #include "config.h" // CONFIG_*
-#include "output.h" // dprintf
-#include "stacks.h" // yield
+#include "x86.h" // rdtscll()
 #include "util.h" // timer_setup
-#include "x86.h" // cpuid
 #include "parisc/pdc.h"
 
 #define PAGE0 ((volatile struct zeropage *) 0UL)
-
-#define NANOSECONDS_PER_SECOND 1000000000LL
-#define SCALE_MS 1000000
-#define SCALE_US 1000
-#define SCALE_NS 1
-
 
 // Setup internal timers.
 void
@@ -70,7 +61,7 @@ timer_sleep(u32 diff)
     u32 start = timer_read();
     u32 end = start + diff;
     while (!timer_check(end))
-        yield();
+        /* idle wait */;
 }
 
 void ndelay(u32 count) {

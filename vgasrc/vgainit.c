@@ -56,7 +56,7 @@ allocate_pmm(u32 size, int highmem, int aligned)
         dprintf(1, "Attempting to allocate %u bytes %s via pmm call to %04x:%04x\n"
                 , size, highmem ? "highmem" : "lowmem"
                 , entry.seg, entry.offset);
-#if !CONFIG_PARISC
+#if CONFIG_X86
         u16 res1, res2;
         u16 flags = 8 |
             ( highmem ? 2 : 1 )|
@@ -192,7 +192,7 @@ vga_post(struct bregs *regs)
     if (CONFIG_VGA_STDVGA_PORTS)
         stdvga_build_video_param();
 
-#if !CONFIG_PARISC
+#if CONFIG_X86
     extern void entry_10(void);
     SET_IVT(0x10, SEGOFF(get_global_seg(), (u32)entry_10));
 #endif
