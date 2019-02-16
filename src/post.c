@@ -23,7 +23,6 @@
 #include "string.h" // memset
 #include "util.h" // kbd_init
 #include "tcgbios.h" // tpm_*
-#include "stacks.h" // wait_threads
 
 
 /****************************************************************
@@ -171,7 +170,7 @@ prepareboot(void)
     cdrom_prepboot();
     pmm_prepboot();
     malloc_prepboot();
-    // e820_prepboot();
+    e820_prepboot();
 
     HaveRunPost = 2;
 

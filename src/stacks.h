@@ -59,15 +59,9 @@ void wait_threads(void);
 struct mutex_s { u32 isLocked; };
 void mutex_lock(struct mutex_s *mutex);
 void mutex_unlock(struct mutex_s *mutex);
-#if CONFIG_THREADS
 void start_preempt(void);
 void finish_preempt(void);
 int wait_preempt(void);
-#else
-static inline void start_preempt(void) { return; }
-static inline void finish_preempt(void) { return; }
-static inline int wait_preempt(void) { return 0; }
-#endif
 void check_preempt(void);
 u32 __call32_params(void *func, u32 eax, u32 edx, u32 ecx, u32 errret);
 #define call32_params(func, eax, edx, ecx, errret) ({                   \

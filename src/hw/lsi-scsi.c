@@ -110,13 +110,6 @@ lsi_scsi_process_op(struct disk_op_s *op)
     /* convert to little endian for PCI */
     convert_to_le32(script, sizeof(script));
 
-#if 0
- int nr;
- dprintf(1, "Data from SEABIOS  cdbcmd = ");
- for (nr=0; nr<15; nr++) dprintf(1, "0x%x  ", cdbcmd[nr]);
- dprintf(1, "\n");
-#endif
-
     outb(dsp         & 0xff, iobase + LSI_REG_DSP0);
     outb((dsp >>  8) & 0xff, iobase + LSI_REG_DSP1);
     outb((dsp >> 16) & 0xff, iobase + LSI_REG_DSP2);

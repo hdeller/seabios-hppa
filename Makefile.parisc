@@ -1,6 +1,5 @@
 # SeaBIOS build system for PA-RISC
 #
-# Copyright (C) 2008-2012  Kevin O'Connor <kevin@koconnor.net>
 # Copyright (C) 2017-2019  Helge Deller <deller@gmx.de> for PA-RISC
 #
 # This file may be distributed under the terms of the GNU LGPLv3 license.

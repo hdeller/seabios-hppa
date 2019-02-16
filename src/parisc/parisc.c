@@ -64,6 +64,9 @@ void farcall16(struct bregs *callregs) { }
 void farcall16big(struct bregs *callregs) { }
 void mutex_lock(struct mutex_s *mutex) { }
 void mutex_unlock(struct mutex_s *mutex) { }
+void start_preempt(void) { }
+void finish_preempt(void) { }
+int wait_preempt(void) { return 0; }
 
 void cpuid(u32 index, u32 *eax, u32 *ebx, u32 *ecx, u32 *edx)
 {
@@ -1214,11 +1217,11 @@ static void parisc_vga_init(void)
         //
         // vga_set_mode(0x119, MF_NOCLEARMEM); // bochs: MM_DIRECT, 1280, 1024, 15, 8, 16,
         // vga_set_mode(0x105, 0); // bochs:     { 0x105, { MM_PACKED, 1024, 768,  8,  8, 16, SEG_GRAPH } },
-        // vga_set_mode(0x107, 0); // bochs:  { 0x107, { MM_PACKED, 1280, 1024, 8,  8, 16, SEG_GRAPH } },
+        vga_set_mode(0x107, 0); // bochs:  { 0x107, { MM_PACKED, 1280, 1024, 8,  8, 16, SEG_GRAPH } },
         // vga_set_mode(0x11c, 0); // bochs:  { 0x11C, { MM_PACKED, 1600, 1200, 8,  8, 16, SEG_GRAPH } },
         // vga_set_mode(0x11f, 0); // bochs:  { 0x11F, { MM_DIRECT, 1600, 1200, 24, 8, 16, SEG_GRAPH } },
         // vga_set_mode(0x101, 0); // bochs:  { 0x101, { MM_PACKED, 640,  480,  8,  8, 16, SEG_GRAPH } },
-        vga_set_mode(0x100, 0); // bochs:  { 0x100, { MM_PACKED, 640,  400,  8,  8, 16, SEG_GRAPH } },
+        // vga_set_mode(0x100, 0); // bochs:  { 0x100, { MM_PACKED, 640,  400,  8,  8, 16, SEG_GRAPH } },
 
         u32 endian = *(u32 *)(parisc_vga_mmio + 0x0604);
         dprintf(1, "parisc: VGA at %pP, mem 0x%lx  mmio 0x%lx endian 0x%x found.\n",
@@ -1231,6 +1234,8 @@ static void parisc_vga_init(void)
         dprintf(1, "parisc: VGA resolution: %dx%d-%d  memmodel:%d  bpp:%d  linelength:%d\n",
                 vmode_g->width, vmode_g->height, vmode_g->depth,
                 vmode_g->memmodel, bpp, linelength);
+
+        break; // only allow one VGA for now.
     }
 }
 
