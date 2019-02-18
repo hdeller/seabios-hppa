@@ -15,6 +15,7 @@
 #include "hw/serialio.h" // qemu_debug_port
 #include "hw/pcidevice.h" // foreachpci
 #include "hw/pci.h" // pci_config_readl
+#include "hw/pci_ids.h" // PCI IDs
 #include "hw/pci_regs.h" // PCI_BASE_ADDRESS_0
 #include "hw/ata.h"
 #include "hw/blockcmd.h" // scsi_is_ready()
@@ -1191,6 +1192,17 @@ static const struct pz_device mem_kbd_boot = {
     .cl_class = CL_KEYBD,
 };
 
+static void find_pci_slot_for_dev(unsigned int pciid, char *pci_slot)
+{
+    struct pci_device *pci;
+
+    foreachpci(pci)
+        if (pci->vendor == pciid) {
+            *pci_slot = (pci->bdf >> 3) & 0x0f;
+            return;
+        }
+}
+
 static void parisc_vga_init(void)
 {
     extern void vga_post(struct bregs *);
@@ -1394,6 +1406,10 @@ void __VISIBLE start_parisc_firmware(void)
         boot_drive = parisc_boot_harddisc;
     else
         boot_drive = parisc_boot_cdrom;
+
+    // Find PCI bus id of LSI SCSI card
+    find_pci_slot_for_dev(PCI_VENDOR_ID_LSI_LOGIC,
+            &mod_path_emulated_drives.path.bc[5]);
 
     // Store initial emulated drives path master data
     if (parisc_boot_harddisc) {
