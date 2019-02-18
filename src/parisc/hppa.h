@@ -237,9 +237,9 @@ static inline void outb(u8 value, portaddr_t port) {
 	*(volatile u8 *)(port) = value;
     } else {
 	/* write PCI I/O address to Dino's PCI_CONFIG_ADDR */
-	outl(port, DINO_HPA + 0x064);
+	outl(port & ~3U, DINO_HPA + 0x064);
 	/* write value to PCI_IO_DATA */
-	outb(value, DINO_HPA + 0x06c);
+	outb(value, DINO_HPA + 0x06c + (port & 3));
     }
 }
 
@@ -248,9 +248,9 @@ static inline u8 inb(portaddr_t port) {
         return *(volatile u8 *)(port);
     } else {
 	/* write PCI I/O address to Dino's PCI_CONFIG_ADDR */
-	outl(port, DINO_HPA + 0x064);
+	outl(port & ~3U, DINO_HPA + 0x064);
 	/* read value to PCI_IO_DATA */
-	return inb(DINO_HPA + 0x06c);
+	return inb(DINO_HPA + 0x06c + (port & 3));
     }
 }
 
@@ -259,9 +259,9 @@ static inline u16 inw(portaddr_t port) {
         return *(volatile u16 *)(port);
     } else {
 	/* write PCI I/O address to Dino's PCI_CONFIG_ADDR */
-	outl(port, DINO_HPA + 0x064);
+	outl(port & ~3U, DINO_HPA + 0x064);
 	/* read value to PCI_IO_DATA */
-	return inw(DINO_HPA + 0x06c);
+	return inw(DINO_HPA + 0x06c + (port & 3));
     }
 }
 static inline u32 inl(portaddr_t port) {
@@ -269,9 +269,9 @@ static inline u32 inl(portaddr_t port) {
         return *(volatile u32 *)(port);
     } else {
 	/* write PCI I/O address to Dino's PCI_CONFIG_ADDR */
-	outl(port, DINO_HPA + 0x064);
+	outl(port & ~3U, DINO_HPA + 0x064);
 	/* read value to PCI_IO_DATA */
-	return inl(DINO_HPA + 0x06c);
+	return inl(DINO_HPA + 0x06c + (port & 3));
     }
 }
 
