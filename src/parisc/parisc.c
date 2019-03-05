@@ -704,14 +704,51 @@ static int pdc_pim(unsigned int *arg)
     return PDC_BAD_PROC;
 }
 
+static int pdc_model(unsigned int *arg)
+{
+    static unsigned long model[] = { PARISC_PDC_MODEL };
+    static const char model_str[] = PARISC_MODEL;
+    unsigned long option = ARG1;
+    unsigned long *result = (unsigned long *)ARG2;
+
+    switch (option) {
+        case PDC_MODEL_INFO:
+            memcpy(result, model, sizeof(model));
+            return PDC_OK;
+        case PDC_MODEL_VERSIONS:
+            switch (ARG3) {
+                case 0: /* return CPU0 version */
+                    result[0] = 35; // TODO! ???
+                    return PDC_OK;
+                case 1: /* return PDC version */
+                    result[0] = PARISC_PDC_VERSION;
+                    return PDC_OK;
+            }
+            return -4; // invalid c_index
+        case PDC_MODEL_SYSMODEL:
+            result[0] = sizeof(model_str) - 1;
+            strtcpy((char *)ARG4, model_str, sizeof(model_str));
+            return PDC_OK;
+        case PDC_MODEL_CPU_ID:
+            result[0] = PARISC_PDC_CPUID;
+            return PDC_OK;
+        case PDC_MODEL_CAPABILITIES:
+            result[0] = PARISC_PDC_CAPABILITIES;
+            return PDC_OK;
+        case PDC_MODEL_GET_INSTALL_KERNEL:
+            // No need to provide a special install kernel during installation of HP-UX
+            return PDC_BAD_OPTION;
+    }
+    dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_MODEL function %d %x %x %x %x\n", ARG1, ARG2, ARG3, ARG4, ARG5);
+    return PDC_BAD_OPTION;
+}
+
 int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
 {
     static unsigned long psw_defaults = PDC_PSW_ENDIAN_BIT;
     static unsigned long cache_info[] = { PARISC_PDC_CACHE_INFO };
     static struct pdc_cache_info *machine_cache_info
         = (struct pdc_cache_info *) &cache_info;
-    static unsigned long model[] = { PARISC_PDC_MODEL };
-    static const char model_str[] = PARISC_MODEL;
 
     unsigned long proc = ARG0;
     unsigned long option = ARG1;
@@ -741,37 +778,8 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
             return pdc_pim(arg);
 
         case PDC_MODEL: /* model information */
-            switch (option) {
-                case PDC_MODEL_INFO:
-                    memcpy(result, model, sizeof(model));
-                    return PDC_OK;
-                case PDC_MODEL_VERSIONS:
-                    switch (ARG3) {
-                    case 0: /* return CPU0 version */
-                        result[0] = 35; // TODO! ???
-                        return PDC_OK;
-                    case 1: /* return PDC version */
-                        result[0] = PARISC_PDC_VERSION;
-                        return PDC_OK;
-                    }
-                    return -4; // invalid c_index
-                case PDC_MODEL_SYSMODEL:
-                    result[0] = sizeof(model_str) - 1;
-                    strtcpy((char *)ARG4, model_str, sizeof(model_str));
-                    return PDC_OK;
-                case PDC_MODEL_CPU_ID:
-                    result[0] = PARISC_PDC_CPUID;
-                    return PDC_OK;
-                case PDC_MODEL_CAPABILITIES:
-                    result[0] = PARISC_PDC_CAPABILITIES;
-                    return PDC_OK;
-                case PDC_MODEL_GET_INSTALL_KERNEL:
-                    // No need to provide a special install kernel during installation of HP-UX
-                    return PDC_BAD_OPTION;
-            }
-            dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_MODEL function %d %x %x %x %x\n", ARG1, ARG2, ARG3, ARG4, ARG5);
-            return PDC_BAD_OPTION;
-        case PDC_CACHE:
+            return pdc_model(arg);
+      case PDC_CACHE:
             switch (option) {
                 case PDC_CACHE_INFO:
                     BUG_ON(sizeof(cache_info) != sizeof(*machine_cache_info));
