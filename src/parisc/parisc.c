@@ -1007,6 +1007,34 @@ static int pdc_tlb(unsigned int *arg)
     return PDC_BAD_PROC;
 }
 
+static int pdc_mem(unsigned int *arg)
+{
+    unsigned long option = ARG1;
+    unsigned long *result = (unsigned long *)ARG2;
+
+    // only implemented on 64bit PDC!
+    if (sizeof(unsigned long) == sizeof(unsigned int))
+        return PDC_BAD_PROC;
+
+    switch (option) {
+        case PDC_MEM_MEMINFO:
+            result[0] = 0;	// no PDT entries
+            result[1] = 0;	// page entries
+            result[2] = 0;	// PDT status
+            result[3] = (unsigned long)-1ULL; // dbe_loc
+            result[4] = GoldenMemory; // good_mem
+            return PDC_OK;
+        case PDC_MEM_READ_PDT:
+            result[0] = 0;	// no PDT entries
+            return PDC_OK;
+        case PDC_MEM_GOODMEM:
+            GoldenMemory = ARG3;
+            return PDC_OK;
+    }
+    dprintf(0, "\n\nSeaBIOS: Check PDC_MEM option %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
+    return PDC_BAD_PROC;
+}
+
 int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
 {
     static unsigned long psw_defaults = PDC_PSW_ENDIAN_BIT;
@@ -1073,28 +1101,9 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
             return pdc_tlb(arg);
 
         case PDC_MEM:
-            // only implemented on 64bit PDC!
-            if (sizeof(unsigned long) == sizeof(unsigned int))
-                return PDC_BAD_PROC;
+            return pdc_mem(arg);
 
-            switch (option) {
-                case PDC_MEM_MEMINFO:
-                    result[0] = 0;	// no PDT entries
-                    result[1] = 0;	// page entries
-                    result[2] = 0;	// PDT status
-                    result[3] = (unsigned long)-1ULL; // dbe_loc
-                    result[4] = GoldenMemory; // good_mem
-                    return PDC_OK;
-                case PDC_MEM_READ_PDT:
-                    result[0] = 0;	// no PDT entries
-                    return PDC_OK;
-                case PDC_MEM_GOODMEM:
-                    GoldenMemory = ARG3;
-                    return PDC_OK;
-            }
-            dprintf(0, "\n\nSeaBIOS: Check PDC_MEM option %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
-            return PDC_BAD_PROC;
-        case PDC_PSW:	/* Get/Set default System Mask  */
+       case PDC_PSW:	/* Get/Set default System Mask  */
             if (option > PDC_PSW_SET_DEFAULTS)
                 return PDC_BAD_OPTION;
             /* FIXME: For 64bit support enable PDC_PSW_WIDE_BIT too! */
