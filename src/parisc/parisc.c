@@ -457,6 +457,7 @@ int __VISIBLE parisc_iodc_ENTRY_INIT(unsigned int *arg FUNC_MANY_ARGS)
             result[2] = result[3] = 0; /* TODO?: MAC of network card. */
             return PDC_OK;
         case ENTRY_INIT_MOD:    /* 6: INIT */
+            result[0] = 0; /* module IO_STATUS */
             return PDC_OK;
     }
     return PDC_BAD_OPTION;
