@@ -730,7 +730,11 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
                     memcpy(result, model, sizeof(model));
                     return PDC_OK;
                 case PDC_MODEL_VERSIONS:
-                    if (ARG3 == 0) {
+                    switch (ARG3) {
+                    case 0: /* return CPU0 version */
+                        result[0] = 35; // TODO! ???
+                        return PDC_OK;
+                    case 1: /* return PDC version */
                         result[0] = PARISC_PDC_VERSION;
                         return PDC_OK;
                     }
@@ -800,7 +804,8 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
                 case PDC_COPROC_CFG:
                     memset(result, 0, 32 * sizeof(unsigned long));
                     /* set bit per cpu in ccr_functional and ccr_present: */
-                    result[0] = result[1] = (1ULL << smp_cpus) - 1;
+                    result[0] = result[1] = (smp_cpus <= 1) ? 1 : (1ULL << smp_cpus) - 1;
+                    mtctl(result[0], 10); /* initialize cr10 */
                     result[17] = 1; // Revision
                     result[18] = 19; // Model
                     return PDC_OK;
