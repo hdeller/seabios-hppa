@@ -1114,6 +1114,21 @@ static int pdc_soft_power(unsigned int *arg)
     return PDC_BAD_OPTION;
 }
 
+static int pdc_io(unsigned int *arg)
+{
+    unsigned long option = ARG1;
+
+    switch (option) {
+        case PDC_IO_READ_AND_CLEAR_ERRORS:
+            dprintf(0, "\n\nSeaBIOS: PDC_IO called with ARG2=%x ARG3=%x ARG4=%x\n", ARG2, ARG3, ARG4);
+            // return PDC_BAD_OPTION;
+        case PDC_IO_RESET:
+        case PDC_IO_RESET_DEVICES:
+            return PDC_OK;
+    }
+    return PDC_BAD_OPTION;
+}
+
 int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
 {
     unsigned long proc = ARG0;
@@ -1192,22 +1207,18 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
                Ignoring it for now, otherwise the BUG_ON below would quit qemu before we have
                a chance to see the kernel panic */
             return PDC_OK;
+
         case 26: // PDC_SCSI_PARMS is the architected firmware interface to replace the Hversion PDC_INITIATOR procedure.
             return PDC_BAD_PROC;
+
         case 64: // Called by HP-UX 11 bootcd during boot. Probably checks PDC_PAT_CELL (even if we are not PAT firmware)
         case 65: // Called by HP-UX 11 bootcd during boot. Probably checks PDC_PAT_CHASSIS_LOG (even if we are not PAT firmware)
             dprintf(0, "\n\nSeaBIOS: UNKNOWN PDC proc %lu OPTION %lu called with ARG2=%x ARG3=%x ARG4=%x\n", proc, option, ARG2, ARG3, ARG4);
             return PDC_BAD_PROC;
+
         case PDC_IO:
-            switch (option) {
-                case PDC_IO_READ_AND_CLEAR_ERRORS:
-                    dprintf(0, "\n\nSeaBIOS: PDC_IO called with ARG2=%x ARG3=%x ARG4=%x\n", ARG2, ARG3, ARG4);
-                    // return PDC_BAD_OPTION;
-                case PDC_IO_RESET:
-                case PDC_IO_RESET_DEVICES:
-                    return PDC_OK;
-            }
-            break;
+            return pdc_io(arg);
+
         case PDC_BROADCAST_RESET:
             dprintf(0, "\n\nSeaBIOS: PDC_BROADCAST_RESET (reset system) called with ARG3=%x ARG4=%x\n", ARG3, ARG4);
             reset();
