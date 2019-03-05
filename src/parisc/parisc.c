@@ -1100,6 +1100,20 @@ static int pdc_system_map(unsigned int *arg)
     return PDC_BAD_OPTION;
 }
 
+static int pdc_soft_power(unsigned int *arg)
+{
+    unsigned long option = ARG1;
+
+    switch (option) {
+        case PDC_SOFT_POWER_ENABLE:
+            if (ARG3 == 0) // put soft power button under hardware control.
+                hlt();
+            return PDC_OK;
+    }
+    // dprintf(0, "\n\nSeaBIOS: PDC_SOFT_POWER called with ARG2=%x ARG3=%x ARG4=%x\n", ARG2, ARG3, ARG4);
+    return PDC_BAD_OPTION;
+}
+
 int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
 {
     unsigned long proc = ARG0;
@@ -1169,15 +1183,10 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
 
         case PDC_SYSTEM_MAP:
             return pdc_system_map(arg);
+
         case PDC_SOFT_POWER: // don't have a soft-power switch
-            switch (option) {
-                case PDC_SOFT_POWER_ENABLE:
-                    if (ARG3 == 0) // put soft power button under hardware control.
-                        hlt();
-                    return PDC_OK;
-            }
-            // dprintf(0, "\n\nSeaBIOS: PDC_SOFT_POWER called with ARG2=%x ARG3=%x ARG4=%x\n", ARG2, ARG3, ARG4);
-            return PDC_BAD_OPTION;
+            return pdc_soft_power(arg);
+
         case PDC_CRASH_PREP:
             /* This should actually quiesce all I/O and prepare the System for crash dumping.
                Ignoring it for now, otherwise the BUG_ON below would quit qemu before we have
