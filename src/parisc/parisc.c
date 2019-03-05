@@ -786,6 +786,21 @@ static int pdc_cache(unsigned int *arg)
     return PDC_BAD_OPTION;
 }
 
+static int pdc_hpa(unsigned int *arg)
+{
+    unsigned long option = ARG1;
+    unsigned long *result = (unsigned long *)ARG2;
+
+    switch (option) {
+        case PDC_HPA_PROCESSOR:
+            result[0] = CPU_HPA; // XXX: NEED TO FIX FOR SMP?
+            result[1] = 0;       // XXX: for SMP: 0,1,2,3,4...(num of this cpu)
+            return PDC_OK;
+        case PDC_HPA_MODULES:
+            return PDC_BAD_OPTION; // all modules on same board as the processor.
+    }
+    return PDC_BAD_OPTION;
+}
 
 int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
 {
@@ -824,16 +839,9 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
         case PDC_CACHE:
             return pdc_cache(arg);
 
-       case PDC_HPA:
-            switch (option) {
-                case PDC_HPA_PROCESSOR:
-                    result[0] = CPU_HPA; // XXX: NEED TO FIX FOR SMP?
-                    result[1] = 0;       // XXX: for SMP: 0,1,2,3,4...(num of this cpu)
-                    return PDC_OK;
-                case PDC_HPA_MODULES:
-                    return PDC_BAD_OPTION; // all modules on same board as the processor.
-            }
-            break;
+        case PDC_HPA:
+            return pdc_hpa(arg);
+
         case PDC_COPROC:
             switch (option) {
                 case PDC_COPROC_CFG:
