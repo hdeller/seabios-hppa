@@ -317,10 +317,7 @@ static int compare_module_path(struct pdc_module_path *path,
     if (path->path.mod != search->path.mod)
         return -1;
 
-    for(i = ARRAY_SIZE(path->path.bc); i >= 0; i--) {
-        if (search->path.bc[i] < 0)
-            break;
-
+    for(i = 0; i < ARRAY_SIZE(path->path.bc); i++) {
         if (path->path.bc[i] != search->path.bc[i])
             return -1;
     }
