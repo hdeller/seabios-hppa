@@ -820,20 +820,80 @@ static int pdc_coproc(unsigned int *arg)
     return PDC_BAD_OPTION;
 }
 
+static int pdc_iodc(unsigned int *arg)
+{
+    unsigned long option = ARG1;
+    unsigned long *result = (unsigned long *)ARG2;
+    unsigned long hpa;
+    struct pdc_iodc *iodc_p;
+    int hpa_index;
+    unsigned char *c;
+
+    // dprintf(0, "\n\nSeaBIOS: Info PDC_IODC function %ld ARG3=%x ARG4=%x ARG5=%x ARG6=%x\n", option, ARG3, ARG4, ARG5, ARG6);
+    switch (option) {
+        case PDC_IODC_READ:
+            hpa = ARG3;
+            if (hpa == IDE_HPA) { // do NOT check for DINO_SCSI_HPA, breaks Linux which scans IO areas for unlisted io modules
+                iodc_p = &iodc_data_hpa_fff8c000; // workaround for PCI ATA
+            } else {
+                hpa_index = find_hpa_index(hpa);
+                if (hpa_index < 0)
+                    return -4; // not found
+                iodc_p = parisc_devices[hpa_index].iodc;
+            }
+
+            if (ARG4 == PDC_IODC_INDEX_DATA) {
+                // if (hpa == MEMORY_HPA)
+                //	ARG6 = 2; // Memory modules return 2 bytes of IODC memory (result2 ret[0] = 0x6701f41 HI !!)
+                memcpy((void*) ARG5, iodc_p, ARG6);
+                c = (unsigned char *) ARG5;
+                // printf("SeaBIOS: PDC_IODC get: hpa = 0x%lx, HV: 0x%x 0x%x IODC_SPA=0x%x  type 0x%x, \n", hpa, c[0], c[1], c[2], c[3]);
+                // c[0] = iodc_p->hversion_model; // FIXME. BROKEN HERE !!!
+                // c[1] = iodc_p->hversion_rev || (iodc_p->hversion << 4);
+                *result = ARG6;
+                return PDC_OK;
+            }
+
+            // ARG4 is IODC function to copy.
+            if (ARG4 < PDC_IODC_RI_INIT || ARG4 > PDC_IODC_RI_TLB)
+                return PDC_IODC_INVALID_INDEX;
+
+            *result = 512; /* max size of function iodc_entry */
+            if (ARG6 < *result)
+                return PDC_IODC_COUNT;
+            memcpy((void*) ARG5, &iodc_entry, *result);
+            c = (unsigned char *) &iodc_entry_table;
+            /* calculate offset into jump table. */
+            c += (ARG4 - PDC_IODC_RI_INIT) * 2 * sizeof(unsigned int);
+            memcpy((void*) ARG5, c, 2 * sizeof(unsigned int));
+            // dprintf(0, "\n\nSeaBIOS: Info PDC_IODC function OK\n");
+            flush_data_cache((char*)ARG5, *result);
+            return PDC_OK;
+            break;
+        case PDC_IODC_NINIT:	/* non-destructive init */
+        case PDC_IODC_DINIT:	/* destructive init */
+            break;
+        case PDC_IODC_MEMERR:
+            result[0] = 0; /* IO_STATUS */
+            result[1] = 0;
+            result[2] = 0;
+            result[3] = 0;
+            return PDC_OK;
+    }
+    dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_IODC function %ld ARG3=%x ARG4=%x ARG5=%x ARG6=%x\n", option, ARG3, ARG4, ARG5, ARG6);
+    return PDC_BAD_OPTION;
+}
+
+
 int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
 {
     static unsigned long psw_defaults = PDC_PSW_ENDIAN_BIT;
-
     unsigned long proc = ARG0;
     unsigned long option = ARG1;
     unsigned long *result = (unsigned long *)ARG2;
-
-    int hpa_index;
     unsigned long hpa;
-    struct pdc_iodc *iodc_p;
-    unsigned char *c;
-
     struct pdc_module_path *mod_path;
+    int hpa_index;
 
     if (pdc_debug) {
         printf("\nSeaBIOS: Start PDC proc %s(%d) option %d result=0x%x ARG3=0x%x %s ",
@@ -863,60 +923,9 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
         case PDC_COPROC:
             return pdc_coproc(arg);
 
-       case PDC_IODC: /* Call IODC functions */
-            // dprintf(0, "\n\nSeaBIOS: Info PDC_IODC function %ld ARG3=%x ARG4=%x ARG5=%x ARG6=%x\n", option, ARG3, ARG4, ARG5, ARG6);
-            switch (option) {
-                case PDC_IODC_READ:
-                    hpa = ARG3;
-                    if (hpa == IDE_HPA) { // do NOT check for DINO_SCSI_HPA, breaks Linux which scans IO areas for unlisted io modules
-                        iodc_p = &iodc_data_hpa_fff8c000; // workaround for PCI ATA
-                    } else {
-                        hpa_index = find_hpa_index(hpa);
-                        if (hpa_index < 0)
-                            return -4; // not found
-                        iodc_p = parisc_devices[hpa_index].iodc;
-                    }
+        case PDC_IODC: /* Call IODC functions */
+            return pdc_iodc(arg);
 
-                    if (ARG4 == PDC_IODC_INDEX_DATA) {
-                        // if (hpa == MEMORY_HPA)
-                        //	ARG6 = 2; // Memory modules return 2 bytes of IODC memory (result2 ret[0] = 0x6701f41 HI !!)
-                        memcpy((void*) ARG5, iodc_p, ARG6);
-                        c = (unsigned char *) ARG5;
-                        // printf("SeaBIOS: PDC_IODC get: hpa = 0x%lx, HV: 0x%x 0x%x IODC_SPA=0x%x  type 0x%x, \n", hpa, c[0], c[1], c[2], c[3]);
-                        // c[0] = iodc_p->hversion_model; // FIXME. BROKEN HERE !!!
-                        // c[1] = iodc_p->hversion_rev || (iodc_p->hversion << 4);
-                        *result = ARG6;
-                        return PDC_OK;
-                    }
-
-                    // ARG4 is IODC function to copy.
-                    if (ARG4 < PDC_IODC_RI_INIT || ARG4 > PDC_IODC_RI_TLB)
-                        return PDC_IODC_INVALID_INDEX;
-
-                    *result = 512; /* max size of function iodc_entry */
-                    if (ARG6 < *result)
-                        return PDC_IODC_COUNT;
-                    memcpy((void*) ARG5, &iodc_entry, *result);
-                    c = (unsigned char *) &iodc_entry_table;
-                    /* calculate offset into jump table. */
-                    c += (ARG4 - PDC_IODC_RI_INIT) * 2 * sizeof(unsigned int);
-                    memcpy((void*) ARG5, c, 2 * sizeof(unsigned int));
-                    // dprintf(0, "\n\nSeaBIOS: Info PDC_IODC function OK\n");
-                    flush_data_cache((char*)ARG5, *result);
-                    return PDC_OK;
-                    break;
-                case PDC_IODC_NINIT:	/* non-destructive init */
-                case PDC_IODC_DINIT:	/* destructive init */
-                    break;
-                case PDC_IODC_MEMERR:
-                    result[0] = 0; /* IO_STATUS */
-                    result[1] = 0;
-                    result[2] = 0;
-                    result[3] = 0;
-                    return PDC_OK;
-            }
-            dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_IODC function %ld ARG3=%x ARG4=%x ARG5=%x ARG6=%x\n", option, ARG3, ARG4, ARG5, ARG6);
-            return PDC_BAD_OPTION;
         case PDC_TOD:	/* Time of day */
             switch (option) {
                 case PDC_TOD_READ:
