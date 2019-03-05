@@ -884,6 +884,91 @@ static int pdc_iodc(unsigned int *arg)
     return PDC_BAD_OPTION;
 }
 
+static int pdc_tod(unsigned int *arg)
+{
+    unsigned long option = ARG1;
+    unsigned long *result = (unsigned long *)ARG2;
+
+    switch (option) {
+        case PDC_TOD_READ:
+            result[0] = seconds_since_1970();
+            result[1] = result[2] = result[3] = 0;
+            return PDC_OK;
+        case PDC_TOD_WRITE:
+            // HP-UX 10.20 tries to write TOD clock with too small values (e.g. 0x432e)...
+            if (ARG2 < SECONDS_2000_JAN_1)
+                return PDC_INVALID_ARG;
+            /* we ignore the usecs in ARG3 */
+            return epoch_to_date_time(ARG2);
+        case 2: /* PDC_TOD_CALIBRATE_TIMERS */
+            /* double-precision floating-point with frequency of Interval Timer in megahertz: */
+            *(double*)&result[0] = (double)CPU_CLOCK_MHZ;
+            /* unsigned 64-bit integers representing  clock accuracy in parts per billion: */
+            result[2] = 0x5a6c; /* TOD_acc */
+            result[3] = 0x5a6c; /* CR_acc (interval timer) */
+            return PDC_OK;
+    }
+    dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_TOD function %ld ARG2=%x ARG3=%x ARG4=%x\n", option, ARG2, ARG3, ARG4);
+    return PDC_BAD_OPTION;
+}
+
+static int pdc_stable(unsigned int *arg)
+{
+    unsigned long option = ARG1;
+    unsigned long *result = (unsigned long *)ARG2;
+
+    // dprintf(0, "\n\nSeaBIOS: PDC_STABLE function %ld ARG2=%x ARG3=%x ARG4=%x\n", option, ARG2, ARG3, ARG4);
+    switch (option) {
+        case PDC_STABLE_READ:
+            if ((ARG2 + ARG4) > STABLE_STORAGE_SIZE)
+                return PDC_INVALID_ARG;
+            memcpy((unsigned char *) ARG3, &stable_storage[ARG2], ARG4);
+            return PDC_OK;
+        case PDC_STABLE_WRITE:
+            if ((ARG2 + ARG4) > STABLE_STORAGE_SIZE)
+                return PDC_INVALID_ARG;
+            memcpy(&stable_storage[ARG2], (unsigned char *) ARG3, ARG4);
+            return PDC_OK;
+        case PDC_STABLE_RETURN_SIZE:
+            result[0] = STABLE_STORAGE_SIZE;
+            return PDC_OK;
+        case PDC_STABLE_VERIFY_CONTENTS:
+            return PDC_OK;
+        case PDC_STABLE_INITIALIZE:
+            init_stable_storage();
+            return PDC_OK;
+    }
+    return PDC_BAD_OPTION;
+}
+
+static int pdc_nvolatile(unsigned int *arg)
+{
+    unsigned long option = ARG1;
+    unsigned long *result = (unsigned long *)ARG2;
+
+    switch (option) {
+        case PDC_NVOLATILE_READ:
+            if ((ARG2 + ARG4) > NVOLATILE_STORAGE_SIZE)
+                return PDC_INVALID_ARG;
+            memcpy((unsigned char *) ARG3, &nvolatile_storage[ARG2], ARG4);
+            return PDC_OK;
+        case PDC_NVOLATILE_WRITE:
+            if ((ARG2 + ARG4) > NVOLATILE_STORAGE_SIZE)
+                return PDC_INVALID_ARG;
+            memcpy(&nvolatile_storage[ARG2], (unsigned char *) ARG3, ARG4);
+            return PDC_OK;
+        case PDC_NVOLATILE_RETURN_SIZE:
+            result[0] = NVOLATILE_STORAGE_SIZE;
+            return PDC_OK;
+        case PDC_NVOLATILE_VERIFY_CONTENTS:
+            return PDC_OK;
+        case PDC_NVOLATILE_INITIALIZE:
+            memset(nvolatile_storage, 0, sizeof(nvolatile_storage));
+            return PDC_OK;
+    }
+    return PDC_BAD_OPTION;
+}
+
 
 int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
 {
@@ -927,73 +1012,15 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
             return pdc_iodc(arg);
 
         case PDC_TOD:	/* Time of day */
-            switch (option) {
-                case PDC_TOD_READ:
-                    result[0] = seconds_since_1970();
-                    result[1] = result[2] = result[3] = 0;
-                    return PDC_OK;
-                case PDC_TOD_WRITE:
-                    // HP-UX 10.20 tries to write TOD clock with too small values (e.g. 0x432e)...
-                    if (ARG2 < SECONDS_2000_JAN_1)
-                        return PDC_INVALID_ARG;
-                    /* we ignore the usecs in ARG3 */
-                    return epoch_to_date_time(ARG2);
-                case 2: /* PDC_TOD_CALIBRATE_TIMERS */
-                    /* double-precision floating-point with frequency of Interval Timer in megahertz: */
-                    *(double*)&result[0] = (double)CPU_CLOCK_MHZ;
-                    /* unsigned 64-bit integers representing  clock accuracy in parts per billion: */
-                    result[2] = 0x5a6c; /* TOD_acc */
-                    result[3] = 0x5a6c; /* CR_acc (interval timer) */
-                    return PDC_OK;
-            }
-            dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_TOD function %ld ARG2=%x ARG3=%x ARG4=%x\n", option, ARG2, ARG3, ARG4);
-            return PDC_BAD_OPTION;
+            return pdc_tod(arg);
+
         case PDC_STABLE:
-            // dprintf(0, "\n\nSeaBIOS: PDC_STABLE function %ld ARG2=%x ARG3=%x ARG4=%x\n", option, ARG2, ARG3, ARG4);
-            switch (option) {
-                case PDC_STABLE_READ:
-                    if ((ARG2 + ARG4) > STABLE_STORAGE_SIZE)
-                        return PDC_INVALID_ARG;
-                    memcpy((unsigned char *) ARG3, &stable_storage[ARG2], ARG4);
-                    return PDC_OK;
-                case PDC_STABLE_WRITE:
-                    if ((ARG2 + ARG4) > STABLE_STORAGE_SIZE)
-                        return PDC_INVALID_ARG;
-                    memcpy(&stable_storage[ARG2], (unsigned char *) ARG3, ARG4);
-                    return PDC_OK;
-                case PDC_STABLE_RETURN_SIZE:
-                    result[0] = STABLE_STORAGE_SIZE;
-                    return PDC_OK;
-                case PDC_STABLE_VERIFY_CONTENTS:
-                    return PDC_OK;
-                case PDC_STABLE_INITIALIZE:
-                    init_stable_storage();
-                    return PDC_OK;
-            }
-            return PDC_BAD_OPTION;
+            return pdc_stable(arg);
+
         case PDC_NVOLATILE:
-            switch (option) {
-                case PDC_NVOLATILE_READ:
-                    if ((ARG2 + ARG4) > NVOLATILE_STORAGE_SIZE)
-                        return PDC_INVALID_ARG;
-                    memcpy((unsigned char *) ARG3, &nvolatile_storage[ARG2], ARG4);
-                    return PDC_OK;
-                case PDC_NVOLATILE_WRITE:
-                    if ((ARG2 + ARG4) > NVOLATILE_STORAGE_SIZE)
-                        return PDC_INVALID_ARG;
-                    memcpy(&nvolatile_storage[ARG2], (unsigned char *) ARG3, ARG4);
-                    return PDC_OK;
-                case PDC_NVOLATILE_RETURN_SIZE:
-                    result[0] = NVOLATILE_STORAGE_SIZE;
-                    return PDC_OK;
-                case PDC_NVOLATILE_VERIFY_CONTENTS:
-                    return PDC_OK;
-                case PDC_NVOLATILE_INITIALIZE:
-                    memset(nvolatile_storage, 0, sizeof(nvolatile_storage));
-                    return PDC_OK;
-            }
-            return PDC_BAD_OPTION;
-        case PDC_ADD_VALID:
+            return pdc_nvolatile(arg);
+
+       case PDC_ADD_VALID:
             // dprintf(0, "\n\nSeaBIOS: PDC_ADD_VALID function %ld ARG2=%x called.\n", option, ARG2);
             if (option != 0)
                 return PDC_BAD_OPTION;
