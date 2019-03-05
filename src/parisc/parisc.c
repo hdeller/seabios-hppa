@@ -969,6 +969,25 @@ static int pdc_nvolatile(unsigned int *arg)
     return PDC_BAD_OPTION;
 }
 
+static int pdc_add_valid(unsigned int *arg)
+{
+    unsigned long option = ARG1;
+
+    // dprintf(0, "\n\nSeaBIOS: PDC_ADD_VALID function %ld ARG2=%x called.\n", option, ARG2);
+    if (option != 0)
+        return PDC_BAD_OPTION;
+    if (0 && ARG2 == 0) // should PAGE0 be valid?  HP-UX asks for it, but maybe due a bug in our code...
+        return 1;
+    // if (ARG2 < PAGE_SIZE) return PDC_ERROR;
+    if (ARG2 < ram_size)
+        return PDC_OK;
+    if (ARG2 < FIRMWARE_END)
+        return 1;
+    if (ARG2 <= 0xffffffff)
+        return PDC_OK;
+    dprintf(0, "\n\nSeaBIOS: FAILED!!!! PDC_ADD_VALID function %ld ARG2=%x called.\n", option, ARG2);
+    return PDC_REQ_ERR_0; /* Operation completed with a requestor bus error. */
+}
 
 int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
 {
@@ -1020,27 +1039,18 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
         case PDC_NVOLATILE:
             return pdc_nvolatile(arg);
 
-       case PDC_ADD_VALID:
-            // dprintf(0, "\n\nSeaBIOS: PDC_ADD_VALID function %ld ARG2=%x called.\n", option, ARG2);
-            if (option != 0)
-                return PDC_BAD_OPTION;
-            if (0 && ARG2 == 0) // should PAGE0 be valid?  HP-UX asks for it, but maybe due a bug in our code...
-                return 1;
-            // if (ARG2 < PAGE_SIZE) return PDC_ERROR;
-            if (ARG2 < ram_size)
-                return PDC_OK;
-            if (ARG2 < FIRMWARE_END)
-                return 1;
-            if (ARG2 <= 0xffffffff)
-                return PDC_OK;
-            dprintf(0, "\n\nSeaBIOS: FAILED!!!! PDC_ADD_VALID function %ld ARG2=%x called.\n", option, ARG2);
-            return PDC_REQ_ERR_0; /* Operation completed with a requestor bus error. */
+        case PDC_ADD_VALID:
+            return pdc_add_valid(arg);
+
         case PDC_INSTR:
             return PDC_BAD_PROC;
+
         case PDC_CONFIG:	/* Obsolete */
             return PDC_BAD_PROC;
+
         case PDC_BLOCK_TLB:	/* not needed on virtual machine */
             return PDC_BAD_PROC;
+
         case PDC_TLB:		/* hardware TLB not used on Linux, but on HP-UX (if available) */
 #if 0
             /* still buggy, let's avoid it to keep things simple. */
