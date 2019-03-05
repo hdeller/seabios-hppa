@@ -1054,14 +1054,57 @@ static int pdc_psw(unsigned int *arg)
     return PDC_OK;
 }
 
+static int pdc_system_map(unsigned int *arg)
+{
+    unsigned long option = ARG1;
+    unsigned long *result = (unsigned long *)ARG2;
+    struct pdc_module_path *mod_path;
+    unsigned long hpa;
+    int hpa_index;
+
+    // dprintf(0, "\n\nSeaBIOS: Info: PDC_SYSTEM_MAP function %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
+    switch (option) {
+        case PDC_FIND_MODULE:
+            hpa_index = ARG4;
+            if (hpa_index >= ARRAY_SIZE(parisc_devices))
+                return PDC_NE_MOD; // Module not found
+            hpa = parisc_devices[hpa_index].hpa;
+            if (!hpa)
+                return PDC_NE_MOD; // Module not found
+
+            mod_path = (struct pdc_module_path *)ARG3;
+            if (mod_path)
+                *mod_path = *parisc_devices[hpa_index].mod_path;
+
+            // *pdc_mod_info = *parisc_devices[hpa_index].mod_info; -> can be dropped.
+            memset(result, 0, 32*sizeof(long));
+            result[0] = hpa; // .mod_addr for PDC_IODC
+            result[1] = 1; // .mod_pgs number of pages (FIXME: only graphics has more, e.g. 0x2000)
+            result[2] = 0; // FIXME: additional addresses
+
+            return PDC_OK;
+        case PDC_FIND_ADDRESS:
+            break;
+
+        case PDC_TRANSLATE_PATH:
+            mod_path = (struct pdc_module_path *)ARG3;
+            hppa_device_t *dev = find_hppa_device_by_path(mod_path, result+3);
+            if (!dev)
+                return PDC_NE_MOD;
+
+            result[0] = dev->hpa;
+            result[1] = 1;
+            result[2] = 0;
+            return PDC_OK;
+    }
+    return PDC_BAD_OPTION;
+}
+
 int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
 {
     unsigned long proc = ARG0;
     unsigned long option = ARG1;
     unsigned long *result = (unsigned long *)ARG2;
-    unsigned long hpa;
-    struct pdc_module_path *mod_path;
-    int hpa_index;
 
     if (pdc_debug) {
         printf("\nSeaBIOS: Start PDC proc %s(%d) option %d result=0x%x ARG3=0x%x %s ",
@@ -1124,44 +1167,8 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
         case PDC_PSW:	/* Get/Set default System Mask  */
             return pdc_psw(arg);
 
-
-       case PDC_SYSTEM_MAP:
-            // dprintf(0, "\n\nSeaBIOS: Info: PDC_SYSTEM_MAP function %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
-            switch (option) {
-                case PDC_FIND_MODULE:
-                    hpa_index = ARG4;
-                    if (hpa_index >= ARRAY_SIZE(parisc_devices))
-                        return PDC_NE_MOD; // Module not found
-                    hpa = parisc_devices[hpa_index].hpa;
-                    if (!hpa)
-                        return PDC_NE_MOD; // Module not found
-
-                    mod_path = (struct pdc_module_path *)ARG3;
-                    if (mod_path)
-                        *mod_path = *parisc_devices[hpa_index].mod_path;
-
-                    // *pdc_mod_info = *parisc_devices[hpa_index].mod_info; -> can be dropped.
-                    memset(result, 0, 32*sizeof(long));
-                    result[0] = hpa; // .mod_addr for PDC_IODC
-                    result[1] = 1; // .mod_pgs number of pages (FIXME: only graphics has more, e.g. 0x2000)
-                    result[2] = 0; // FIXME: additional addresses
-
-                    return PDC_OK;
-                case PDC_FIND_ADDRESS:
-                    break;
-
-                case PDC_TRANSLATE_PATH:
-                    mod_path = (struct pdc_module_path *)ARG3;
-                    hppa_device_t *dev = find_hppa_device_by_path(mod_path, result+3);
-                    if (!dev)
-                        return PDC_NE_MOD;
-
-                    result[0] = dev->hpa;
-                    result[1] = 1;
-                    result[2] = 0;
-                    return PDC_OK;
-            }
-            break;
+        case PDC_SYSTEM_MAP:
+            return pdc_system_map(arg);
         case PDC_SOFT_POWER: // don't have a soft-power switch
             switch (option) {
                 case PDC_SOFT_POWER_ENABLE:
