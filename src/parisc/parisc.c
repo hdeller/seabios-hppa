@@ -1100,12 +1100,12 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
         case PDC_INITIATOR:
             switch (option) {
                 case PDC_GET_INITIATOR:
-                    // ARG3 has hwpath
-                    result[0] = 7; // host_id: 7 to 15 ?
-                    result[1] = 10; // 1, 2, 5 or 10 for 5, 10, 20 or 40 MT/s
-                    result[2] = 0; // ??
-                    result[3] = 0; // ??
-                    result[4] = 0; // width: 0:"Narrow, 1:"Wide"
+                    // ARG3 points to the hwpath of device for which initiator is asked for.
+                    result[0] = 7;  // initiator_id/host_id: 7 to 15.
+                    result[1] = 10; // scsi_rate: 1, 2, 5 or 10 for 5, 10, 20 or 40 MT/s
+                    result[2] = 7;  // firmware suggested value for initiator_id
+                    result[3] = 10; // firmware suggested value for scsi_rate
+                    result[4] = 0;  // width: 0:"Narrow, 1:"Wide"
                     result[5] = 0; // mode: 0:SMODE_SE, 1:SMODE_HVD, 2:SMODE_LVD
                     return PDC_OK;
                 case PDC_SET_INITIATOR:
