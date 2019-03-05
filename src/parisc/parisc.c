@@ -743,12 +743,53 @@ static int pdc_model(unsigned int *arg)
     return PDC_BAD_OPTION;
 }
 
-int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
+static int pdc_cache(unsigned int *arg)
 {
-    static unsigned long psw_defaults = PDC_PSW_ENDIAN_BIT;
+    unsigned long option = ARG1;
+    unsigned long *result = (unsigned long *)ARG2;
     static unsigned long cache_info[] = { PARISC_PDC_CACHE_INFO };
     static struct pdc_cache_info *machine_cache_info
         = (struct pdc_cache_info *) &cache_info;
+
+    switch (option) {
+        case PDC_CACHE_INFO:
+            BUG_ON(sizeof(cache_info) != sizeof(*machine_cache_info));
+            // XXX: number of TLB entries should be aligned with qemu
+            machine_cache_info->it_size = 256;
+            machine_cache_info->dt_size = 256;
+            machine_cache_info->it_loop = 1;
+            machine_cache_info->dt_loop = 1;
+
+#if 0
+            dprintf(0, "\n\nCACHE  IC: %ld %ld %ld DC: %ld %ld %ld\n",
+                    machine_cache_info->ic_count, machine_cache_info->ic_loop, machine_cache_info->ic_stride,
+                    machine_cache_info->dc_count, machine_cache_info->dc_loop, machine_cache_info->dc_stride);
+#endif
+#if 1
+            /* Increase cc_block from 1 to 11. This increases icache_stride
+             * and dcache_stride to 32768 bytes. Revisit for HP-UX. */
+            machine_cache_info->dc_conf.cc_block = 11;
+            machine_cache_info->ic_conf.cc_block = 11;
+
+            machine_cache_info->ic_size = 0; /* no instruction cache */
+            machine_cache_info->ic_count = 0;
+            machine_cache_info->ic_loop = 0;
+            machine_cache_info->dc_size = 0; /* no data cache */
+            machine_cache_info->dc_count = 0;
+            machine_cache_info->dc_loop = 0;
+#endif
+
+            memcpy(result, cache_info, sizeof(cache_info));
+            return PDC_OK;
+    }
+    dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_CACHE function %d %x %x %x %x\n", ARG1, ARG2, ARG3, ARG4, ARG5);
+    return PDC_BAD_OPTION;
+}
+
+
+int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
+{
+    static unsigned long psw_defaults = PDC_PSW_ENDIAN_BIT;
 
     unsigned long proc = ARG0;
     unsigned long option = ARG1;
@@ -779,41 +820,11 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
 
         case PDC_MODEL: /* model information */
             return pdc_model(arg);
-      case PDC_CACHE:
-            switch (option) {
-                case PDC_CACHE_INFO:
-                    BUG_ON(sizeof(cache_info) != sizeof(*machine_cache_info));
-                    // XXX: number of TLB entries should be aligned with qemu
-                    machine_cache_info->it_size = 256;
-                    machine_cache_info->dt_size = 256;
-                    machine_cache_info->it_loop = 1;
-                    machine_cache_info->dt_loop = 1;
 
-#if 0
-                    dprintf(0, "\n\nCACHE  IC: %ld %ld %ld DC: %ld %ld %ld\n",
-                            machine_cache_info->ic_count, machine_cache_info->ic_loop, machine_cache_info->ic_stride,
-                            machine_cache_info->dc_count, machine_cache_info->dc_loop, machine_cache_info->dc_stride);
-#endif
-#if 1
-                    /* Increase cc_block from 1 to 11. This increases icache_stride
-                     * and dcache_stride to 32768 bytes. Revisit for HP-UX. */
-                    machine_cache_info->dc_conf.cc_block = 11;
-                    machine_cache_info->ic_conf.cc_block = 11;
+        case PDC_CACHE:
+            return pdc_cache(arg);
 
-                    machine_cache_info->ic_size = 0; /* no instruction cache */
-                    machine_cache_info->ic_count = 0;
-                    machine_cache_info->ic_loop = 0;
-                    machine_cache_info->dc_size = 0; /* no data cache */
-                    machine_cache_info->dc_count = 0;
-                    machine_cache_info->dc_loop = 0;
-#endif
-
-                    memcpy(result, cache_info, sizeof(cache_info));
-                    return PDC_OK;
-            }
-            dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_CACHE function %d %x %x %x %x\n", ARG1, ARG2, ARG3, ARG4, ARG5);
-            return PDC_BAD_OPTION;
-        case PDC_HPA:
+       case PDC_HPA:
             switch (option) {
                 case PDC_HPA_PROCESSOR:
                     result[0] = CPU_HPA; // XXX: NEED TO FIX FOR SMP?
