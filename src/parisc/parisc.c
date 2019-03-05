@@ -989,6 +989,24 @@ static int pdc_add_valid(unsigned int *arg)
     return PDC_REQ_ERR_0; /* Operation completed with a requestor bus error. */
 }
 
+static int pdc_tlb(unsigned int *arg)
+{
+#if 0
+    /* still buggy, let's avoid it to keep things simple. */
+    switch (option) {
+        case PDC_TLB_INFO:
+            result[0] = PAGE_SIZE;
+            result[0] = PAGE_SIZE << 2;
+            return PDC_OK;
+        case PDC_TLB_SETUP:
+            result[0] = ARG5 & 1;
+            result[1] = 0;
+            return PDC_OK;
+    }
+#endif
+    return PDC_BAD_PROC;
+}
+
 int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
 {
     static unsigned long psw_defaults = PDC_PSW_ENDIAN_BIT;
@@ -1052,20 +1070,8 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
             return PDC_BAD_PROC;
 
         case PDC_TLB:		/* hardware TLB not used on Linux, but on HP-UX (if available) */
-#if 0
-            /* still buggy, let's avoid it to keep things simple. */
-            switch (option) {
-                case PDC_TLB_INFO:
-                    result[0] = PAGE_SIZE;
-                    result[0] = PAGE_SIZE << 2;
-                    return PDC_OK;
-                case PDC_TLB_SETUP:
-                    result[0] = ARG5 & 1;
-                    result[1] = 0;
-                    return PDC_OK;
-            }
-#endif
-            return PDC_BAD_PROC;
+            return pdc_tlb(arg);
+
         case PDC_MEM:
             // only implemented on 64bit PDC!
             if (sizeof(unsigned long) == sizeof(unsigned int))
