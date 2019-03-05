@@ -309,6 +309,47 @@ static int find_hpa_index(unsigned long hpa)
     return -1;
 }
 
+static int compare_module_path(struct pdc_module_path *path,
+                               struct pdc_module_path *search)
+{
+    int i;
+
+    if (path->path.mod != search->path.mod)
+        return -1;
+
+    for(i = ARRAY_SIZE(path->path.bc); i >= 0; i--) {
+        if (search->path.bc[i] < 0)
+            break;
+
+        if (path->path.bc[i] != search->path.bc[i])
+            return -1;
+    }
+
+    for(i = 0; i < ARRAY_SIZE(path->layers); i++) {
+        if (path->layers[i] != search->layers[i])
+            return -1;
+    }
+    return 0;
+}
+
+static hppa_device_t *find_hppa_device_by_path(struct pdc_module_path *search,
+                                               unsigned long *index)
+{
+    hppa_device_t *dev;
+    int i;
+
+    for (i = 0; i < (ARRAY_SIZE(parisc_devices)-1); i++) {
+        dev = parisc_devices + i;
+        if (!dev->hpa)
+            continue;
+
+        if (!compare_module_path(dev->mod_path, search)) {
+            *index = i;
+            return dev;
+        }
+    }
+    return NULL;
+}
 
 #define SERIAL_TIMEOUT 20
 static unsigned long parisc_serial_in(char *c, unsigned long maxchars)
@@ -971,8 +1012,18 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
 
                     return PDC_OK;
                 case PDC_FIND_ADDRESS:
+                    break;
+
                 case PDC_TRANSLATE_PATH:
-                    break; // return PDC_OK;
+                    mod_path = (struct pdc_module_path *)ARG3;
+                    hppa_device_t *dev = find_hppa_device_by_path(mod_path, result+3);
+                    if (!dev)
+                        return PDC_NE_MOD;
+
+                    result[0] = dev->hpa;
+                    result[1] = 1;
+                    result[2] = 0;
+                    return PDC_OK;
             }
             break;
         case PDC_SOFT_POWER: // don't have a soft-power switch
