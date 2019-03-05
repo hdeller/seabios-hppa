@@ -802,6 +802,24 @@ static int pdc_hpa(unsigned int *arg)
     return PDC_BAD_OPTION;
 }
 
+static int pdc_coproc(unsigned int *arg)
+{
+    unsigned long option = ARG1;
+    unsigned long *result = (unsigned long *)ARG2;
+
+    switch (option) {
+        case PDC_COPROC_CFG:
+            memset(result, 0, 32 * sizeof(unsigned long));
+            /* set bit per cpu in ccr_functional and ccr_present: */
+            result[0] = result[1] = (smp_cpus <= 1) ? 1 : (1ULL << smp_cpus) - 1;
+            mtctl(result[0], 10); /* initialize cr10 */
+            result[17] = 1; // Revision
+            result[18] = 19; // Model
+            return PDC_OK;
+    }
+    return PDC_BAD_OPTION;
+}
+
 int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
 {
     static unsigned long psw_defaults = PDC_PSW_ENDIAN_BIT;
@@ -843,18 +861,9 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
             return pdc_hpa(arg);
 
         case PDC_COPROC:
-            switch (option) {
-                case PDC_COPROC_CFG:
-                    memset(result, 0, 32 * sizeof(unsigned long));
-                    /* set bit per cpu in ccr_functional and ccr_present: */
-                    result[0] = result[1] = (smp_cpus <= 1) ? 1 : (1ULL << smp_cpus) - 1;
-                    mtctl(result[0], 10); /* initialize cr10 */
-                    result[17] = 1; // Revision
-                    result[18] = 19; // Model
-                    return PDC_OK;
-            }
-            return PDC_BAD_OPTION;
-        case PDC_IODC: /* Call IODC functions */
+            return pdc_coproc(arg);
+
+       case PDC_IODC: /* Call IODC functions */
             // dprintf(0, "\n\nSeaBIOS: Info PDC_IODC function %ld ARG3=%x ARG4=%x ARG5=%x ARG6=%x\n", option, ARG3, ARG4, ARG5, ARG6);
             switch (option) {
                 case PDC_IODC_READ:
