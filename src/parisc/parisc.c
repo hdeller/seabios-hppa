@@ -1035,9 +1035,27 @@ static int pdc_mem(unsigned int *arg)
     return PDC_BAD_PROC;
 }
 
-int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
+static int pdc_psw(unsigned int *arg)
 {
     static unsigned long psw_defaults = PDC_PSW_ENDIAN_BIT;
+    unsigned long option = ARG1;
+    unsigned long *result = (unsigned long *)ARG2;
+
+    if (option > PDC_PSW_SET_DEFAULTS)
+        return PDC_BAD_OPTION;
+    /* FIXME: For 64bit support enable PDC_PSW_WIDE_BIT too! */
+    if (option == PDC_PSW_MASK)
+        *result = PDC_PSW_ENDIAN_BIT;
+    if (option == PDC_PSW_GET_DEFAULTS)
+        *result = psw_defaults;
+    if (option == PDC_PSW_SET_DEFAULTS) {
+        psw_defaults = ARG2;
+    }
+    return PDC_OK;
+}
+
+int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
+{
     unsigned long proc = ARG0;
     unsigned long option = ARG1;
     unsigned long *result = (unsigned long *)ARG2;
@@ -1103,19 +1121,11 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
         case PDC_MEM:
             return pdc_mem(arg);
 
-       case PDC_PSW:	/* Get/Set default System Mask  */
-            if (option > PDC_PSW_SET_DEFAULTS)
-                return PDC_BAD_OPTION;
-            /* FIXME: For 64bit support enable PDC_PSW_WIDE_BIT too! */
-            if (option == PDC_PSW_MASK)
-                *result = PDC_PSW_ENDIAN_BIT;
-            if (option == PDC_PSW_GET_DEFAULTS)
-                *result = psw_defaults;
-            if (option == PDC_PSW_SET_DEFAULTS) {
-                psw_defaults = ARG2;
-            }
-            return PDC_OK;
-        case PDC_SYSTEM_MAP:
+        case PDC_PSW:	/* Get/Set default System Mask  */
+            return pdc_psw(arg);
+
+
+       case PDC_SYSTEM_MAP:
             // dprintf(0, "\n\nSeaBIOS: Info: PDC_SYSTEM_MAP function %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
             switch (option) {
                 case PDC_FIND_MODULE:
