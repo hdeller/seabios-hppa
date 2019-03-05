@@ -659,6 +659,30 @@ static const char *pdc_name(unsigned long num)
         return "UNKNOWN!";
 }
 
+static int pdc_chassis(unsigned int *arg)
+{
+    unsigned long option = ARG1;
+    unsigned long *result = (unsigned long *)ARG2;
+
+    switch (option) {
+        case PDC_CHASSIS_DISP:
+            ARG3 = ARG2;
+            result = (unsigned long *)&ARG4; // do not write to ARG2, use &ARG4 instead
+            // fall through
+        case PDC_CHASSIS_DISPWARN:
+            ARG4 = (ARG3 >> 17) & 7;
+            chassis_code = ARG3 & 0xffff;
+            if (0) printf("\nPDC_CHASSIS: %s (%d), %sCHASSIS  %0x\n",
+                    systat[ARG4], ARG4, (ARG3>>16)&1 ? "blank display, ":"", chassis_code);
+            // fall through
+        case PDC_CHASSIS_WARN:
+            // return warnings regarding fans, batteries and temperature: None!
+            result[0] = 0;
+            return PDC_OK;
+    }
+    return PDC_BAD_PROC;
+}
+
 int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
 {
     static unsigned long psw_defaults = PDC_PSW_ENDIAN_BIT;
@@ -689,23 +713,7 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
         case PDC_POW_FAIL:
             break;
         case PDC_CHASSIS: /* chassis functions */
-            switch (option) {
-                case PDC_CHASSIS_DISP:
-                    ARG3 = ARG2;
-                    result = (unsigned long *)&ARG4; // do not write to ARG2, use &ARG4 instead
-                    // fall through
-                case PDC_CHASSIS_DISPWARN:
-                    ARG4 = (ARG3 >> 17) & 7;
-                    chassis_code = ARG3 & 0xffff;
-                    if (0) printf("\nPDC_CHASSIS: %s (%d), %sCHASSIS  %0x\n",
-                            systat[ARG4], ARG4, (ARG3>>16)&1 ? "blank display, ":"", chassis_code);
-                    // fall through
-                case PDC_CHASSIS_WARN:
-                    // return warnings regarding fans, batteries and temperature: None!
-                    result[0] = 0;
-                    return PDC_OK;
-            }
-            return PDC_BAD_PROC;
+            return pdc_chassis(arg);
         case PDC_PIM:
             switch (option) {
                 case PDC_PIM_HPMC:
