@@ -683,6 +683,27 @@ static int pdc_chassis(unsigned int *arg)
     return PDC_BAD_PROC;
 }
 
+static int pdc_pim(unsigned int *arg)
+{
+    unsigned long option = ARG1;
+    unsigned long *result = (unsigned long *)ARG2;
+
+    switch (option) {
+        case PDC_PIM_HPMC:
+            break;
+        case PDC_PIM_RETURN_SIZE:
+            *result = sizeof(struct pdc_hpmc_pim_11); // FIXME 64bit!
+            // B160 returns only "2". Why?
+            return PDC_OK;
+        case PDC_PIM_LPMC:
+        case PDC_PIM_SOFT_BOOT:
+            return PDC_BAD_OPTION;
+        case PDC_PIM_TOC:
+            break;
+    }
+    return PDC_BAD_PROC;
+}
+
 int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
 {
     static unsigned long psw_defaults = PDC_PSW_ENDIAN_BIT;
@@ -712,23 +733,13 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
     switch (proc) {
         case PDC_POW_FAIL:
             break;
+
         case PDC_CHASSIS: /* chassis functions */
             return pdc_chassis(arg);
+
         case PDC_PIM:
-            switch (option) {
-                case PDC_PIM_HPMC:
-                    break;
-                case PDC_PIM_RETURN_SIZE:
-                    *result = sizeof(struct pdc_hpmc_pim_11); // FIXME 64bit!
-                    // B160 returns only "2". Why?
-                    return PDC_OK;
-                case PDC_PIM_LPMC:
-                case PDC_PIM_SOFT_BOOT:
-                    return PDC_BAD_OPTION;
-                case PDC_PIM_TOC:
-                    break;
-            }
-            break;
+            return pdc_pim(arg);
+
         case PDC_MODEL: /* model information */
             switch (option) {
                 case PDC_MODEL_INFO:
