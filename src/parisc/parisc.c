@@ -394,6 +394,7 @@ int __VISIBLE parisc_iodc_ENTRY_IO(unsigned int *arg FUNC_MANY_ARGS)
 
     if (1 &&
             ((hpa == DINO_UART_HPA && option == ENTRY_IO_COUT) ||
+             (hpa == DINO_UART_HPA && option == ENTRY_IO_CIN) ||
              (hpa == IDE_HPA       && option == ENTRY_IO_BOOTIN) ||
              (hpa == DINO_SCSI_HPA && option == ENTRY_IO_BOOTIN)) ) {
         /* avoid debug messages */
@@ -452,11 +453,13 @@ int __VISIBLE parisc_iodc_ENTRY_INIT(unsigned int *arg FUNC_MANY_ARGS)
 
     iodc_log_call(arg, __FUNCTION__);
     switch (option) {
-        case 4:	/* Init & test mod & dev */
+        case ENTRY_INIT_MOD_DEV: /* 4: Init & test mod & dev */
             result[0] = 0; /* module IO_STATUS */
             result[1] = (hpa == DINO_UART_HPA || hpa == LASI_UART_HPA) ? CL_DUPLEX:
                 (hpa == DINO_SCSI_HPA || hpa == IDE_HPA) ? CL_RANDOM : 0;
             result[2] = result[3] = 0; /* TODO?: MAC of network card. */
+            return PDC_OK;
+        case ENTRY_INIT_MOD:    /* 6: INIT */
             return PDC_OK;
     }
     return PDC_BAD_OPTION;
@@ -564,7 +567,7 @@ static inline int rtc_to_bcd(int a)
     return ((a / 10) << 4) | (a % 10);
 }
 
-void epoch_to_date_time(unsigned long epoch)
+int epoch_to_date_time(unsigned long epoch)
 {
     epoch -= SECONDS_2000_JAN_1;
 
@@ -598,10 +601,13 @@ void epoch_to_date_time(unsigned long epoch)
     rtc_write(CMOS_RTC_HOURS, rtc_to_bcd(hour));
     rtc_write(CMOS_RTC_DAY_MONTH, rtc_to_bcd(rtc_day));
     rtc_write(CMOS_RTC_MONTH, rtc_to_bcd(rtc_month));
-    rtc_write(CMOS_RTC_YEAR, rtc_to_bcd(rtc_year));
+    if (rtc_year < 100) { /* < year 2100? */
+        rtc_write(CMOS_RTC_YEAR, rtc_to_bcd(rtc_year));
+        return PDC_OK;
+    }
 
-    if (rtc_year >= 100)
-        printf("\nSeaBIOS WARNING: WRITE RTC_YEAR=%d above year 2100.\n", rtc_year);
+    printf("\nSeaBIOS WARNING: WRITE RTC_YEAR=%d above year 2100.\n", rtc_year);
+    return PDC_INVALID_ARG;
 }
 
 /* values in PDC_CHASSIS */
@@ -861,9 +867,11 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
                     result[1] = result[2] = result[3] = 0;
                     return PDC_OK;
                 case PDC_TOD_WRITE:
+                    // HP-UX 10.20 tries to write TOD clock with too small values (e.g. 0x432e)...
+                    if (ARG2 < SECONDS_2000_JAN_1)
+                        return PDC_INVALID_ARG;
                     /* we ignore the usecs in ARG3 */
-                    epoch_to_date_time(ARG2);
-                    return PDC_OK;
+                    return epoch_to_date_time(ARG2);
                 case 2: /* PDC_TOD_CALIBRATE_TIMERS */
                     /* double-precision floating-point with frequency of Interval Timer in megahertz: */
                     *(double*)&result[0] = (double)CPU_CLOCK_MHZ;
@@ -1297,6 +1305,11 @@ static void parisc_vga_init(void)
         dprintf(1, "parisc: VGA resolution: %dx%d-%d  memmodel:%d  bpp:%d  linelength:%d\n",
                 vmode_g->width, vmode_g->height, vmode_g->depth,
                 vmode_g->memmodel, bpp, linelength);
+
+        if (linelength == 0) {
+            printf( "CRITICAL: Please enable BOCHS video support in SeaBIOS\n");
+            BUG_ON(1);
+        }
 
         break; // only allow one VGA for now.
     }
