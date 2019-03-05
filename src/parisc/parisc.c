@@ -1129,6 +1129,38 @@ static int pdc_io(unsigned int *arg)
     return PDC_BAD_OPTION;
 }
 
+static int pdc_pci_index(unsigned int *arg)
+{
+    unsigned long option = ARG1;
+    unsigned long *result = (unsigned long *)ARG2;
+
+    // dprintf(0, "\n\nSeaBIOS: PDC_PCI_INDEX(%lu) called with ARG2=%x ARG3=%x ARG4=%x\n", option, ARG2, ARG3, ARG4);
+    switch (option) {
+        case PDC_PCI_INTERFACE_INFO:
+            memset(result, 0, 32 * sizeof(unsigned long));
+            result[0] = 2;  /* XXX physical hardware returns those ?!? */
+            result[16] = 0x60;
+            result[17] = 0x90;
+            return PDC_OK;
+        case PDC_PCI_GET_INT_TBL_SIZE:
+        case PDC_PCI_GET_INT_TBL:
+            memset(result, 0, 32 * sizeof(unsigned long));
+            result[0] = 2; /* Hardware fills in, even though we return PDC_BAD_OPTION below. */
+            result[16] = 0x60;
+            result[17] = 0x90;
+            return PDC_BAD_OPTION;
+        case PDC_PCI_PCI_PATH_TO_PCI_HPA:
+            result[0] = PCI_HPA;
+            // result[0] = DINO_SCSI_HPA;
+            // result[0] = IDE_HPA;
+            return PDC_OK;
+            // return PDC_BAD_OPTION;
+        case PDC_PCI_PCI_HPA_TO_PCI_PATH:
+            BUG_ON(1);
+    }
+    return PDC_BAD_OPTION;
+}
+
 int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
 {
     unsigned long proc = ARG0;
@@ -1223,33 +1255,11 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
             dprintf(0, "\n\nSeaBIOS: PDC_BROADCAST_RESET (reset system) called with ARG3=%x ARG4=%x\n", ARG3, ARG4);
             reset();
             return PDC_OK;
+
         case PDC_PCI_INDEX:
-            // dprintf(0, "\n\nSeaBIOS: PDC_PCI_INDEX(%lu) called with ARG2=%x ARG3=%x ARG4=%x\n", option, ARG2, ARG3, ARG4);
-            switch (option) {
-                case PDC_PCI_INTERFACE_INFO:
-                    memset(result, 0, 32 * sizeof(unsigned long));
-                    result[0] = 2;  /* XXX physical hardware returns those ?!? */
-                    result[16] = 0x60;
-                    result[17] = 0x90;
-                    return PDC_OK;
-                case PDC_PCI_GET_INT_TBL_SIZE:
-                case PDC_PCI_GET_INT_TBL:
-                    memset(result, 0, 32 * sizeof(unsigned long));
-                    result[0] = 2; /* Hardware fills in, even though we return PDC_BAD_OPTION below. */
-                    result[16] = 0x60;
-                    result[17] = 0x90;
-                    return PDC_BAD_OPTION;
-                case PDC_PCI_PCI_PATH_TO_PCI_HPA:
-                    result[0] = PCI_HPA;
-                    // result[0] = DINO_SCSI_HPA;
-                    // result[0] = IDE_HPA;
-                    return PDC_OK;
-                    // return PDC_BAD_OPTION;
-                case PDC_PCI_PCI_HPA_TO_PCI_PATH:
-                    BUG_ON(1);
-            }
-            break;
-        case PDC_RELOCATE:
+            return pdc_pci_index(arg);
+
+       case PDC_RELOCATE:
             /* We don't want to relocate any firmware. */
             return PDC_BAD_PROC;
         case PDC_INITIATOR:
