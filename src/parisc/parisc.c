@@ -1161,11 +1161,36 @@ static int pdc_pci_index(unsigned int *arg)
     return PDC_BAD_OPTION;
 }
 
+static int pdc_initiator(unsigned int *arg)
+{
+    unsigned long option = ARG1;
+    unsigned long *result = (unsigned long *)ARG2;
+
+    switch (option) {
+        case PDC_GET_INITIATOR:
+            // ARG3 points to the hwpath of device for which initiator is asked for.
+            result[0] = 7;  // initiator_id/host_id: 7 to 15.
+            result[1] = 10; // scsi_rate: 1, 2, 5 or 10 for 5, 10, 20 or 40 MT/s
+            result[2] = 7;  // firmware suggested value for initiator_id
+            result[3] = 10; // firmware suggested value for scsi_rate
+            result[4] = 0;  // width: 0:"Narrow, 1:"Wide"
+            result[5] = 0; // mode: 0:SMODE_SE, 1:SMODE_HVD, 2:SMODE_LVD
+            return PDC_OK;
+        case PDC_SET_INITIATOR:
+        case PDC_DELETE_INITIATOR:
+        case PDC_RETURN_TABLE_SIZE:
+        case PDC_RETURN_TABLE:
+            break;
+    }
+    dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_INITIATOR function %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
+    return PDC_BAD_OPTION;
+}
+
+
 int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
 {
     unsigned long proc = ARG0;
     unsigned long option = ARG1;
-    unsigned long *result = (unsigned long *)ARG2;
 
     if (pdc_debug) {
         printf("\nSeaBIOS: Start PDC proc %s(%d) option %d result=0x%x ARG3=0x%x %s ",
@@ -1262,26 +1287,10 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
        case PDC_RELOCATE:
             /* We don't want to relocate any firmware. */
             return PDC_BAD_PROC;
+
         case PDC_INITIATOR:
-            switch (option) {
-                case PDC_GET_INITIATOR:
-                    // ARG3 points to the hwpath of device for which initiator is asked for.
-                    result[0] = 7;  // initiator_id/host_id: 7 to 15.
-                    result[1] = 10; // scsi_rate: 1, 2, 5 or 10 for 5, 10, 20 or 40 MT/s
-                    result[2] = 7;  // firmware suggested value for initiator_id
-                    result[3] = 10; // firmware suggested value for scsi_rate
-                    result[4] = 0;  // width: 0:"Narrow, 1:"Wide"
-                    result[5] = 0; // mode: 0:SMODE_SE, 1:SMODE_HVD, 2:SMODE_LVD
-                    return PDC_OK;
-                case PDC_SET_INITIATOR:
-                case PDC_DELETE_INITIATOR:
-                case PDC_RETURN_TABLE_SIZE:
-                case PDC_RETURN_TABLE:
-                    break;
-            }
-            dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_INITIATOR function %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
-            return PDC_BAD_OPTION;
-    }
+            return pdc_initiator(arg);
+}
 
     printf("\n** WARNING **: SeaBIOS: Unimplemented PDC proc %s(%d) option %d result=%x ARG3=%x ",
             pdc_name(ARG0), ARG0, ARG1, ARG2, ARG3);
