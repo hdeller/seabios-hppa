@@ -807,13 +807,15 @@ static int pdc_coproc(unsigned int *arg)
 {
     unsigned long option = ARG1;
     unsigned long *result = (unsigned long *)ARG2;
-
+    unsigned char mask;
     switch (option) {
         case PDC_COPROC_CFG:
             memset(result, 0, 32 * sizeof(unsigned long));
+            mask = ~((1 << (8-smp_cpus))-1);
             /* set bit per cpu in ccr_functional and ccr_present: */
-            result[0] = result[1] = (smp_cpus <= 1) ? 1 : (1ULL << smp_cpus) - 1;
-            mtctl(result[0], 10); /* initialize cr10 */
+            mtctl(mask, 10); /* initialize cr10 */
+            result[0] = mask;
+            result[1] = mask;
             result[17] = 1; // Revision
             result[18] = 19; // Model
             return PDC_OK;
