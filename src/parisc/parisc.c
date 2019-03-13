@@ -229,6 +229,17 @@ static const char *hpa_name(unsigned long hpa)
         return "UNKNOWN HPA";
 }
 
+int HPA_is_serial_device(unsigned long hpa)
+{
+    return (hpa == DINO_UART_HPA) || (hpa == LASI_UART_HPA);
+}
+
+int HPA_is_storage_device(unsigned long hpa)
+{
+    return (hpa == DINO_SCSI_HPA) || (hpa == IDE_HPA) || (hpa == LASI_SCSI_HPA);
+}
+
+
 static int keep_this_hpa(unsigned long hpa)
 {
     static const unsigned long keep_list[] = { PARISC_KEEP_LIST };
@@ -390,17 +401,16 @@ int __VISIBLE parisc_iodc_ENTRY_IO(unsigned int *arg FUNC_MANY_ARGS)
     struct disk_op_s disk_op;
 
     if (1 &&
-            ((hpa == DINO_UART_HPA && option == ENTRY_IO_COUT) ||
-             (hpa == DINO_UART_HPA && option == ENTRY_IO_CIN) ||
-             (hpa == IDE_HPA       && option == ENTRY_IO_BOOTIN) ||
-             (hpa == DINO_SCSI_HPA && option == ENTRY_IO_BOOTIN)) ) {
+            ((HPA_is_serial_device(hpa) && option == ENTRY_IO_COUT) ||
+             (HPA_is_serial_device(hpa) && option == ENTRY_IO_CIN) ||
+             (HPA_is_storage_device(hpa) && option == ENTRY_IO_BOOTIN))) {
         /* avoid debug messages */
     } else {
         iodc_log_call(arg, __FUNCTION__);
     }
 
     /* console I/O */
-    if (hpa == DINO_UART_HPA || hpa == LASI_UART_HPA)
+    if (HPA_is_serial_device(hpa))
         switch (option) {
             case ENTRY_IO_COUT: /* console output */
                 c = (char*)ARG6;
@@ -415,7 +425,7 @@ int __VISIBLE parisc_iodc_ENTRY_IO(unsigned int *arg FUNC_MANY_ARGS)
         }
 
     /* boot medium I/O */
-    if (hpa == DINO_SCSI_HPA || hpa == IDE_HPA)
+    if (HPA_is_storage_device(hpa))
         switch (option) {
             case ENTRY_IO_BOOTIN: /* boot medium IN */
                 disk_op.drive_fl = boot_drive;
@@ -452,8 +462,8 @@ int __VISIBLE parisc_iodc_ENTRY_INIT(unsigned int *arg FUNC_MANY_ARGS)
     switch (option) {
         case ENTRY_INIT_MOD_DEV: /* 4: Init & test mod & dev */
             result[0] = 0; /* module IO_STATUS */
-            result[1] = (hpa == DINO_UART_HPA || hpa == LASI_UART_HPA) ? CL_DUPLEX:
-                (hpa == DINO_SCSI_HPA || hpa == IDE_HPA) ? CL_RANDOM : 0;
+            result[1] = HPA_is_serial_device(hpa) ? CL_DUPLEX:
+                HPA_is_storage_device(hpa) ? CL_RANDOM : 0;
             result[2] = result[3] = 0; /* TODO?: MAC of network card. */
             return PDC_OK;
         case ENTRY_INIT_MOD:    /* 6: INIT */
@@ -477,7 +487,31 @@ int __VISIBLE parisc_iodc_ENTRY_CONFIG(unsigned int *arg FUNC_MANY_ARGS)
 
 int __VISIBLE parisc_iodc_ENTRY_TEST(unsigned int *arg FUNC_MANY_ARGS)
 {
+    unsigned long hpa = ARG0;
+    unsigned long option = ARG1;
+    unsigned long *result = (unsigned long *)ARG4;
+    int hpa_index;
+
     iodc_log_call(arg, __FUNCTION__);
+
+    hpa_index = find_hpa_index(hpa);
+    if (hpa_index < 0)
+        return PDC_INVALID_ARG;
+
+    /* The options ARG1=0 and ARG1=1 are required. Others are optional. */
+    if (option == 0) { // Return info
+        unsigned long *list_addr = (unsigned long *)ARG5;
+        list_addr[0] = 0; // no test lists available.
+        result[0] = 0; // data buffer size, no bytes required.
+        result[1] = 0; // message buffer size, no bytes required.
+        return PDC_OK;
+    }
+
+    if (option == 1) { // Execute step
+        result[0] = 0; // fixed address of remote por
+        return PDC_OK;
+    }
+
     return PDC_BAD_OPTION;
 }
 
@@ -489,7 +523,8 @@ int __VISIBLE parisc_iodc_ENTRY_TLB(unsigned int *arg FUNC_MANY_ARGS)
     iodc_log_call(arg, __FUNCTION__);
 
     if (option == 0) {
-        *result = 0; /* no TLB */
+        result[0] = 0; /* no TLB */
+        result[1] = 0;
         return PDC_OK;
     }
     return PDC_BAD_OPTION;
@@ -1504,9 +1539,9 @@ static void prepare_boot_path(volatile struct pz_device *dest,
     hpa = source->hpa;
     hpa_index = find_hpa_index(hpa);
 
-    if (hpa == DINO_SCSI_HPA || hpa == IDE_HPA)
+    if (HPA_is_storage_device(hpa))
         mod_path = &mod_path_emulated_drives;
-    else if (hpa == DINO_UART_HPA || hpa == LASI_UART_HPA)
+    else if (HPA_is_serial_device(hpa))
         mod_path = &mod_path_hpa_fff83000;
     else {
         BUG_ON(hpa_index < 0);
