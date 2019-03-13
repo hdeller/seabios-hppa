@@ -195,7 +195,7 @@ typedef struct {
     int add_addr[5];
 } hppa_device_t;
 
-static hppa_device_t parisc_devices[HPPA_MAX_CPUS+10] = { PARISC_DEVICE_LIST };
+static hppa_device_t parisc_devices[HPPA_MAX_CPUS+16] = { PARISC_DEVICE_LIST };
 
 #define PARISC_KEEP_LIST \
     GSC_HPA,\
