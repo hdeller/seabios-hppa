@@ -457,10 +457,17 @@ int __VISIBLE parisc_iodc_ENTRY_INIT(unsigned int *arg FUNC_MANY_ARGS)
     unsigned long hpa = ARG0;
     unsigned long option = ARG1;
     unsigned long *result = (unsigned long *)ARG4;
+    int hpa_index;
 
     iodc_log_call(arg, __FUNCTION__);
+
+    hpa_index = find_hpa_index(hpa);
+    if (hpa_index < 0 && hpa != IDE_HPA)
+        return PDC_INVALID_ARG;
+
     switch (option) {
         case ENTRY_INIT_MOD_DEV: /* 4: Init & test mod & dev */
+        case ENTRY_INIT_DEV:     /* 5: Init & test dev */
             result[0] = 0; /* module IO_STATUS */
             result[1] = HPA_is_serial_device(hpa) ? CL_DUPLEX:
                 HPA_is_storage_device(hpa) ? CL_RANDOM : 0;
@@ -495,7 +502,7 @@ int __VISIBLE parisc_iodc_ENTRY_TEST(unsigned int *arg FUNC_MANY_ARGS)
     iodc_log_call(arg, __FUNCTION__);
 
     hpa_index = find_hpa_index(hpa);
-    if (hpa_index < 0)
+    if (hpa_index < 0 && hpa != IDE_HPA)
         return PDC_INVALID_ARG;
 
     /* The options ARG1=0 and ARG1=1 are required. Others are optional. */
