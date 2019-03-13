@@ -317,10 +317,7 @@ static int compare_module_path(struct pdc_module_path *path,
     if (path->path.mod != search->path.mod)
         return -1;
 
-    for(i = ARRAY_SIZE(path->path.bc); i >= 0; i--) {
-        if (search->path.bc[i] < 0)
-            break;
-
+    for(i = 0; i < ARRAY_SIZE(path->path.bc); i++) {
         if (path->path.bc[i] != search->path.bc[i])
             return -1;
     }
@@ -460,6 +457,7 @@ int __VISIBLE parisc_iodc_ENTRY_INIT(unsigned int *arg FUNC_MANY_ARGS)
             result[2] = result[3] = 0; /* TODO?: MAC of network card. */
             return PDC_OK;
         case ENTRY_INIT_MOD:    /* 6: INIT */
+            result[0] = 0; /* module IO_STATUS */
             return PDC_OK;
     }
     return PDC_BAD_OPTION;
@@ -662,25 +660,540 @@ static const char *pdc_name(unsigned long num)
         return "UNKNOWN!";
 }
 
-int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
+static int pdc_chassis(unsigned int *arg)
 {
-    static unsigned long psw_defaults = PDC_PSW_ENDIAN_BIT;
-    static unsigned long cache_info[] = { PARISC_PDC_CACHE_INFO };
-    static struct pdc_cache_info *machine_cache_info
-        = (struct pdc_cache_info *) &cache_info;
-    static unsigned long model[] = { PARISC_PDC_MODEL };
-    static const char model_str[] = PARISC_MODEL;
-
-    unsigned long proc = ARG0;
     unsigned long option = ARG1;
     unsigned long *result = (unsigned long *)ARG2;
 
-    int hpa_index;
+    switch (option) {
+        case PDC_CHASSIS_DISP:
+            ARG3 = ARG2;
+            result = (unsigned long *)&ARG4; // do not write to ARG2, use &ARG4 instead
+            // fall through
+        case PDC_CHASSIS_DISPWARN:
+            ARG4 = (ARG3 >> 17) & 7;
+            chassis_code = ARG3 & 0xffff;
+            if (0) printf("\nPDC_CHASSIS: %s (%d), %sCHASSIS  %0x\n",
+                    systat[ARG4], ARG4, (ARG3>>16)&1 ? "blank display, ":"", chassis_code);
+            // fall through
+        case PDC_CHASSIS_WARN:
+            // return warnings regarding fans, batteries and temperature: None!
+            result[0] = 0;
+            return PDC_OK;
+    }
+    return PDC_BAD_PROC;
+}
+
+static int pdc_pim(unsigned int *arg)
+{
+    unsigned long option = ARG1;
+    unsigned long *result = (unsigned long *)ARG2;
+
+    switch (option) {
+        case PDC_PIM_HPMC:
+            break;
+        case PDC_PIM_RETURN_SIZE:
+            *result = sizeof(struct pdc_hpmc_pim_11); // FIXME 64bit!
+            // B160 returns only "2". Why?
+            return PDC_OK;
+        case PDC_PIM_LPMC:
+        case PDC_PIM_SOFT_BOOT:
+            return PDC_BAD_OPTION;
+        case PDC_PIM_TOC:
+            break;
+    }
+    return PDC_BAD_PROC;
+}
+
+static int pdc_model(unsigned int *arg)
+{
+    static unsigned long model[] = { PARISC_PDC_MODEL };
+    static const char model_str[] = PARISC_MODEL;
+    unsigned long option = ARG1;
+    unsigned long *result = (unsigned long *)ARG2;
+
+    switch (option) {
+        case PDC_MODEL_INFO:
+            memcpy(result, model, sizeof(model));
+            return PDC_OK;
+        case PDC_MODEL_VERSIONS:
+            switch (ARG3) {
+                case 0: /* return CPU0 version */
+                    result[0] = 35; // TODO! ???
+                    return PDC_OK;
+                case 1: /* return PDC version */
+                    result[0] = PARISC_PDC_VERSION;
+                    return PDC_OK;
+            }
+            return -4; // invalid c_index
+        case PDC_MODEL_SYSMODEL:
+            result[0] = sizeof(model_str) - 1;
+            strtcpy((char *)ARG4, model_str, sizeof(model_str));
+            return PDC_OK;
+        case PDC_MODEL_CPU_ID:
+            result[0] = PARISC_PDC_CPUID;
+            return PDC_OK;
+        case PDC_MODEL_CAPABILITIES:
+            result[0] = PARISC_PDC_CAPABILITIES;
+            return PDC_OK;
+        case PDC_MODEL_GET_INSTALL_KERNEL:
+            // No need to provide a special install kernel during installation of HP-UX
+            return PDC_BAD_OPTION;
+    }
+    dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_MODEL function %d %x %x %x %x\n", ARG1, ARG2, ARG3, ARG4, ARG5);
+    return PDC_BAD_OPTION;
+}
+
+static int pdc_cache(unsigned int *arg)
+{
+    unsigned long option = ARG1;
+    unsigned long *result = (unsigned long *)ARG2;
+    static unsigned long cache_info[] = { PARISC_PDC_CACHE_INFO };
+    static struct pdc_cache_info *machine_cache_info
+        = (struct pdc_cache_info *) &cache_info;
+
+    switch (option) {
+        case PDC_CACHE_INFO:
+            BUG_ON(sizeof(cache_info) != sizeof(*machine_cache_info));
+            // XXX: number of TLB entries should be aligned with qemu
+            machine_cache_info->it_size = 256;
+            machine_cache_info->dt_size = 256;
+            machine_cache_info->it_loop = 1;
+            machine_cache_info->dt_loop = 1;
+
+#if 0
+            dprintf(0, "\n\nCACHE  IC: %ld %ld %ld DC: %ld %ld %ld\n",
+                    machine_cache_info->ic_count, machine_cache_info->ic_loop, machine_cache_info->ic_stride,
+                    machine_cache_info->dc_count, machine_cache_info->dc_loop, machine_cache_info->dc_stride);
+#endif
+#if 1
+            /* Increase cc_block from 1 to 11. This increases icache_stride
+             * and dcache_stride to 32768 bytes. Revisit for HP-UX. */
+            machine_cache_info->dc_conf.cc_block = 11;
+            machine_cache_info->ic_conf.cc_block = 11;
+
+            machine_cache_info->ic_size = 0; /* no instruction cache */
+            machine_cache_info->ic_count = 0;
+            machine_cache_info->ic_loop = 0;
+            machine_cache_info->dc_size = 0; /* no data cache */
+            machine_cache_info->dc_count = 0;
+            machine_cache_info->dc_loop = 0;
+#endif
+
+            memcpy(result, cache_info, sizeof(cache_info));
+            return PDC_OK;
+    }
+    dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_CACHE function %d %x %x %x %x\n", ARG1, ARG2, ARG3, ARG4, ARG5);
+    return PDC_BAD_OPTION;
+}
+
+static int pdc_hpa(unsigned int *arg)
+{
+    unsigned long option = ARG1;
+    unsigned long *result = (unsigned long *)ARG2;
+
+    switch (option) {
+        case PDC_HPA_PROCESSOR:
+            result[0] = CPU_HPA; // XXX: NEED TO FIX FOR SMP?
+            result[1] = 0;       // XXX: for SMP: 0,1,2,3,4...(num of this cpu)
+            return PDC_OK;
+        case PDC_HPA_MODULES:
+            return PDC_BAD_OPTION; // all modules on same board as the processor.
+    }
+    return PDC_BAD_OPTION;
+}
+
+static int pdc_coproc(unsigned int *arg)
+{
+    unsigned long option = ARG1;
+    unsigned long *result = (unsigned long *)ARG2;
+    unsigned char mask;
+    switch (option) {
+        case PDC_COPROC_CFG:
+            memset(result, 0, 32 * sizeof(unsigned long));
+            mask = ~((1 << (8-smp_cpus))-1);
+            /* set bit per cpu in ccr_functional and ccr_present: */
+            mtctl(mask, 10); /* initialize cr10 */
+            result[0] = mask;
+            result[1] = mask;
+            result[17] = 1; // Revision
+            result[18] = 19; // Model
+            return PDC_OK;
+    }
+    return PDC_BAD_OPTION;
+}
+
+static int pdc_iodc(unsigned int *arg)
+{
+    unsigned long option = ARG1;
+    unsigned long *result = (unsigned long *)ARG2;
     unsigned long hpa;
     struct pdc_iodc *iodc_p;
+    int hpa_index;
     unsigned char *c;
 
+    // dprintf(0, "\n\nSeaBIOS: Info PDC_IODC function %ld ARG3=%x ARG4=%x ARG5=%x ARG6=%x\n", option, ARG3, ARG4, ARG5, ARG6);
+    switch (option) {
+        case PDC_IODC_READ:
+            hpa = ARG3;
+            if (hpa == IDE_HPA) { // do NOT check for DINO_SCSI_HPA, breaks Linux which scans IO areas for unlisted io modules
+                iodc_p = &iodc_data_hpa_fff8c000; // workaround for PCI ATA
+            } else {
+                hpa_index = find_hpa_index(hpa);
+                if (hpa_index < 0)
+                    return -4; // not found
+                iodc_p = parisc_devices[hpa_index].iodc;
+            }
+
+            if (ARG4 == PDC_IODC_INDEX_DATA) {
+                // if (hpa == MEMORY_HPA)
+                //	ARG6 = 2; // Memory modules return 2 bytes of IODC memory (result2 ret[0] = 0x6701f41 HI !!)
+                memcpy((void*) ARG5, iodc_p, ARG6);
+                c = (unsigned char *) ARG5;
+                // printf("SeaBIOS: PDC_IODC get: hpa = 0x%lx, HV: 0x%x 0x%x IODC_SPA=0x%x  type 0x%x, \n", hpa, c[0], c[1], c[2], c[3]);
+                // c[0] = iodc_p->hversion_model; // FIXME. BROKEN HERE !!!
+                // c[1] = iodc_p->hversion_rev || (iodc_p->hversion << 4);
+                *result = ARG6;
+                return PDC_OK;
+            }
+
+            // ARG4 is IODC function to copy.
+            if (ARG4 < PDC_IODC_RI_INIT || ARG4 > PDC_IODC_RI_TLB)
+                return PDC_IODC_INVALID_INDEX;
+
+            *result = 512; /* max size of function iodc_entry */
+            if (ARG6 < *result)
+                return PDC_IODC_COUNT;
+            memcpy((void*) ARG5, &iodc_entry, *result);
+            c = (unsigned char *) &iodc_entry_table;
+            /* calculate offset into jump table. */
+            c += (ARG4 - PDC_IODC_RI_INIT) * 2 * sizeof(unsigned int);
+            memcpy((void*) ARG5, c, 2 * sizeof(unsigned int));
+            // dprintf(0, "\n\nSeaBIOS: Info PDC_IODC function OK\n");
+            flush_data_cache((char*)ARG5, *result);
+            return PDC_OK;
+            break;
+        case PDC_IODC_NINIT:	/* non-destructive init */
+        case PDC_IODC_DINIT:	/* destructive init */
+            break;
+        case PDC_IODC_MEMERR:
+            result[0] = 0; /* IO_STATUS */
+            result[1] = 0;
+            result[2] = 0;
+            result[3] = 0;
+            return PDC_OK;
+    }
+    dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_IODC function %ld ARG3=%x ARG4=%x ARG5=%x ARG6=%x\n", option, ARG3, ARG4, ARG5, ARG6);
+    return PDC_BAD_OPTION;
+}
+
+static int pdc_tod(unsigned int *arg)
+{
+    unsigned long option = ARG1;
+    unsigned long *result = (unsigned long *)ARG2;
+
+    switch (option) {
+        case PDC_TOD_READ:
+            result[0] = seconds_since_1970();
+            result[1] = result[2] = result[3] = 0;
+            return PDC_OK;
+        case PDC_TOD_WRITE:
+            // HP-UX 10.20 tries to write TOD clock with too small values (e.g. 0x432e)...
+            if (ARG2 < SECONDS_2000_JAN_1)
+                return PDC_INVALID_ARG;
+            /* we ignore the usecs in ARG3 */
+            return epoch_to_date_time(ARG2);
+        case 2: /* PDC_TOD_CALIBRATE_TIMERS */
+            /* double-precision floating-point with frequency of Interval Timer in megahertz: */
+            *(double*)&result[0] = (double)CPU_CLOCK_MHZ;
+            /* unsigned 64-bit integers representing  clock accuracy in parts per billion: */
+            result[2] = 0x5a6c; /* TOD_acc */
+            result[3] = 0x5a6c; /* CR_acc (interval timer) */
+            return PDC_OK;
+    }
+    dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_TOD function %ld ARG2=%x ARG3=%x ARG4=%x\n", option, ARG2, ARG3, ARG4);
+    return PDC_BAD_OPTION;
+}
+
+static int pdc_stable(unsigned int *arg)
+{
+    unsigned long option = ARG1;
+    unsigned long *result = (unsigned long *)ARG2;
+
+    // dprintf(0, "\n\nSeaBIOS: PDC_STABLE function %ld ARG2=%x ARG3=%x ARG4=%x\n", option, ARG2, ARG3, ARG4);
+    switch (option) {
+        case PDC_STABLE_READ:
+            if ((ARG2 + ARG4) > STABLE_STORAGE_SIZE)
+                return PDC_INVALID_ARG;
+            memcpy((unsigned char *) ARG3, &stable_storage[ARG2], ARG4);
+            return PDC_OK;
+        case PDC_STABLE_WRITE:
+            if ((ARG2 + ARG4) > STABLE_STORAGE_SIZE)
+                return PDC_INVALID_ARG;
+            memcpy(&stable_storage[ARG2], (unsigned char *) ARG3, ARG4);
+            return PDC_OK;
+        case PDC_STABLE_RETURN_SIZE:
+            result[0] = STABLE_STORAGE_SIZE;
+            return PDC_OK;
+        case PDC_STABLE_VERIFY_CONTENTS:
+            return PDC_OK;
+        case PDC_STABLE_INITIALIZE:
+            init_stable_storage();
+            return PDC_OK;
+    }
+    return PDC_BAD_OPTION;
+}
+
+static int pdc_nvolatile(unsigned int *arg)
+{
+    unsigned long option = ARG1;
+    unsigned long *result = (unsigned long *)ARG2;
+
+    switch (option) {
+        case PDC_NVOLATILE_READ:
+            if ((ARG2 + ARG4) > NVOLATILE_STORAGE_SIZE)
+                return PDC_INVALID_ARG;
+            memcpy((unsigned char *) ARG3, &nvolatile_storage[ARG2], ARG4);
+            return PDC_OK;
+        case PDC_NVOLATILE_WRITE:
+            if ((ARG2 + ARG4) > NVOLATILE_STORAGE_SIZE)
+                return PDC_INVALID_ARG;
+            memcpy(&nvolatile_storage[ARG2], (unsigned char *) ARG3, ARG4);
+            return PDC_OK;
+        case PDC_NVOLATILE_RETURN_SIZE:
+            result[0] = NVOLATILE_STORAGE_SIZE;
+            return PDC_OK;
+        case PDC_NVOLATILE_VERIFY_CONTENTS:
+            return PDC_OK;
+        case PDC_NVOLATILE_INITIALIZE:
+            memset(nvolatile_storage, 0, sizeof(nvolatile_storage));
+            return PDC_OK;
+    }
+    return PDC_BAD_OPTION;
+}
+
+static int pdc_add_valid(unsigned int *arg)
+{
+    unsigned long option = ARG1;
+
+    // dprintf(0, "\n\nSeaBIOS: PDC_ADD_VALID function %ld ARG2=%x called.\n", option, ARG2);
+    if (option != 0)
+        return PDC_BAD_OPTION;
+    if (0 && ARG2 == 0) // should PAGE0 be valid?  HP-UX asks for it, but maybe due a bug in our code...
+        return 1;
+    // if (ARG2 < PAGE_SIZE) return PDC_ERROR;
+    if (ARG2 < ram_size)
+        return PDC_OK;
+    if (ARG2 < FIRMWARE_END)
+        return 1;
+    if (ARG2 <= 0xffffffff)
+        return PDC_OK;
+    dprintf(0, "\n\nSeaBIOS: FAILED!!!! PDC_ADD_VALID function %ld ARG2=%x called.\n", option, ARG2);
+    return PDC_REQ_ERR_0; /* Operation completed with a requestor bus error. */
+}
+
+static int pdc_tlb(unsigned int *arg)
+{
+#if 0
+    /* still buggy, let's avoid it to keep things simple. */
+    switch (option) {
+        case PDC_TLB_INFO:
+            result[0] = PAGE_SIZE;
+            result[0] = PAGE_SIZE << 2;
+            return PDC_OK;
+        case PDC_TLB_SETUP:
+            result[0] = ARG5 & 1;
+            result[1] = 0;
+            return PDC_OK;
+    }
+#endif
+    return PDC_BAD_PROC;
+}
+
+static int pdc_mem(unsigned int *arg)
+{
+    unsigned long option = ARG1;
+    unsigned long *result = (unsigned long *)ARG2;
+
+    // only implemented on 64bit PDC!
+    if (sizeof(unsigned long) == sizeof(unsigned int))
+        return PDC_BAD_PROC;
+
+    switch (option) {
+        case PDC_MEM_MEMINFO:
+            result[0] = 0;	// no PDT entries
+            result[1] = 0;	// page entries
+            result[2] = 0;	// PDT status
+            result[3] = (unsigned long)-1ULL; // dbe_loc
+            result[4] = GoldenMemory; // good_mem
+            return PDC_OK;
+        case PDC_MEM_READ_PDT:
+            result[0] = 0;	// no PDT entries
+            return PDC_OK;
+        case PDC_MEM_GOODMEM:
+            GoldenMemory = ARG3;
+            return PDC_OK;
+    }
+    dprintf(0, "\n\nSeaBIOS: Check PDC_MEM option %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
+    return PDC_BAD_PROC;
+}
+
+static int pdc_psw(unsigned int *arg)
+{
+    static unsigned long psw_defaults = PDC_PSW_ENDIAN_BIT;
+    unsigned long option = ARG1;
+    unsigned long *result = (unsigned long *)ARG2;
+
+    if (option > PDC_PSW_SET_DEFAULTS)
+        return PDC_BAD_OPTION;
+    /* FIXME: For 64bit support enable PDC_PSW_WIDE_BIT too! */
+    if (option == PDC_PSW_MASK)
+        *result = PDC_PSW_ENDIAN_BIT;
+    if (option == PDC_PSW_GET_DEFAULTS)
+        *result = psw_defaults;
+    if (option == PDC_PSW_SET_DEFAULTS) {
+        psw_defaults = ARG2;
+    }
+    return PDC_OK;
+}
+
+static int pdc_system_map(unsigned int *arg)
+{
+    unsigned long option = ARG1;
+    unsigned long *result = (unsigned long *)ARG2;
     struct pdc_module_path *mod_path;
+    unsigned long hpa;
+    int hpa_index;
+
+    // dprintf(0, "\n\nSeaBIOS: Info: PDC_SYSTEM_MAP function %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
+    switch (option) {
+        case PDC_FIND_MODULE:
+            hpa_index = ARG4;
+            if (hpa_index >= ARRAY_SIZE(parisc_devices))
+                return PDC_NE_MOD; // Module not found
+            hpa = parisc_devices[hpa_index].hpa;
+            if (!hpa)
+                return PDC_NE_MOD; // Module not found
+
+            mod_path = (struct pdc_module_path *)ARG3;
+            if (mod_path)
+                *mod_path = *parisc_devices[hpa_index].mod_path;
+
+            // *pdc_mod_info = *parisc_devices[hpa_index].mod_info; -> can be dropped.
+            memset(result, 0, 32*sizeof(long));
+            result[0] = hpa; // .mod_addr for PDC_IODC
+            result[1] = 1; // .mod_pgs number of pages (FIXME: only graphics has more, e.g. 0x2000)
+            result[2] = 0; // FIXME: additional addresses
+
+            return PDC_OK;
+        case PDC_FIND_ADDRESS:
+            break;
+
+        case PDC_TRANSLATE_PATH:
+            mod_path = (struct pdc_module_path *)ARG3;
+            hppa_device_t *dev = find_hppa_device_by_path(mod_path, result+3);
+            if (!dev)
+                return PDC_NE_MOD;
+
+            result[0] = dev->hpa;
+            result[1] = 1;
+            result[2] = 0;
+            return PDC_OK;
+    }
+    return PDC_BAD_OPTION;
+}
+
+static int pdc_soft_power(unsigned int *arg)
+{
+    unsigned long option = ARG1;
+
+    switch (option) {
+        case PDC_SOFT_POWER_ENABLE:
+            if (ARG3 == 0) // put soft power button under hardware control.
+                hlt();
+            return PDC_OK;
+    }
+    // dprintf(0, "\n\nSeaBIOS: PDC_SOFT_POWER called with ARG2=%x ARG3=%x ARG4=%x\n", ARG2, ARG3, ARG4);
+    return PDC_BAD_OPTION;
+}
+
+static int pdc_io(unsigned int *arg)
+{
+    unsigned long option = ARG1;
+
+    switch (option) {
+        case PDC_IO_READ_AND_CLEAR_ERRORS:
+            dprintf(0, "\n\nSeaBIOS: PDC_IO called with ARG2=%x ARG3=%x ARG4=%x\n", ARG2, ARG3, ARG4);
+            // return PDC_BAD_OPTION;
+        case PDC_IO_RESET:
+        case PDC_IO_RESET_DEVICES:
+            return PDC_OK;
+    }
+    return PDC_BAD_OPTION;
+}
+
+static int pdc_pci_index(unsigned int *arg)
+{
+    unsigned long option = ARG1;
+    unsigned long *result = (unsigned long *)ARG2;
+
+    // dprintf(0, "\n\nSeaBIOS: PDC_PCI_INDEX(%lu) called with ARG2=%x ARG3=%x ARG4=%x\n", option, ARG2, ARG3, ARG4);
+    switch (option) {
+        case PDC_PCI_INTERFACE_INFO:
+            memset(result, 0, 32 * sizeof(unsigned long));
+            result[0] = 2;  /* XXX physical hardware returns those ?!? */
+            result[16] = 0x60;
+            result[17] = 0x90;
+            return PDC_OK;
+        case PDC_PCI_GET_INT_TBL_SIZE:
+        case PDC_PCI_GET_INT_TBL:
+            memset(result, 0, 32 * sizeof(unsigned long));
+            result[0] = 2; /* Hardware fills in, even though we return PDC_BAD_OPTION below. */
+            result[16] = 0x60;
+            result[17] = 0x90;
+            return PDC_BAD_OPTION;
+        case PDC_PCI_PCI_PATH_TO_PCI_HPA:
+            result[0] = PCI_HPA;
+            // result[0] = DINO_SCSI_HPA;
+            // result[0] = IDE_HPA;
+            return PDC_OK;
+            // return PDC_BAD_OPTION;
+        case PDC_PCI_PCI_HPA_TO_PCI_PATH:
+            BUG_ON(1);
+    }
+    return PDC_BAD_OPTION;
+}
+
+static int pdc_initiator(unsigned int *arg)
+{
+    unsigned long option = ARG1;
+    unsigned long *result = (unsigned long *)ARG2;
+
+    switch (option) {
+        case PDC_GET_INITIATOR:
+            // ARG3 points to the hwpath of device for which initiator is asked for.
+            result[0] = 7;  // initiator_id/host_id: 7 to 15.
+            result[1] = 10; // scsi_rate: 1, 2, 5 or 10 for 5, 10, 20 or 40 MT/s
+            result[2] = 7;  // firmware suggested value for initiator_id
+            result[3] = 10; // firmware suggested value for scsi_rate
+            result[4] = 0;  // width: 0:"Narrow, 1:"Wide"
+            result[5] = 0; // mode: 0:SMODE_SE, 1:SMODE_HVD, 2:SMODE_LVD
+            return PDC_OK;
+        case PDC_SET_INITIATOR:
+        case PDC_DELETE_INITIATOR:
+        case PDC_RETURN_TABLE_SIZE:
+        case PDC_RETURN_TABLE:
+            break;
+    }
+    dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_INITIATOR function %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
+    return PDC_BAD_OPTION;
+}
+
+
+int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
+{
+    unsigned long proc = ARG0;
+    unsigned long option = ARG1;
 
     if (pdc_debug) {
         printf("\nSeaBIOS: Start PDC proc %s(%d) option %d result=0x%x ARG3=0x%x %s ",
@@ -691,437 +1204,96 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
     switch (proc) {
         case PDC_POW_FAIL:
             break;
+
         case PDC_CHASSIS: /* chassis functions */
-            switch (option) {
-                case PDC_CHASSIS_DISP:
-                    ARG3 = ARG2;
-                    result = (unsigned long *)&ARG4; // do not write to ARG2, use &ARG4 instead
-                    // fall through
-                case PDC_CHASSIS_DISPWARN:
-                    ARG4 = (ARG3 >> 17) & 7;
-                    chassis_code = ARG3 & 0xffff;
-                    if (0) printf("\nPDC_CHASSIS: %s (%d), %sCHASSIS  %0x\n",
-                            systat[ARG4], ARG4, (ARG3>>16)&1 ? "blank display, ":"", chassis_code);
-                    // fall through
-                case PDC_CHASSIS_WARN:
-                    // return warnings regarding fans, batteries and temperature: None!
-                    result[0] = 0;
-                    return PDC_OK;
-            }
-            return PDC_BAD_PROC;
+            return pdc_chassis(arg);
+
         case PDC_PIM:
-            switch (option) {
-                case PDC_PIM_HPMC:
-                    break;
-                case PDC_PIM_RETURN_SIZE:
-                    *result = sizeof(struct pdc_hpmc_pim_11); // FIXME 64bit!
-                    // B160 returns only "2". Why?
-                    return PDC_OK;
-                case PDC_PIM_LPMC:
-                case PDC_PIM_SOFT_BOOT:
-                    return PDC_BAD_OPTION;
-                case PDC_PIM_TOC:
-                    break;
-            }
-            break;
+            return pdc_pim(arg);
+
         case PDC_MODEL: /* model information */
-            switch (option) {
-                case PDC_MODEL_INFO:
-                    memcpy(result, model, sizeof(model));
-                    return PDC_OK;
-                case PDC_MODEL_VERSIONS:
-                    switch (ARG3) {
-                    case 0: /* return CPU0 version */
-                        result[0] = 35; // TODO! ???
-                        return PDC_OK;
-                    case 1: /* return PDC version */
-                        result[0] = PARISC_PDC_VERSION;
-                        return PDC_OK;
-                    }
-                    return -4; // invalid c_index
-                case PDC_MODEL_SYSMODEL:
-                    result[0] = sizeof(model_str) - 1;
-                    strtcpy((char *)ARG4, model_str, sizeof(model_str));
-                    return PDC_OK;
-                case PDC_MODEL_CPU_ID:
-                    result[0] = PARISC_PDC_CPUID;
-                    return PDC_OK;
-                case PDC_MODEL_CAPABILITIES:
-                    result[0] = PARISC_PDC_CAPABILITIES;
-                    return PDC_OK;
-                case PDC_MODEL_GET_INSTALL_KERNEL:
-                    // No need to provide a special install kernel during installation of HP-UX
-                    return PDC_BAD_OPTION;
-            }
-            dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_MODEL function %d %x %x %x %x\n", ARG1, ARG2, ARG3, ARG4, ARG5);
-            return PDC_BAD_OPTION;
+            return pdc_model(arg);
+
         case PDC_CACHE:
-            switch (option) {
-                case PDC_CACHE_INFO:
-                    BUG_ON(sizeof(cache_info) != sizeof(*machine_cache_info));
-                    // XXX: number of TLB entries should be aligned with qemu
-                    machine_cache_info->it_size = 256;
-                    machine_cache_info->dt_size = 256;
-                    machine_cache_info->it_loop = 1;
-                    machine_cache_info->dt_loop = 1;
+            return pdc_cache(arg);
 
-#if 0
-                    dprintf(0, "\n\nCACHE  IC: %ld %ld %ld DC: %ld %ld %ld\n",
-                            machine_cache_info->ic_count, machine_cache_info->ic_loop, machine_cache_info->ic_stride,
-                            machine_cache_info->dc_count, machine_cache_info->dc_loop, machine_cache_info->dc_stride);
-#endif
-#if 1
-                    /* Increase cc_block from 1 to 11. This increases icache_stride
-                     * and dcache_stride to 32768 bytes. Revisit for HP-UX. */
-                    machine_cache_info->dc_conf.cc_block = 11;
-                    machine_cache_info->ic_conf.cc_block = 11;
-
-                    machine_cache_info->ic_size = 0; /* no instruction cache */
-                    machine_cache_info->ic_count = 0;
-                    machine_cache_info->ic_loop = 0;
-                    machine_cache_info->dc_size = 0; /* no data cache */
-                    machine_cache_info->dc_count = 0;
-                    machine_cache_info->dc_loop = 0;
-#endif
-
-                    memcpy(result, cache_info, sizeof(cache_info));
-                    return PDC_OK;
-            }
-            dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_CACHE function %d %x %x %x %x\n", ARG1, ARG2, ARG3, ARG4, ARG5);
-            return PDC_BAD_OPTION;
         case PDC_HPA:
-            switch (option) {
-                case PDC_HPA_PROCESSOR:
-                    result[0] = CPU_HPA; // XXX: NEED TO FIX FOR SMP?
-                    result[1] = 0;       // XXX: for SMP: 0,1,2,3,4...(num of this cpu)
-                    return PDC_OK;
-                case PDC_HPA_MODULES:
-                    return PDC_BAD_OPTION; // all modules on same board as the processor.
-            }
-            break;
+            return pdc_hpa(arg);
+
         case PDC_COPROC:
-            switch (option) {
-                case PDC_COPROC_CFG:
-                    memset(result, 0, 32 * sizeof(unsigned long));
-                    /* set bit per cpu in ccr_functional and ccr_present: */
-                    result[0] = result[1] = (smp_cpus <= 1) ? 1 : (1ULL << smp_cpus) - 1;
-                    mtctl(result[0], 10); /* initialize cr10 */
-                    result[17] = 1; // Revision
-                    result[18] = 19; // Model
-                    return PDC_OK;
-            }
-            return PDC_BAD_OPTION;
+            return pdc_coproc(arg);
+
         case PDC_IODC: /* Call IODC functions */
-            // dprintf(0, "\n\nSeaBIOS: Info PDC_IODC function %ld ARG3=%x ARG4=%x ARG5=%x ARG6=%x\n", option, ARG3, ARG4, ARG5, ARG6);
-            switch (option) {
-                case PDC_IODC_READ:
-                    hpa = ARG3;
-                    if (hpa == IDE_HPA) { // do NOT check for DINO_SCSI_HPA, breaks Linux which scans IO areas for unlisted io modules
-                        iodc_p = &iodc_data_hpa_fff8c000; // workaround for PCI ATA
-                    } else {
-                        hpa_index = find_hpa_index(hpa);
-                        if (hpa_index < 0)
-                            return -4; // not found
-                        iodc_p = parisc_devices[hpa_index].iodc;
-                    }
+            return pdc_iodc(arg);
 
-                    if (ARG4 == PDC_IODC_INDEX_DATA) {
-                        // if (hpa == MEMORY_HPA)
-                        //	ARG6 = 2; // Memory modules return 2 bytes of IODC memory (result2 ret[0] = 0x6701f41 HI !!)
-                        memcpy((void*) ARG5, iodc_p, ARG6);
-                        c = (unsigned char *) ARG5;
-                        // printf("SeaBIOS: PDC_IODC get: hpa = 0x%lx, HV: 0x%x 0x%x IODC_SPA=0x%x  type 0x%x, \n", hpa, c[0], c[1], c[2], c[3]);
-                        // c[0] = iodc_p->hversion_model; // FIXME. BROKEN HERE !!!
-                        // c[1] = iodc_p->hversion_rev || (iodc_p->hversion << 4);
-                        *result = ARG6;
-                        return PDC_OK;
-                    }
-
-                    // ARG4 is IODC function to copy.
-                    if (ARG4 < PDC_IODC_RI_INIT || ARG4 > PDC_IODC_RI_TLB)
-                        return PDC_IODC_INVALID_INDEX;
-
-                    *result = 512; /* max size of function iodc_entry */
-                    if (ARG6 < *result)
-                        return PDC_IODC_COUNT;
-                    memcpy((void*) ARG5, &iodc_entry, *result);
-                    c = (unsigned char *) &iodc_entry_table;
-                    /* calculate offset into jump table. */
-                    c += (ARG4 - PDC_IODC_RI_INIT) * 2 * sizeof(unsigned int);
-                    memcpy((void*) ARG5, c, 2 * sizeof(unsigned int));
-                    // dprintf(0, "\n\nSeaBIOS: Info PDC_IODC function OK\n");
-                    flush_data_cache((char*)ARG5, *result);
-                    return PDC_OK;
-                    break;
-                case PDC_IODC_NINIT:	/* non-destructive init */
-                case PDC_IODC_DINIT:	/* destructive init */
-                    break;
-                case PDC_IODC_MEMERR:
-                    result[0] = 0; /* IO_STATUS */
-                    result[1] = 0;
-                    result[2] = 0;
-                    result[3] = 0;
-                    return PDC_OK;
-            }
-            dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_IODC function %ld ARG3=%x ARG4=%x ARG5=%x ARG6=%x\n", option, ARG3, ARG4, ARG5, ARG6);
-            return PDC_BAD_OPTION;
         case PDC_TOD:	/* Time of day */
-            switch (option) {
-                case PDC_TOD_READ:
-                    result[0] = seconds_since_1970();
-                    result[1] = result[2] = result[3] = 0;
-                    return PDC_OK;
-                case PDC_TOD_WRITE:
-                    // HP-UX 10.20 tries to write TOD clock with too small values (e.g. 0x432e)...
-                    if (ARG2 < SECONDS_2000_JAN_1)
-                        return PDC_INVALID_ARG;
-                    /* we ignore the usecs in ARG3 */
-                    return epoch_to_date_time(ARG2);
-                case 2: /* PDC_TOD_CALIBRATE_TIMERS */
-                    /* double-precision floating-point with frequency of Interval Timer in megahertz: */
-                    *(double*)&result[0] = (double)CPU_CLOCK_MHZ;
-                    /* unsigned 64-bit integers representing  clock accuracy in parts per billion: */
-                    result[2] = 0x5a6c; /* TOD_acc */
-                    result[3] = 0x5a6c; /* CR_acc (interval timer) */
-                    return PDC_OK;
-            }
-            dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_TOD function %ld ARG2=%x ARG3=%x ARG4=%x\n", option, ARG2, ARG3, ARG4);
-            return PDC_BAD_OPTION;
+            return pdc_tod(arg);
+
         case PDC_STABLE:
-            // dprintf(0, "\n\nSeaBIOS: PDC_STABLE function %ld ARG2=%x ARG3=%x ARG4=%x\n", option, ARG2, ARG3, ARG4);
-            switch (option) {
-                case PDC_STABLE_READ:
-                    if ((ARG2 + ARG4) > STABLE_STORAGE_SIZE)
-                        return PDC_INVALID_ARG;
-                    memcpy((unsigned char *) ARG3, &stable_storage[ARG2], ARG4);
-                    return PDC_OK;
-                case PDC_STABLE_WRITE:
-                    if ((ARG2 + ARG4) > STABLE_STORAGE_SIZE)
-                        return PDC_INVALID_ARG;
-                    memcpy(&stable_storage[ARG2], (unsigned char *) ARG3, ARG4);
-                    return PDC_OK;
-                case PDC_STABLE_RETURN_SIZE:
-                    result[0] = STABLE_STORAGE_SIZE;
-                    return PDC_OK;
-                case PDC_STABLE_VERIFY_CONTENTS:
-                    return PDC_OK;
-                case PDC_STABLE_INITIALIZE:
-                    init_stable_storage();
-                    return PDC_OK;
-            }
-            return PDC_BAD_OPTION;
+            return pdc_stable(arg);
+
         case PDC_NVOLATILE:
-            switch (option) {
-                case PDC_NVOLATILE_READ:
-                    if ((ARG2 + ARG4) > NVOLATILE_STORAGE_SIZE)
-                        return PDC_INVALID_ARG;
-                    memcpy((unsigned char *) ARG3, &nvolatile_storage[ARG2], ARG4);
-                    return PDC_OK;
-                case PDC_NVOLATILE_WRITE:
-                    if ((ARG2 + ARG4) > NVOLATILE_STORAGE_SIZE)
-                        return PDC_INVALID_ARG;
-                    memcpy(&nvolatile_storage[ARG2], (unsigned char *) ARG3, ARG4);
-                    return PDC_OK;
-                case PDC_NVOLATILE_RETURN_SIZE:
-                    result[0] = NVOLATILE_STORAGE_SIZE;
-                    return PDC_OK;
-                case PDC_NVOLATILE_VERIFY_CONTENTS:
-                    return PDC_OK;
-                case PDC_NVOLATILE_INITIALIZE:
-                    memset(nvolatile_storage, 0, sizeof(nvolatile_storage));
-                    return PDC_OK;
-            }
-            return PDC_BAD_OPTION;
+            return pdc_nvolatile(arg);
+
         case PDC_ADD_VALID:
-            // dprintf(0, "\n\nSeaBIOS: PDC_ADD_VALID function %ld ARG2=%x called.\n", option, ARG2);
-            if (option != 0)
-                return PDC_BAD_OPTION;
-            if (0 && ARG2 == 0) // should PAGE0 be valid?  HP-UX asks for it, but maybe due a bug in our code...
-                return 1;
-            // if (ARG2 < PAGE_SIZE) return PDC_ERROR;
-            if (ARG2 < ram_size)
-                return PDC_OK;
-            if (ARG2 < FIRMWARE_END)
-                return 1;
-            if (ARG2 <= 0xffffffff)
-                return PDC_OK;
-            dprintf(0, "\n\nSeaBIOS: FAILED!!!! PDC_ADD_VALID function %ld ARG2=%x called.\n", option, ARG2);
-            return PDC_REQ_ERR_0; /* Operation completed with a requestor bus error. */
+            return pdc_add_valid(arg);
+
         case PDC_INSTR:
             return PDC_BAD_PROC;
+
         case PDC_CONFIG:	/* Obsolete */
             return PDC_BAD_PROC;
+
         case PDC_BLOCK_TLB:	/* not needed on virtual machine */
             return PDC_BAD_PROC;
+
         case PDC_TLB:		/* hardware TLB not used on Linux, but on HP-UX (if available) */
-#if 0
-            /* still buggy, let's avoid it to keep things simple. */
-            switch (option) {
-                case PDC_TLB_INFO:
-                    result[0] = PAGE_SIZE;
-                    result[0] = PAGE_SIZE << 2;
-                    return PDC_OK;
-                case PDC_TLB_SETUP:
-                    result[0] = ARG5 & 1;
-                    result[1] = 0;
-                    return PDC_OK;
-            }
-#endif
-            return PDC_BAD_PROC;
+            return pdc_tlb(arg);
+
         case PDC_MEM:
-            // only implemented on 64bit PDC!
-            if (sizeof(unsigned long) == sizeof(unsigned int))
-                return PDC_BAD_PROC;
+            return pdc_mem(arg);
 
-            switch (option) {
-                case PDC_MEM_MEMINFO:
-                    result[0] = 0;	// no PDT entries
-                    result[1] = 0;	// page entries
-                    result[2] = 0;	// PDT status
-                    result[3] = (unsigned long)-1ULL; // dbe_loc
-                    result[4] = GoldenMemory; // good_mem
-                    return PDC_OK;
-                case PDC_MEM_READ_PDT:
-                    result[0] = 0;	// no PDT entries
-                    return PDC_OK;
-                case PDC_MEM_GOODMEM:
-                    GoldenMemory = ARG3;
-                    return PDC_OK;
-            }
-            dprintf(0, "\n\nSeaBIOS: Check PDC_MEM option %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
-            return PDC_BAD_PROC;
         case PDC_PSW:	/* Get/Set default System Mask  */
-            if (option > PDC_PSW_SET_DEFAULTS)
-                return PDC_BAD_OPTION;
-            /* FIXME: For 64bit support enable PDC_PSW_WIDE_BIT too! */
-            if (option == PDC_PSW_MASK)
-                *result = PDC_PSW_ENDIAN_BIT;
-            if (option == PDC_PSW_GET_DEFAULTS)
-                *result = psw_defaults;
-            if (option == PDC_PSW_SET_DEFAULTS) {
-                psw_defaults = ARG2;
-            }
-            return PDC_OK;
+            return pdc_psw(arg);
+
         case PDC_SYSTEM_MAP:
-            // dprintf(0, "\n\nSeaBIOS: Info: PDC_SYSTEM_MAP function %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
-            switch (option) {
-                case PDC_FIND_MODULE:
-                    hpa_index = ARG4;
-                    if (hpa_index >= ARRAY_SIZE(parisc_devices))
-                        return PDC_NE_MOD; // Module not found
-                    hpa = parisc_devices[hpa_index].hpa;
-                    if (!hpa)
-                        return PDC_NE_MOD; // Module not found
+            return pdc_system_map(arg);
 
-                    mod_path = (struct pdc_module_path *)ARG3;
-                    if (mod_path)
-                        *mod_path = *parisc_devices[hpa_index].mod_path;
-
-                    // *pdc_mod_info = *parisc_devices[hpa_index].mod_info; -> can be dropped.
-                    memset(result, 0, 32*sizeof(long));
-                    result[0] = hpa; // .mod_addr for PDC_IODC
-                    result[1] = 1; // .mod_pgs number of pages (FIXME: only graphics has more, e.g. 0x2000)
-                    result[2] = 0; // FIXME: additional addresses
-
-                    return PDC_OK;
-                case PDC_FIND_ADDRESS:
-                    break;
-
-                case PDC_TRANSLATE_PATH:
-                    mod_path = (struct pdc_module_path *)ARG3;
-                    hppa_device_t *dev = find_hppa_device_by_path(mod_path, result+3);
-                    if (!dev)
-                        return PDC_NE_MOD;
-
-                    result[0] = dev->hpa;
-                    result[1] = 1;
-                    result[2] = 0;
-                    return PDC_OK;
-            }
-            break;
         case PDC_SOFT_POWER: // don't have a soft-power switch
-            switch (option) {
-                case PDC_SOFT_POWER_ENABLE:
-                    if (ARG3 == 0) // put soft power button under hardware control.
-                        hlt();
-                    return PDC_OK;
-            }
-            // dprintf(0, "\n\nSeaBIOS: PDC_SOFT_POWER called with ARG2=%x ARG3=%x ARG4=%x\n", ARG2, ARG3, ARG4);
-            return PDC_BAD_OPTION;
+            return pdc_soft_power(arg);
+
         case PDC_CRASH_PREP:
             /* This should actually quiesce all I/O and prepare the System for crash dumping.
                Ignoring it for now, otherwise the BUG_ON below would quit qemu before we have
                a chance to see the kernel panic */
             return PDC_OK;
+
         case 26: // PDC_SCSI_PARMS is the architected firmware interface to replace the Hversion PDC_INITIATOR procedure.
             return PDC_BAD_PROC;
+
         case 64: // Called by HP-UX 11 bootcd during boot. Probably checks PDC_PAT_CELL (even if we are not PAT firmware)
         case 65: // Called by HP-UX 11 bootcd during boot. Probably checks PDC_PAT_CHASSIS_LOG (even if we are not PAT firmware)
             dprintf(0, "\n\nSeaBIOS: UNKNOWN PDC proc %lu OPTION %lu called with ARG2=%x ARG3=%x ARG4=%x\n", proc, option, ARG2, ARG3, ARG4);
             return PDC_BAD_PROC;
+
         case PDC_IO:
-            switch (option) {
-                case PDC_IO_READ_AND_CLEAR_ERRORS:
-                    dprintf(0, "\n\nSeaBIOS: PDC_IO called with ARG2=%x ARG3=%x ARG4=%x\n", ARG2, ARG3, ARG4);
-                    // return PDC_BAD_OPTION;
-                case PDC_IO_RESET:
-                case PDC_IO_RESET_DEVICES:
-                    return PDC_OK;
-            }
-            break;
+            return pdc_io(arg);
+
         case PDC_BROADCAST_RESET:
             dprintf(0, "\n\nSeaBIOS: PDC_BROADCAST_RESET (reset system) called with ARG3=%x ARG4=%x\n", ARG3, ARG4);
             reset();
             return PDC_OK;
+
         case PDC_PCI_INDEX:
-            // dprintf(0, "\n\nSeaBIOS: PDC_PCI_INDEX(%lu) called with ARG2=%x ARG3=%x ARG4=%x\n", option, ARG2, ARG3, ARG4);
-            switch (option) {
-                case PDC_PCI_INTERFACE_INFO:
-                    memset(result, 0, 32 * sizeof(unsigned long));
-                    result[0] = 2;  /* XXX physical hardware returns those ?!? */
-                    result[16] = 0x60;
-                    result[17] = 0x90;
-                    return PDC_OK;
-                case PDC_PCI_GET_INT_TBL_SIZE:
-                case PDC_PCI_GET_INT_TBL:
-                    memset(result, 0, 32 * sizeof(unsigned long));
-                    result[0] = 2; /* Hardware fills in, even though we return PDC_BAD_OPTION below. */
-                    result[16] = 0x60;
-                    result[17] = 0x90;
-                    return PDC_BAD_OPTION;
-                case PDC_PCI_PCI_PATH_TO_PCI_HPA:
-                    result[0] = PCI_HPA;
-                    // result[0] = DINO_SCSI_HPA;
-                    // result[0] = IDE_HPA;
-                    return PDC_OK;
-                    // return PDC_BAD_OPTION;
-                case PDC_PCI_PCI_HPA_TO_PCI_PATH:
-                    BUG_ON(1);
-            }
-            break;
-        case PDC_RELOCATE:
+            return pdc_pci_index(arg);
+
+       case PDC_RELOCATE:
             /* We don't want to relocate any firmware. */
             return PDC_BAD_PROC;
+
         case PDC_INITIATOR:
-            switch (option) {
-                case PDC_GET_INITIATOR:
-                    // ARG3 points to the hwpath of device for which initiator is asked for.
-                    result[0] = 7;  // initiator_id/host_id: 7 to 15.
-                    result[1] = 10; // scsi_rate: 1, 2, 5 or 10 for 5, 10, 20 or 40 MT/s
-                    result[2] = 7;  // firmware suggested value for initiator_id
-                    result[3] = 10; // firmware suggested value for scsi_rate
-                    result[4] = 0;  // width: 0:"Narrow, 1:"Wide"
-                    result[5] = 0; // mode: 0:SMODE_SE, 1:SMODE_HVD, 2:SMODE_LVD
-                    return PDC_OK;
-                case PDC_SET_INITIATOR:
-                case PDC_DELETE_INITIATOR:
-                case PDC_RETURN_TABLE_SIZE:
-                case PDC_RETURN_TABLE:
-                    break;
-            }
-            dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_INITIATOR function %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
-            return PDC_BAD_OPTION;
-    }
+            return pdc_initiator(arg);
+}
 
     printf("\n** WARNING **: SeaBIOS: Unimplemented PDC proc %s(%d) option %d result=%x ARG3=%x ",
             pdc_name(ARG0), ARG0, ARG1, ARG2, ARG3);

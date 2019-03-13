@@ -48,7 +48,7 @@
 #define PORT_SERIAL1    (DINO_UART_HPA + 0x800)
 #define PORT_SERIAL2    (LASI_UART_HPA + 0x800)
 
-#define HPPA_MAX_CPUS   32      /* max. number of SMP CPUs */
+#define HPPA_MAX_CPUS   8      /* max. number of SMP CPUs */
 #define CPU_CLOCK_MHZ   250     /* emulate a 250 MHz CPU */
 
 
