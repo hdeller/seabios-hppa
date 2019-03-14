@@ -179,7 +179,7 @@ static struct drive_s *parisc_boot_cdrom;    // first DVD or CD-ROM
 
 static struct pdc_module_path mod_path_emulated_drives = {
     .path = { .flags = 0x0, .bc = { 0xff, 0xff, 0xff, 0x8, 0x0, 0x0 }, .mod = 0x0  },
-    .layers = { 0xAA, 0xBB, 0x0, 0x0, 0x0, 0x0 } // AA/BB gets replaced
+    .layers = { 0x0, 0x0, 0x0, 0x0, 0x0, 0x0 } // first two layer entries get replaced
 };
 
 /********************************************************
@@ -280,7 +280,12 @@ static void remove_parisc_devices(unsigned int num_cpus)
         p++;
     }
 
-    /* Generate CPU list */
+    /* Fix monarch CPU */
+    BUG_ON(!cpu_dev);
+    cpu_dev->mod_info->mod_addr = CPU_HPA;
+    cpu_dev->mod_path->path.mod = (CPU_HPA - DINO_HPA) / 0x1000;
+
+    /* Generate other CPU devices */
     for (i = 1; i < num_cpus; i++) {
         unsigned long hpa = CPU_HPA + i*0x1000;
 
@@ -292,7 +297,7 @@ static void remove_parisc_devices(unsigned int num_cpus)
         parisc_devices[t].mod_info = &modinfo[i];
 
         modpath[i] = *cpu_dev->mod_path;
-        modpath[i].path.mod = 128 + i;
+        modpath[i].path.mod = (hpa - DINO_HPA) / 0x1000;
         parisc_devices[t].mod_path = &modpath[i];
 
         t++;
