@@ -208,25 +208,51 @@ static hppa_device_t parisc_devices[HPPA_MAX_CPUS+16] = { PARISC_DEVICE_LIST };
 
 static const char *hpa_name(unsigned long hpa)
 {
-#define DO(x) if (hpa == x) return #x;
+    struct pci_device *pci;
+    int i;
+
+    #define DO(x) if (hpa == x) return #x;
     DO(GSC_HPA)
-        DO(DINO_HPA)
-        DO(DINO_UART_HPA)
-        DO(DINO_SCSI_HPA)
-        DO(CPU_HPA)
-        DO(MEMORY_HPA)
-        DO(IDE_HPA)
-        DO(LASI_HPA)
-        DO(LASI_UART_HPA)
-        DO(LASI_SCSI_HPA)
-        DO(LASI_LAN_HPA)
-        DO(LASI_LPT_HPA)
-        DO(LASI_AUDIO_HPA)
-        DO(LASI_PS2KBD_HPA)
-        DO(LASI_PS2MOU_HPA)
-        DO(LASI_GFX_HPA)
-#undef DO
-        return "UNKNOWN HPA";
+    DO(DINO_HPA)
+    DO(DINO_UART_HPA)
+    DO(DINO_SCSI_HPA)
+    DO(CPU_HPA)
+    DO(MEMORY_HPA)
+    DO(IDE_HPA)
+    DO(LASI_HPA)
+    DO(LASI_UART_HPA)
+    DO(LASI_SCSI_HPA)
+    DO(LASI_LAN_HPA)
+    DO(LASI_LPT_HPA)
+    DO(LASI_AUDIO_HPA)
+    DO(LASI_PS2KBD_HPA)
+    DO(LASI_PS2MOU_HPA)
+    DO(LASI_GFX_HPA)
+    #undef DO
+
+    /* could be one of the SMP CPUs */
+    for (i = 1; i < smp_cpus; i++) {
+        static char CPU_TXT[] = "CPU_HPA_x";
+        if (hpa == (CPU_HPA + i*0x1000)) {
+            CPU_TXT[8] = '0'+i;
+            return CPU_TXT;
+        }
+    }
+
+    /* could be a PCI device */
+    foreachpci(pci) {
+        unsigned long mem, mmio;
+        mem = pci_config_readl(pci->bdf, PCI_BASE_ADDRESS_0);
+        mem &= PCI_BASE_ADDRESS_MEM_MASK;
+        if (hpa == mem)
+            return "HPA_PCI_CARD_MEM";
+        mmio = pci_config_readl(pci->bdf, PCI_BASE_ADDRESS_2);
+        mmio &= PCI_BASE_ADDRESS_MEM_MASK;
+        if (hpa == mem)
+            return "HPA_PCI_CARD_MMIO";
+    }
+
+    return "UNKNOWN HPA";
 }
 
 int HPA_is_serial_device(unsigned long hpa)
@@ -954,7 +980,7 @@ static int pdc_tod(unsigned int *arg)
             /* double-precision floating-point with frequency of Interval Timer in megahertz: */
             *(double*)&result[0] = (double)CPU_CLOCK_MHZ;
             /* unsigned 64-bit integers representing  clock accuracy in parts per billion: */
-            result[2] = 0x5a6c; /* TOD_acc */
+            result[2] = 1000000000; /* TOD_acc */
             result[3] = 0x5a6c; /* CR_acc (interval timer) */
             return PDC_OK;
     }
@@ -1201,10 +1227,7 @@ static int pdc_pci_index(unsigned int *arg)
             return PDC_BAD_OPTION;
         case PDC_PCI_PCI_PATH_TO_PCI_HPA:
             result[0] = PCI_HPA;
-            // result[0] = DINO_SCSI_HPA;
-            // result[0] = IDE_HPA;
             return PDC_OK;
-            // return PDC_BAD_OPTION;
         case PDC_PCI_PCI_HPA_TO_PCI_PATH:
             BUG_ON(1);
     }
@@ -1340,7 +1363,7 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
 
         case PDC_INITIATOR:
             return pdc_initiator(arg);
-}
+    }
 
     printf("\n** WARNING **: SeaBIOS: Unimplemented PDC proc %s(%d) option %d result=%x ARG3=%x ",
             pdc_name(ARG0), ARG0, ARG1, ARG2, ARG3);
