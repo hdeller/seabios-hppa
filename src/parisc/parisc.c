@@ -202,6 +202,10 @@ static hppa_device_t parisc_devices[HPPA_MAX_CPUS+16] = { PARISC_DEVICE_LIST };
     DINO_HPA,\
     DINO_UART_HPA,\
     /* DINO_SCSI_HPA, */ \
+    LASI_HPA, \
+    LASI_UART_HPA, \
+    LASI_LAN_HPA, \
+    LASI_LPT_HPA, \
     CPU_HPA,\
     MEMORY_HPA,\
     0
@@ -266,9 +270,22 @@ int HPA_is_storage_device(unsigned long hpa)
 }
 
 
+static unsigned long keep_list[] = { PARISC_KEEP_LIST };
+
+static void remove_from_keep_list(unsigned long hpa)
+{
+    int i = 0;
+
+    while (keep_list[i] && keep_list[i] != hpa)
+        i++;
+    while (keep_list[i]) {
+            ++i;
+            keep_list[i-1] = keep_list[i];
+    }
+}
+
 static int keep_this_hpa(unsigned long hpa)
 {
-    static const unsigned long keep_list[] = { PARISC_KEEP_LIST };
     int i = 0;
 
     while (keep_list[i]) {
@@ -294,6 +311,18 @@ static void remove_parisc_devices(unsigned int num_cpus)
     if (!uninitialized)
         return;
     uninitialized = 0;
+
+    /* check if qemu emulates LASI chip (LASI_IAR exists) */
+    if (*(unsigned long *)(LASI_HPA+16) == 0) {
+        remove_from_keep_list(LASI_HPA);
+        remove_from_keep_list(LASI_UART_HPA);
+        remove_from_keep_list(LASI_LAN_HPA);
+        remove_from_keep_list(LASI_LPT_HPA);
+    } else {
+        /* check if qemu emulates LASI i82596 LAN card */
+        if (*(unsigned long *)(LASI_LAN_HPA+12) != 0xBEEFBABE)
+            remove_from_keep_list(LASI_LAN_HPA);
+    }
 
     p = t = 0;
     while ((hpa = parisc_devices[p].hpa) != 0) {
@@ -750,6 +779,7 @@ static int pdc_chassis(unsigned int *arg)
 {
     unsigned long option = ARG1;
     unsigned long *result = (unsigned long *)ARG2;
+    short *display_model = (short *)ARG3;
 
     switch (option) {
         case PDC_CHASSIS_DISP:
@@ -765,6 +795,13 @@ static int pdc_chassis(unsigned int *arg)
         case PDC_CHASSIS_WARN:
             // return warnings regarding fans, batteries and temperature: None!
             result[0] = 0;
+            return PDC_OK;
+        case PDC_RETURN_CHASSIS_INFO: /* return chassis LED/LCD info */
+            // XXX: Later we could emulate an LCD display here.
+            result[0] = result[1] = 4; // actcnt & maxcnt
+            memset((char *)ARG3, 0, ARG4);
+            display_model[0] = 1; // 1=DISPLAY_MODEL_NONE
+            display_model[1] = 0; // 0=LCD WIDTH is 0
             return PDC_OK;
     }
     return PDC_BAD_PROC;
@@ -1252,6 +1289,23 @@ static int pdc_io(unsigned int *arg)
     return PDC_BAD_OPTION;
 }
 
+static int pdc_lan_station_id(unsigned int *arg)
+{
+    unsigned long option = ARG1;
+
+    switch (option) {
+        case PDC_LAN_STATION_ID_READ:
+            if (ARG3 != LASI_LAN_HPA)
+                return PDC_INVALID_ARG;
+            if (!keep_this_hpa(LASI_LAN_HPA))
+                return PDC_INVALID_ARG;
+            /* Let qemu store the MAC of NIC to address @ARG2 */
+            *(unsigned long *)(LASI_LAN_HPA+12) = ARG2;
+            return PDC_OK;
+    }
+    return PDC_BAD_OPTION;
+}
+
 static int pdc_pci_index(unsigned int *arg)
 {
     unsigned long option = ARG1;
@@ -1404,10 +1458,13 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
             reset();
             return PDC_OK;
 
+        case PDC_LAN_STATION_ID:
+            return pdc_lan_station_id(arg);
+
         case PDC_PCI_INDEX:
             return pdc_pci_index(arg);
 
-       case PDC_RELOCATE:
+        case PDC_RELOCATE:
             /* We don't want to relocate any firmware. */
             return PDC_BAD_PROC;
 
