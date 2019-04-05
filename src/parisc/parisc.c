@@ -93,6 +93,8 @@ extern unsigned long boot_args[];
 #define smp_cpus		(boot_args[5])
 #define pdc_debug		0 // (boot_args[6])
 
+#define PARISC_SERIAL_CONSOLE   PORT_SERIAL1
+
 extern char pdc_entry;
 extern char pdc_entry_table[12];
 extern char iodc_entry[512];
@@ -425,7 +427,7 @@ static hppa_device_t *find_hppa_device_by_path(struct pdc_module_path *search,
 #define SERIAL_TIMEOUT 20
 static unsigned long parisc_serial_in(char *c, unsigned long maxchars)
 {
-    const portaddr_t addr = DINO_UART_HPA+0x800;
+    const portaddr_t addr = PARISC_SERIAL_CONSOLE;
     unsigned long end = timer_calc(SERIAL_TIMEOUT);
     unsigned long count = 0;
     while (count < maxchars) {
@@ -858,6 +860,11 @@ static int pdc_model(unsigned int *arg)
         case PDC_MODEL_SYSMODEL:
             result[0] = sizeof(model_str) - 1;
             strtcpy((char *)ARG4, model_str, sizeof(model_str));
+            return PDC_OK;
+        case PDC_MODEL_ENSPEC:
+        case PDC_MODEL_DISPEC:
+            if (ARG3 != model[7])
+                return -20;
             return PDC_OK;
         case PDC_MODEL_CPU_ID:
             result[0] = PARISC_PDC_CPUID;
@@ -1595,7 +1602,7 @@ static int parisc_boot_menu(unsigned long *iplstart, unsigned long *iplend,
  ********************************************************/
 
 static const struct pz_device mem_cons_boot = {
-    .hpa = DINO_UART_HPA,
+    .hpa = PARISC_SERIAL_CONSOLE - 0x800,
     .iodc_io = (unsigned long) &iodc_entry,
     .cl_class = CL_DUPLEX,
 };
@@ -1608,7 +1615,7 @@ static const struct pz_device mem_boot_boot = {
 };
 
 static const struct pz_device mem_kbd_boot = {
-    .hpa = DINO_UART_HPA,
+    .hpa = PARISC_SERIAL_CONSOLE - 0x800,
     .iodc_io = (unsigned long) &iodc_entry,
     .cl_class = CL_KEYBD,
 };
@@ -1691,7 +1698,9 @@ static void prepare_boot_path(volatile struct pz_device *dest,
 
     if (HPA_is_storage_device(hpa))
         mod_path = &mod_path_emulated_drives;
-    else if (HPA_is_serial_device(hpa))
+    else if (hpa == LASI_UART_HPA) // HPA_is_serial_device(hpa))
+        mod_path = &mod_path_hpa_ffd05000;
+    else if (hpa == DINO_UART_HPA) // HPA_is_serial_device(hpa))
         mod_path = &mod_path_hpa_fff83000;
     else {
         BUG_ON(hpa_index < 0);
@@ -1767,7 +1776,7 @@ void __VISIBLE start_parisc_firmware(void)
     malloc_preinit();
 
     // set Qemu serial debug port
-    DebugOutputPort = PORT_SERIAL1;
+    DebugOutputPort = PARISC_SERIAL_CONSOLE;
     // PlatformRunningOn = PF_QEMU;  // emulate runningOnQEMU()
 
     cpu_hz = 100 * PAGE0->mem_10msec; /* Hz of this PARISC */
@@ -1823,10 +1832,11 @@ void __VISIBLE start_parisc_firmware(void)
 
     printf("  Primary boot path:    FWSCSI.%d.%d\n"
             "  Alternate boot path:  FWSCSI.%d.%d\n"
-            "  Console path:         SERIAL_1.9600.8.none\n"
+            "  Console path:         SERIAL_%d.9600.8.none\n"
             "  Keyboard path:        PS2\n\n",
             parisc_boot_harddisc->target, parisc_boot_harddisc->lun,
-            parisc_boot_cdrom->target, parisc_boot_cdrom->lun);
+            parisc_boot_cdrom->target, parisc_boot_cdrom->lun,
+            (PARISC_SERIAL_CONSOLE == PORT_SERIAL1) ? 1 : 2);
 
     if (bootdrive == 'c')
         boot_drive = parisc_boot_harddisc;
