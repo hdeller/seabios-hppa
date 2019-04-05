@@ -111,7 +111,7 @@ screen_putc(struct putcinfo *action, char c)
 {
     if (ScreenAndDebug)
         debug_putc(&debuginfo, c);
-    if (c == '\n')
+    if (CONFIG_X86 && c == '\n')
         screenc('\r');
     screenc(c);
 }
