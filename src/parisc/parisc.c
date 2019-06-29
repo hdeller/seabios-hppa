@@ -1235,11 +1235,24 @@ static int pdc_system_map(unsigned int *arg)
             memset(result, 0, 32*sizeof(long));
             result[0] = hpa; // .mod_addr for PDC_IODC
             result[1] = 1; // .mod_pgs number of pages (FIXME: only graphics has more, e.g. 0x2000)
-            result[2] = 0; // FIXME: additional addresses
-
+            result[2] = parisc_devices[hpa_index].num_addr; // additional addresses
             return PDC_OK;
+
         case PDC_FIND_ADDRESS:
-            break;
+            hpa_index = ARG3;
+            if (hpa_index >= ARRAY_SIZE(parisc_devices))
+                return PDC_NE_MOD; // Module not found
+            hpa = parisc_devices[hpa_index].hpa;
+            if (!hpa)
+                return PDC_NE_MOD; // Module not found
+
+            memset(result, 0, 32*sizeof(long));
+            ARG4 -= 1;
+            if (ARG4 >= parisc_devices[hpa_index].num_addr)
+                return PDC_INVALID_ARG;
+            result[0] = parisc_devices[hpa_index].add_addr[ARG4];
+            result[1] = 1; // .mod_pgs number of pages (FIXME: only graphics has more, e.g. 0x2000)
+            return PDC_OK;
 
         case PDC_TRANSLATE_PATH:
             mod_path = (struct pdc_module_path *)ARG3;
