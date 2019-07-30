@@ -1078,6 +1078,20 @@ static int pdc_add_valid(unsigned int *arg)
     return PDC_REQ_ERR_0; /* Operation completed with a requestor bus error. */
 }
 
+static int pdc_block_tlb(unsigned int *arg)
+{
+    unsigned long option = ARG1;
+    struct pdc_btlb_info *info = (struct pdc_btlb_info *) ARG2;
+
+    switch (option) {
+        case PDC_BTLB_INFO:
+            /* tell operating system that we don't have any BTLBs */
+            memset(info, 0, sizeof(*info));
+            return PDC_OK;
+    }
+    return PDC_BAD_OPTION;
+}
+
 static int pdc_tlb(unsigned int *arg)
 {
 #if 0
@@ -1347,8 +1361,8 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
         case PDC_CONFIG:	/* Obsolete */
             return PDC_BAD_PROC;
 
-        case PDC_BLOCK_TLB:	/* not needed on virtual machine */
-            return PDC_BAD_PROC;
+        case PDC_BLOCK_TLB:
+            return pdc_block_tlb(arg);
 
         case PDC_TLB:		/* hardware TLB not used on Linux, but on HP-UX (if available) */
             return pdc_tlb(arg);
