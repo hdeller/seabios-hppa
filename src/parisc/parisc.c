@@ -352,7 +352,8 @@ static int find_hpa_index(unsigned long hpa)
 }
 
 static int compare_module_path(struct pdc_module_path *path,
-                               struct pdc_module_path *search)
+                               struct pdc_module_path *search,
+                               int check_layers)
 {
     int i;
 
@@ -364,15 +365,17 @@ static int compare_module_path(struct pdc_module_path *path,
             return -1;
     }
 
-    for(i = 0; i < ARRAY_SIZE(path->layers); i++) {
-        if (path->layers[i] != search->layers[i])
-            return -1;
+    if (check_layers) {
+        for(i = 0; i < ARRAY_SIZE(path->layers); i++) {
+            if (path->layers[i] != search->layers[i])
+                return -1;
+        }
     }
     return 0;
 }
 
 static hppa_device_t *find_hppa_device_by_path(struct pdc_module_path *search,
-                                               unsigned long *index)
+                                        unsigned long *index, int check_layers)
 {
     hppa_device_t *dev;
     int i;
@@ -382,7 +385,7 @@ static hppa_device_t *find_hppa_device_by_path(struct pdc_module_path *search,
         if (!dev->hpa)
             continue;
 
-        if (!compare_module_path(dev->mod_path, search)) {
+        if (!compare_module_path(dev->mod_path, search, check_layers)) {
             *index = i;
             return dev;
         }
@@ -497,6 +500,16 @@ int __VISIBLE parisc_iodc_ENTRY_INIT(unsigned int *arg FUNC_MANY_ARGS)
         return PDC_INVALID_ARG;
 
     switch (option) {
+        case ENTRY_INIT_SRCH_FRST: /* 2: Search first */
+            memcpy((void *)ARG3, &mod_path_emulated_drives.layers,
+                sizeof(mod_path_emulated_drives.layers)); /* fill ID_addr */
+            result[0] = 0;
+            result[1] = HPA_is_serial_device(hpa) ? CL_DUPLEX:
+                HPA_is_storage_device(hpa) ? CL_RANDOM : 0;
+            result[2] = result[3] = 0; /* No network card, so no MAC. */
+            return PDC_OK;
+	case ENTRY_INIT_SRCH_NEXT: /* 3: Search next */
+            return PDC_NE_BOOTDEV; /* No further boot devices */
         case ENTRY_INIT_MOD_DEV: /* 4: Init & test mod & dev */
         case ENTRY_INIT_DEV:     /* 5: Init & test dev */
             result[0] = 0; /* module IO_STATUS */
@@ -1164,7 +1177,7 @@ static int pdc_system_map(unsigned int *arg)
 
         case PDC_TRANSLATE_PATH:
             mod_path = (struct pdc_module_path *)ARG3;
-            hppa_device_t *dev = find_hppa_device_by_path(mod_path, result+3);
+            hppa_device_t *dev = find_hppa_device_by_path(mod_path, result+3, 1);
             if (!dev)
                 return PDC_NE_MOD;
 
@@ -1187,6 +1200,26 @@ static int pdc_soft_power(unsigned int *arg)
             return PDC_OK;
     }
     // dprintf(0, "\n\nSeaBIOS: PDC_SOFT_POWER called with ARG2=%x ARG3=%x ARG4=%x\n", ARG2, ARG3, ARG4);
+    return PDC_BAD_OPTION;
+}
+
+static int pdc_mem_map(unsigned int *arg)
+{
+    unsigned long option = ARG1;
+    struct pdc_memory_map *memmap = (struct pdc_memory_map *) ARG2;
+    struct device_path *dp = (struct device_path *) ARG3;
+    hppa_device_t *dev;
+    unsigned long index;
+
+    switch (option) {
+        case PDC_MEM_MAP_HPA:
+            // dprintf(0, "\nSeaBIOS: PDC_MEM_MAP_HPA  bus = %d,  mod = %d\n", dp->bc[4], dp->mod);
+            dev = find_hppa_device_by_path((struct pdc_module_path *) dp, &index, 0);
+            if (!dev)
+                return PDC_NE_MOD;
+            memcpy(memmap, dev->mod_info, sizeof(*memmap));
+            return PDC_OK;
+    }
     return PDC_BAD_OPTION;
 }
 
@@ -1345,6 +1378,9 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
         case 65: // Called by HP-UX 11 bootcd during boot. Probably checks PDC_PAT_CHASSIS_LOG (even if we are not PAT firmware)
             dprintf(0, "\n\nSeaBIOS: UNKNOWN PDC proc %lu OPTION %lu called with ARG2=%x ARG3=%x ARG4=%x\n", proc, option, ARG2, ARG3, ARG4);
             return PDC_BAD_PROC;
+
+	case PDC_MEM_MAP:
+            return pdc_mem_map(arg);
 
         case PDC_IO:
             return pdc_io(arg);
