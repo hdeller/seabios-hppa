@@ -96,7 +96,7 @@ extern unsigned long boot_args[];
 extern char pdc_entry;
 extern char pdc_entry_table[12];
 extern char iodc_entry[512];
-extern char iodc_entry_table;
+extern char iodc_entry_table[14*4];
 
 /* args as handed over for firmware calls */
 #define ARG0 arg[7-0]
@@ -491,11 +491,17 @@ int __VISIBLE parisc_iodc_ENTRY_IO(unsigned int *arg FUNC_MANY_ARGS)
     if (HPA_is_storage_device(hpa))
         switch (option) {
             case ENTRY_IO_BOOTIN: /* boot medium IN */
+            case ENTRY_IO_BBLOCK_IN: /* boot block medium IN */
                 disk_op.drive_fl = boot_drive;
                 disk_op.buf_fl = (void*)ARG6;
                 disk_op.command = CMD_READ;
-                disk_op.count = (ARG7 / disk_op.drive_fl->blksize);
-                disk_op.lba = (ARG5 / disk_op.drive_fl->blksize);
+                if (option == ENTRY_IO_BBLOCK_IN) { /* in 2k blocks */
+                    disk_op.count = (ARG7 * ((u64)FW_BLOCKSIZE / disk_op.drive_fl->blksize));
+                    disk_op.lba = (ARG5 * ((u64)FW_BLOCKSIZE / disk_op.drive_fl->blksize));
+                } else {
+                    disk_op.count = (ARG7 / disk_op.drive_fl->blksize);
+                    disk_op.lba = (ARG5 / disk_op.drive_fl->blksize);
+                }
                 // ARG8 = maxsize !!!
                 ret = process_op(&disk_op);
                 // dprintf(0, "\nBOOT IO res %d count = %d\n", ret, ARG7);
@@ -858,6 +864,8 @@ static int pdc_model(unsigned int *arg)
             return PDC_OK;
         case PDC_MODEL_CAPABILITIES:
             result[0] = PARISC_PDC_CAPABILITIES;
+            result[0] |= PDC_MODEL_OS32; /* we do support 32-bit */
+            result[0] &= ~PDC_MODEL_OS64; /* but not 64-bit (yet) */
             return PDC_OK;
         case PDC_MODEL_GET_INSTALL_KERNEL:
             // No need to provide a special install kernel during installation of HP-UX
@@ -1797,7 +1805,7 @@ void __VISIBLE start_parisc_firmware(void)
             "\n"
             "Memory Test/Initialization Completed\n\n");
     printf("------------------------------------------------------------------------------\n"
-            "  (c) Copyright 2017-2018 Helge Deller <deller@gmx.de> and SeaBIOS developers.\n"
+            "  (c) Copyright 2017-2019 Helge Deller <deller@gmx.de> and SeaBIOS developers.\n"
             "------------------------------------------------------------------------------\n\n");
     printf( "  Processor   Speed            State           Coprocessor State  Cache Size\n"
             "  ---------  --------   ---------------------  -----------------  ----------\n");
