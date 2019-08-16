@@ -271,6 +271,12 @@ int HPA_is_storage_device(unsigned long hpa)
     return (hpa == DINO_SCSI_HPA) || (hpa == IDE_HPA) || (hpa == LASI_SCSI_HPA);
 }
 
+#define GFX_NUM_PAGES 0x2000
+int HPA_is_graphics_device(unsigned long hpa)
+{
+    return (hpa == LASI_GFX_HPA) || (hpa == 0xf4000000) ||
+           (hpa == 0xf8000000)   || (hpa == 0xfa000000);
+}
 
 static unsigned long keep_list[] = { PARISC_KEEP_LIST };
 
@@ -1234,7 +1240,7 @@ static int pdc_system_map(unsigned int *arg)
             // *pdc_mod_info = *parisc_devices[hpa_index].mod_info; -> can be dropped.
             memset(result, 0, 32*sizeof(long));
             result[0] = hpa; // .mod_addr for PDC_IODC
-            result[1] = 1; // .mod_pgs number of pages (FIXME: only graphics has more, e.g. 0x2000)
+            result[1] = HPA_is_graphics_device(hpa) ? GFX_NUM_PAGES : 1;
             result[2] = parisc_devices[hpa_index].num_addr; // additional addresses
             return PDC_OK;
 
@@ -1251,7 +1257,7 @@ static int pdc_system_map(unsigned int *arg)
             if (ARG4 >= parisc_devices[hpa_index].num_addr)
                 return PDC_INVALID_ARG;
             result[0] = parisc_devices[hpa_index].add_addr[ARG4];
-            result[1] = 1; // .mod_pgs number of pages (FIXME: only graphics has more, e.g. 0x2000)
+            result[1] = HPA_is_graphics_device(hpa) ? GFX_NUM_PAGES : 1;
             return PDC_OK;
 
         case PDC_TRANSLATE_PATH:
