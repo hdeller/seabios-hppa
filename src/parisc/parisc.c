@@ -1,6 +1,7 @@
 // Glue code for parisc architecture
 //
 // Copyright (C) 2017-2019  Helge Deller <deller@gmx.de>
+// Copyright (C) 2019 Sven Schnelle <svens@stackframe.org>
 //
 // This file may be distributed under the terms of the GNU LGPLv3 license.
 
@@ -25,6 +26,8 @@
 #include "parisc/hppa_hardware.h" // DINO_UART_BASE
 #include "parisc/pdc.h"
 #include "parisc/b160l.h"
+#include "parisc/sticore.h"
+#include "parisc/lasips2.h"
 
 #include "vgabios.h"
 
@@ -210,6 +213,9 @@ static hppa_device_t parisc_devices[HPPA_MAX_CPUS+16] = { PARISC_DEVICE_LIST };
     LASI_LPT_HPA, \
     CPU_HPA,\
     MEMORY_HPA,\
+    LASI_GFX_HPA,\
+    LASI_PS2KBD_HPA, \
+    LASI_PS2MOU_HPA, \
     0
 
 static const char *hpa_name(unsigned long hpa)
@@ -271,6 +277,11 @@ int HPA_is_storage_device(unsigned long hpa)
     return (hpa == DINO_SCSI_HPA) || (hpa == IDE_HPA) || (hpa == LASI_SCSI_HPA);
 }
 
+int HPA_is_keyboard_device(unsigned long hpa)
+{
+    return (hpa == LASI_PS2KBD_HPA);
+}
+
 #define GFX_NUM_PAGES 0x2000
 int HPA_is_graphics_device(unsigned long hpa)
 {
@@ -322,7 +333,6 @@ static void remove_parisc_devices(unsigned int num_cpus)
 
     /* check if qemu emulates LASI chip (LASI_IAR exists) */
     if (*(unsigned long *)(LASI_HPA+16) == 0) {
-        remove_from_keep_list(LASI_HPA);
         remove_from_keep_list(LASI_UART_HPA);
         remove_from_keep_list(LASI_LAN_HPA);
         remove_from_keep_list(LASI_LPT_HPA);
@@ -449,6 +459,29 @@ static unsigned long parisc_serial_in(char *c, unsigned long maxchars)
     return count;
 }
 
+static void parisc_serial_out(char c)
+{
+    for (;;) {
+        if (c == '\n')
+            parisc_serial_out('\r');
+        const portaddr_t addr = PORT_SERIAL1;
+        u8 lsr = inb(addr+SEROFF_LSR);
+        if ((lsr & 0x60) == 0x60) {
+            // Success - can write data
+            outb(c, addr+SEROFF_DATA);
+            break;
+        }
+    }
+}
+
+void parisc_screenc(char c)
+{
+    if (HPA_is_graphics_device(PAGE0->mem_cons.hpa))
+        sti_putc(c);
+    else
+        parisc_serial_out(c);
+}
+
 void iodc_log_call(unsigned int *arg, const char *func)
 {
     if (pdc_debug) {
@@ -472,8 +505,8 @@ int __VISIBLE parisc_iodc_ENTRY_IO(unsigned int *arg FUNC_MANY_ARGS)
     struct disk_op_s disk_op;
 
     if (1 &&
-            ((HPA_is_serial_device(hpa) && option == ENTRY_IO_COUT) ||
-             (HPA_is_serial_device(hpa) && option == ENTRY_IO_CIN) ||
+            (((HPA_is_serial_device(hpa) || HPA_is_graphics_device(hpa)) && option == ENTRY_IO_COUT) ||
+             ((HPA_is_serial_device(hpa) || HPA_is_graphics_device(hpa)) && option == ENTRY_IO_CIN) ||
              (HPA_is_storage_device(hpa) && option == ENTRY_IO_BOOTIN))) {
         /* avoid debug messages */
     } else {
@@ -481,19 +514,23 @@ int __VISIBLE parisc_iodc_ENTRY_IO(unsigned int *arg FUNC_MANY_ARGS)
     }
 
     /* console I/O */
-    if (HPA_is_serial_device(hpa))
-        switch (option) {
-            case ENTRY_IO_COUT: /* console output */
-                c = (char*)ARG6;
-                result[0] = len = ARG7;
+    switch (option) {
+        case ENTRY_IO_COUT: /* console output */
+            c = (char*)ARG6;
+            result[0] = len = ARG7;
+            if (HPA_is_serial_device(hpa) || HPA_is_graphics_device(hpa)) {
                 while (len--)
                     printf("%c", *c++);
-                return PDC_OK;
-            case ENTRY_IO_CIN: /* console input, with 5 seconds timeout */
-                c = (char*)ARG6;
+            }
+            return PDC_OK;
+        case ENTRY_IO_CIN: /* console input, with 5 seconds timeout */
+            c = (char*)ARG6;
+            if (HPA_is_serial_device(hpa))
                 result[0] = parisc_serial_in(c, ARG7);
-                return PDC_OK;
-        }
+            else if (HPA_is_keyboard_device(hpa))
+                result[0] = lasips2_kbd_in(c, ARG7);
+            return PDC_OK;
+    }
 
     /* boot medium I/O */
     if (HPA_is_storage_device(hpa))
@@ -1623,10 +1660,28 @@ static int parisc_boot_menu(unsigned long *iplstart, unsigned long *iplend,
  * FIRMWARE MAIN ENTRY POINT
  ********************************************************/
 
+static const struct pz_device mem_cons_sti_boot = {
+    .hpa = LASI_GFX_HPA,
+    .iodc_io = (unsigned long)&iodc_entry,
+    .cl_class = CL_DISPL,
+};
+
+static const struct pz_device mem_kbd_sti_boot = {
+    .hpa = LASI_PS2KBD_HPA,
+    .iodc_io = (unsigned long)&iodc_entry,
+    .cl_class = CL_KEYBD,
+};
+
 static const struct pz_device mem_cons_boot = {
     .hpa = PARISC_SERIAL_CONSOLE - 0x800,
-    .iodc_io = (unsigned long) &iodc_entry,
+    .iodc_io = (unsigned long)&iodc_entry,
     .cl_class = CL_DUPLEX,
+};
+
+static const struct pz_device mem_kbd_boot = {
+    .hpa = PARISC_SERIAL_CONSOLE - 0x800,
+    .iodc_io = (unsigned long)&iodc_entry,
+    .cl_class = CL_KEYBD,
 };
 
 static const struct pz_device mem_boot_boot = {
@@ -1634,12 +1689,6 @@ static const struct pz_device mem_boot_boot = {
     .hpa = IDE_HPA, // DINO_SCSI_HPA,  // IDE_HPA
     .iodc_io = (unsigned long) &iodc_entry,
     .cl_class = CL_RANDOM,
-};
-
-static const struct pz_device mem_kbd_boot = {
-    .hpa = PARISC_SERIAL_CONSOLE - 0x800,
-    .iodc_io = (unsigned long) &iodc_entry,
-    .cl_class = CL_KEYBD,
 };
 
 static void find_pci_slot_for_dev(unsigned int pciid, char *pci_slot)
@@ -1651,59 +1700,6 @@ static void find_pci_slot_for_dev(unsigned int pciid, char *pci_slot)
             *pci_slot = (pci->bdf >> 3) & 0x0f;
             return;
         }
-}
-
-static void parisc_vga_init(void)
-{
-    extern void vga_post(struct bregs *);
-    struct pci_device *pci;
-
-    foreachpci(pci) {
-        if (!is_pci_vga(pci))
-            continue;
-
-        VgaBDF = pci->bdf;
-
-        parisc_vga_mem = pci_config_readl(pci->bdf, PCI_BASE_ADDRESS_0);
-        parisc_vga_mem &= PCI_BASE_ADDRESS_MEM_MASK;
-        VBE_framebuffer = parisc_vga_mem;
-        parisc_vga_mmio = pci_config_readl(pci->bdf, PCI_BASE_ADDRESS_2);
-        parisc_vga_mmio &= PCI_BASE_ADDRESS_MEM_MASK;
-
-        dprintf(1, "\n");
-
-        regs.ax = VgaBDF;
-        vga_post(&regs);
-
-        // flag = MF_NOCLEARMEM ?
-        //
-        // vga_set_mode(0x119, MF_NOCLEARMEM); // bochs: MM_DIRECT, 1280, 1024, 15, 8, 16,
-        // vga_set_mode(0x105, 0); // bochs:     { 0x105, { MM_PACKED, 1024, 768,  8,  8, 16, SEG_GRAPH } },
-        vga_set_mode(0x107, 0); // bochs:  { 0x107, { MM_PACKED, 1280, 1024, 8,  8, 16, SEG_GRAPH } },
-        // vga_set_mode(0x11c, 0); // bochs:  { 0x11C, { MM_PACKED, 1600, 1200, 8,  8, 16, SEG_GRAPH } },
-        // vga_set_mode(0x11f, 0); // bochs:  { 0x11F, { MM_DIRECT, 1600, 1200, 24, 8, 16, SEG_GRAPH } },
-        // vga_set_mode(0x101, 0); // bochs:  { 0x101, { MM_PACKED, 640,  480,  8,  8, 16, SEG_GRAPH } },
-        // vga_set_mode(0x100, 0); // bochs:  { 0x100, { MM_PACKED, 640,  400,  8,  8, 16, SEG_GRAPH } },
-
-        u32 endian = *(u32 *)(parisc_vga_mmio + 0x0604);
-        dprintf(1, "parisc: VGA at %pP, mem 0x%lx  mmio 0x%lx endian 0x%x found.\n",
-                pci, parisc_vga_mem, parisc_vga_mmio, endian);
-
-        struct vgamode_s *vmode_g = get_current_mode();
-        int bpp = vga_bpp(vmode_g);
-        int linelength = vgahw_get_linelength(vmode_g);
-
-        dprintf(1, "parisc: VGA resolution: %dx%d-%d  memmodel:%d  bpp:%d  linelength:%d\n",
-                vmode_g->width, vmode_g->height, vmode_g->depth,
-                vmode_g->memmodel, bpp, linelength);
-
-        if (linelength == 0) {
-            printf( "CRITICAL: Please enable BOCHS video support in SeaBIOS\n");
-            BUG_ON(1);
-        }
-
-        break; // only allow one VGA for now.
-    }
 }
 
 /* Prepare boot paths in PAGE0 and stable memory */
@@ -1740,6 +1736,10 @@ static void prepare_boot_path(volatile struct pz_device *dest,
     BUG_ON(sizeof(struct device_path) != 0x20);
 }
 
+static int artist_present(void)
+{
+    return !!(*(u32 *)0xf8380004 == 0x6dc20006);
+}
 
 void __VISIBLE start_parisc_firmware(void)
 {
@@ -1755,13 +1755,6 @@ void __VISIBLE start_parisc_firmware(void)
     if (ram_size >= FIRMWARE_START)
         ram_size = FIRMWARE_START;
 
-    /* Initialize device list */
-    remove_parisc_devices(smp_cpus);
-
-    /* Show list of HPA devices which are still returned by firmware. */
-    if (0) { for (i=0; parisc_devices[i].hpa; i++)
-        printf("Kept #%d at 0x%lx\n", i, parisc_devices[i].hpa);
-    }
 
     /* Initialize PAGE0 */
     memset((void*)PAGE0, 0, sizeof(*PAGE0));
@@ -1789,6 +1782,30 @@ void __VISIBLE start_parisc_firmware(void)
     PAGE0->imm_hpa = MEMORY_HPA;
     PAGE0->imm_spa_size = ram_size;
     PAGE0->imm_max_mem = ram_size;
+
+    // Initialize boot paths (disc, display & keyboard)
+    if (artist_present()) {
+        sti_rom_init();
+        sti_console_init(&sti_proc_rom);
+        ps2port_setup();
+        prepare_boot_path(&(PAGE0->mem_cons), &mem_cons_sti_boot, 0x60);
+        prepare_boot_path(&(PAGE0->mem_kbd),  &mem_kbd_sti_boot, 0xa0);
+        PAGE0->proc_sti = (u32)&sti_proc_rom;
+    } else {
+        remove_from_keep_list(LASI_GFX_HPA);
+        remove_from_keep_list(LASI_PS2KBD_HPA);
+        remove_from_keep_list(LASI_PS2MOU_HPA);
+        prepare_boot_path(&(PAGE0->mem_cons), &mem_cons_boot, 0x60);
+        prepare_boot_path(&(PAGE0->mem_kbd),  &mem_kbd_boot, 0xa0);
+    }
+
+    /* Initialize device list */
+    remove_parisc_devices(smp_cpus);
+
+    /* Show list of HPA devices which are still returned by firmware. */
+    if (0) { for (i=0; parisc_devices[i].hpa; i++)
+        printf("Kept #%d at 0x%lx\n", i, parisc_devices[i].hpa);
+    }
 
     // Initialize stable storage
     init_stable_storage();
@@ -1826,9 +1843,6 @@ void __VISIBLE start_parisc_firmware(void)
     serial_setup();
     block_setup();
 
-    // We don't have VGA BIOS, so init now.
-    parisc_vga_init();
-
     printf("\n");
     printf("Firmware Version 6.1\n"
             "\n"
@@ -1853,12 +1867,13 @@ void __VISIBLE start_parisc_firmware(void)
     find_initial_parisc_boot_drives(&parisc_boot_harddisc, &parisc_boot_cdrom);
 
     printf("  Primary boot path:    FWSCSI.%d.%d\n"
-            "  Alternate boot path:  FWSCSI.%d.%d\n"
-            "  Console path:         SERIAL_%d.9600.8.none\n"
-            "  Keyboard path:        PS2\n\n",
+           "  Alternate boot path:  FWSCSI.%d.%d\n"
+           "  Console path:         %s\n"
+           "  Keyboard path:        PS2\n\n",
             parisc_boot_harddisc->target, parisc_boot_harddisc->lun,
             parisc_boot_cdrom->target, parisc_boot_cdrom->lun,
-            (PARISC_SERIAL_CONSOLE == PORT_SERIAL1) ? 1 : 2);
+            HPA_is_graphics_device(PAGE0->mem_cons.hpa) ? "GRAPHICS(1)" :
+            ((PARISC_SERIAL_CONSOLE == PORT_SERIAL1) ? "SERIAL_1.9600.8.none" : "SERIAL_2.9600.8.none"));
 
     if (bootdrive == 'c')
         boot_drive = parisc_boot_harddisc;
@@ -1875,10 +1890,8 @@ void __VISIBLE start_parisc_firmware(void)
         mod_path_emulated_drives.layers[1] = parisc_boot_harddisc->lun;
     }
 
-    // Initialize boot paths (disc, display & keyboard)
-    prepare_boot_path(&(PAGE0->mem_cons), &mem_cons_boot, 0x60);
     prepare_boot_path(&(PAGE0->mem_boot), &mem_boot_boot, 0x0);
-    prepare_boot_path(&(PAGE0->mem_kbd),  &mem_kbd_boot, 0xa0);
+
     // copy primary boot path to alt boot path
     memcpy(&stable_storage[0x80], &stable_storage[0], 0x20);
     if (parisc_boot_cdrom) {
