@@ -1,3 +1,5 @@
+#ifndef HPPA_H
+#define HPPA_H
 /* this file is included by x86.h */
 
 #if 0
@@ -383,3 +385,4 @@ static inline void wrmsr(u32 index, u64 val)
 void cpuid(u32 index, u32 *eax, u32 *ebx, u32 *ecx, u32 *edx);
 
 #endif // !__ASSEMBLY__
+#endif
