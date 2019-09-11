@@ -1128,6 +1128,9 @@ static int pdc_add_valid(unsigned int *arg)
     // if (ARG2 < PAGE_SIZE) return PDC_ERROR;
     if (ARG2 < ram_size)
         return PDC_OK;
+    if (ARG2 >= (unsigned long)_sti_rom_start &&
+        ARG2 <= (unsigned long)_sti_rom_end)
+        return PDC_OK;
     if (ARG2 < FIRMWARE_END)
         return 1;
     if (ARG2 <= 0xffffffff)
