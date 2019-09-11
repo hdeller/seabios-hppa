@@ -63,11 +63,16 @@ dequeue_key(struct bregs *regs, int incr, int extended)
 
         if (buffer_head != buffer_tail)
             break;
+#ifdef CONFIG_PARISC
+        regs->ax = 0;
+        return;
+#else
         if (!incr) {
             regs->flags |= F_ZF;
             return;
         }
         yield_toirq();
+#endif
     }
 
     u16 keycode = GET_FARVAR(SEG_BDA, *(u16*)(buffer_head+0));
