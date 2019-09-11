@@ -16,6 +16,27 @@ SECTIONS
 		*(.text.*)
 		_etext = . ;
 	}
+
+        . = ALIGN(4096);
+        .sti : {
+                _sti_rom_start = .;
+                *(.sti.hdr)
+                *(.sti.text.init_graph)
+                *(.sti.text.state_mgmt)
+                *(.sti.text.font_unpmv)
+                *(.sti.text.block_move)
+                *(.sti.text.self_test)
+                *(.sti.text.excep_hdlr)
+                *(.sti.text.inq_conf)
+                *(.sti.text.set_cm_entry)
+                *(.sti.text.dma_ctrl)
+                *(.sti.textend)
+                *(.sti.text)
+                *(.sti.data)
+                . = ALIGN(4096);
+                _sti_rom_end = .;
+        }
+
 	. = ALIGN(8);
 	.rodata : {
 		_rodata = . ;

@@ -413,7 +413,7 @@ static struct pdc_system_map_mod_info mod_info_hpa_f8000000 = {
 	.add_addrs = 0x1,
 };
 static struct pdc_module_path mod_path_hpa_f8000000 = {
-	.path = { .flags = 0x0, .bc = { 0xff, 0xff, 0xff, 0xff, 0xff, 0x8 }, .mod = 0x18  },
+	.path = { .flags = 0x0, .bc = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff }, .mod = 0x1  },
 	.layers = { 0x0, 0x0, 0x0, 0x0, 0x0, 0x0 }
 };
 static struct pdc_iodc iodc_data_hpa_f8000000 = {
@@ -431,8 +431,8 @@ static struct pdc_iodc iodc_data_hpa_f8000000 = {
 	.length = 0x0002,
 	/* pad: 0x0000, 0x0000 */
 };
-#define HPA_f8000000_num_addr 1
-#define HPA_f8000000_add_addr 0xf0011000, 
+#define HPA_f8000000_num_addr 0
+#define HPA_f8000000_add_addr 0
 
 #define HPA_fff10000_DESCRIPTION "Merlin L2 160 (9000/778/B160L)"
 static struct pdc_system_map_mod_info mod_info_hpa_fff10000 = {

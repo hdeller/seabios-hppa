@@ -33,7 +33,7 @@ LD32BIT_FLAG:=
 SRCBOTH=output.c string.c block.c cdrom.c disk.c kbd.c \
     serial.c sercon.c clock.c vgahooks.c \
     apm.c cp437.c \
-    hw/pci.c hw/rtc.c hw/dma.c hw/pic.c hw/ps2port.c hw/serialio.c \
+    hw/pci.c hw/rtc.c hw/dma.c hw/pic.c hw/serialio.c \
     hw/usb.c hw/usb-uhci.c hw/usb-ohci.c hw/usb-ehci.c \
     hw/usb-hid.c hw/usb-msc.c hw/usb-uas.c \
     hw/blockcmd.c hw/floppy.c hw/ata.c hw/ramdisk.c \
@@ -48,7 +48,7 @@ SRC32FLAT=$(SRCBOTH) post.c e820map.c romfile.c optionroms.c \
     fw/acpi.c fw/mptable.c fw/pirtable.c fw/smbios.c fw/romfile_loader.c \
     hw/virtio-ring.c hw/virtio-pci.c hw/virtio-blk.c hw/virtio-scsi.c \
     hw/tpm_drivers.c hw/nvme.c \
-    version.c parisc/malloc.c parisc/parisc.c parisc/sti.c
+    version.c parisc/malloc.c parisc/parisc.c parisc/sti.c parisc/lasips2.c parisc/stirom.c
 DIRS=src src/hw src/fw vgasrc src/parisc
 
 # VGA src files

@@ -18,6 +18,9 @@
 #include "stacks.h" // call16_int
 #include "string.h" // memset
 #include "util.h" // ScreenAndDebug
+#ifdef CONFIG_PARISC
+#include "parisc/sticore.h"
+#endif
 
 struct putcinfo {
     void (*func)(struct putcinfo *info, char c);
@@ -78,16 +81,8 @@ static void
 screenc(char c)
 {
 #if CONFIG_PARISC
-    for (;;) {
-	const portaddr_t addr = PORT_SERIAL1;
-        u8 lsr = inb(addr+SEROFF_LSR);
-        if ((lsr & 0x60) == 0x60) {
-            // Success - can write data
-            outb(c, addr+SEROFF_DATA);
-            break;
-        }
-    }
-#endif
+    parisc_screenc(c);
+#else
     if (!MODESEGMENT && GET_IVT(0x10).segoff == FUNC16(entry_10).segoff)
         // No need to thunk to 16bit mode if vgabios is not present
         return;
@@ -97,10 +92,6 @@ screenc(char c)
     br.ah = 0x0e;
     br.al = c;
     br.bl = 0x07;
-#if CONFIG_PARISC
-    extern void parisc_teletype_output(struct bregs *regs);
-    parisc_teletype_output(&br);
-#else
     call16_int(0x10, &br);
 #endif
 }
