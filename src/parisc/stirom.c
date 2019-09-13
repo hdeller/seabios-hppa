@@ -303,8 +303,11 @@ static const struct font __stidata sti_rom_font = {
     }
 };
 
-static const mon_tbl_desc __stidata sti_mon_table[1] = {
-    { .x = 1280, .y = 1024, .hz = 70, .class_vesa = 1, .index = 0 }
+static const mon_tbl_desc __stidata sti_mon_table[] = {
+    { .x = 1280, .y = 1024, .hz = 72, .class_vesa = 1, .index = 0 },
+    { .x = 1024, .y = 768, .hz = 72, .class_vesa = 1, .index = 0 },
+    { .x = 768, .y = 600, .hz = 72, .class_vesa = 1, .index = 0 },
+    { .x = 640, .y = 480, .hz = 72, .class_vesa = 1, .index = 0 },
 };
 
 struct sti_rom __stiheader sti_proc_rom = {
@@ -395,17 +398,21 @@ static int __stifunc("init_graph") sti_init_graph(struct sti_init_flags *flags,
         struct sti_glob_cfg *cfg)
 {
     u32 *cmap = (u32 *)cfg->region_ptrs[1];
+    u32 resolution = *(u32 *)(cfg->region_ptrs[2] + 0x111110);
 
     out->errno = 0;
-    out->text_planes = in->text_planes;
+    if (resolution & (1 << 31)) {
+        cfg->text_planes = 1;
+    } else {
+        out->text_planes = in->text_planes;
+    }
 
-    cfg->text_planes = 8;
-    cfg->onscreen_x = 1280;
-    cfg->onscreen_y = 1024;
+    cfg->onscreen_x = (resolution >> 16) & 0xfff;
+    cfg->onscreen_y = resolution & 0xfff;
     cfg->offscreen_x = 0;
     cfg->offscreen_y = 0;
-    cfg->total_x = 1280;
-    cfg->total_y = 1024;
+    cfg->total_x = cfg->onscreen_x;
+    cfg->total_y = cfg->onscreen_y;
 
     if (flags->clear) {
         /* clear screen */
@@ -461,7 +468,7 @@ static __stifunc("inq_conf") int sti_inq_conf(struct sti_conf_flags *flags,
     out->total_x = cfg->total_x;
     out->total_y = cfg->total_y;
     out->bits_per_pixel = 8;
-    out->planes = 8;
+    out->planes = cfg->text_planes;
     out->dev_name[0] = 'H';
     out->dev_name[1] = 'P';
     out->dev_name[2] = 'A';
@@ -470,11 +477,40 @@ static __stifunc("inq_conf") int sti_inq_conf(struct sti_conf_flags *flags,
     out->dev_name[5] = '8';
     out->dev_name[6] = 'L';
     out->dev_name[7] = 'C';
-    out->dev_name[8] = '1';
-    out->dev_name[9] = '2';
-    out->dev_name[10] = '8';
-    out->dev_name[11] = '0';
-    out->dev_name[12] = '\0';
+
+    switch(cfg->total_x) {
+    default:
+    /* default to 1280 if user gave some odd resolution */
+        out->dev_name[8] = '1';
+        out->dev_name[9] = '2';
+        out->dev_name[10] = '8';
+        out->dev_name[11] = '0';
+        out->dev_name[12] = '\0';
+        break;
+
+    case 1024:
+        out->dev_name[8] = '1';
+        out->dev_name[9] = '0';
+        out->dev_name[10] = '2';
+        out->dev_name[11] = '4';
+        out->dev_name[12] = '\0';
+        break;
+
+    case 800:
+        out->dev_name[8] = '8';
+        out->dev_name[9] = '0';
+        out->dev_name[10] = '0';
+        out->dev_name[11] = '\0';
+        break;
+
+    case 640:
+        out->dev_name[8] = '6';
+        out->dev_name[9] = '4';
+        out->dev_name[10] = '0';
+        out->dev_name[11] = '\0';
+        break;
+
+    }
     return 0;
 }
 
