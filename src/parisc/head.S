@@ -107,13 +107,17 @@ ENTRY(startup)
 	rsm	PSW_W_SM, %r0
 	.level 1.1
 
+	/* Save CPU HPA in cr7, hopefully HP-UX will not use that register. */
+	mtctl   %r5, CPU_HPA_CR_REG /* store CPU HPA */
+
 	/* branch if this is the monarch cpu */
 	load32 CPU_HPA,%r1
 	comb,= %r5,%r1,$is_monarch_cpu
 	nop
 
-	/* IDLE LOOP for SMP CPUs */
-	copy	%r5,%r25 /* CPU HPA */
+ENTRY(enter_smp_idle_loop)
+	/* IDLE LOOP for SMP CPUs - wait for rendenzvous. */
+	mfctl   CPU_HPA_CR_REG, %r25 /* get CPU HPA from cr7 */
 
 	/* Load IVT for SMT tiny loop exit */
 #define CR_IVA 14

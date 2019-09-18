@@ -51,6 +51,7 @@
 
 #define HPPA_MAX_CPUS   8      /* max. number of SMP CPUs */
 #define CPU_CLOCK_MHZ   250     /* emulate a 250 MHz CPU */
+#define CPU_HPA_CR_REG  7       /* store CPU HPA in cr7 (SeaBIOS only) */
 
 
 #if 0

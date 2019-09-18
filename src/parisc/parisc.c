@@ -120,6 +120,17 @@ extern char iodc_entry_table[14*4];
 
 #define MEM_PDC_ENTRY	0x4800	/* as in a B160L */
 
+#define CPU_HPA_IDX(i)  (CPU_HPA + (i)*0x1000) /* CPU_HPA of CPU#i */
+
+static int index_of_CPU_HPA(unsigned long hpa) {
+    int i;
+    for (i = 0; i < smp_cpus; i++) {
+        if (hpa == CPU_HPA_IDX(i))
+            return i;
+    }
+    return -1;
+}
+
 static unsigned long GoldenMemory = MIN_RAM_SIZE;
 
 static unsigned int chassis_code = 0;
@@ -245,7 +256,7 @@ static const char *hpa_name(unsigned long hpa)
     /* could be one of the SMP CPUs */
     for (i = 1; i < smp_cpus; i++) {
         static char CPU_TXT[] = "CPU_HPA_x";
-        if (hpa == (CPU_HPA + i*0x1000)) {
+        if (hpa == CPU_HPA_IDX(i)) {
             CPU_TXT[8] = '0'+i;
             return CPU_TXT;
         }
@@ -360,7 +371,7 @@ static void remove_parisc_devices(unsigned int num_cpus)
 
     /* Generate other CPU devices */
     for (i = 1; i < num_cpus; i++) {
-        unsigned long hpa = CPU_HPA + i*0x1000;
+        unsigned long hpa = CPU_HPA_IDX(i);
 
         parisc_devices[t] = *cpu_dev;
         parisc_devices[t].hpa = hpa;
@@ -892,11 +903,16 @@ static int pdc_hpa(unsigned int *arg)
 {
     unsigned long option = ARG1;
     unsigned long *result = (unsigned long *)ARG2;
+    unsigned long hpa;
+    int i;
 
     switch (option) {
         case PDC_HPA_PROCESSOR:
-            result[0] = CPU_HPA; // XXX: NEED TO FIX FOR SMP?
-            result[1] = 0;       // XXX: for SMP: 0,1,2,3,4...(num of this cpu)
+            hpa = mfctl(CPU_HPA_CR_REG); /* get CPU HPA from cr7 */
+            i = index_of_CPU_HPA(hpa);
+            BUG_ON(i < 0); /* ARGH, someone modified cr7! */
+            result[0] = hpa;    /* CPU_HPA */
+            result[1] = i;      /* for SMP: 0,1,2,3,4...(num of this cpu) */
             return PDC_OK;
         case PDC_HPA_MODULES:
             return PDC_BAD_OPTION; // all modules on same board as the processor.
@@ -1091,6 +1107,22 @@ static int pdc_add_valid(unsigned int *arg)
         return PDC_OK;
     dprintf(0, "\n\nSeaBIOS: FAILED!!!! PDC_ADD_VALID function %ld ARG2=%x called.\n", option, ARG2);
     return PDC_REQ_ERR_0; /* Operation completed with a requestor bus error. */
+}
+
+static int pdc_proc(unsigned int *arg)
+{
+    extern void enter_smp_idle_loop(void);
+    unsigned long option = ARG1;
+
+    switch (option) {
+        case 1:
+            if (ARG2 != 0)
+                return PDC_BAD_PROC;
+            /* let the current CPU sleep until rendenzvous. */
+            enter_smp_idle_loop();
+            return PDC_OK;
+    }
+    return PDC_BAD_OPTION;
 }
 
 static int pdc_block_tlb(unsigned int *arg)
@@ -1402,6 +1434,9 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
 
         case PDC_INSTR:
             return PDC_BAD_PROC;
+
+        case PDC_PROC:
+            return pdc_proc(arg);
 
         case PDC_CONFIG:	/* Obsolete */
             return PDC_BAD_PROC;

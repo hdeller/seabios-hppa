@@ -100,8 +100,8 @@ static inline void wbinvd(void)
 #define mfctl(reg)	({		\
 	unsigned long cr;		\
 	__asm__ __volatile__(		\
-		"mfctl " #reg ",%0" :	\
-		 "=r" (cr)		\
+		"mfctl %1,%0" : 	\
+		 "=r" (cr) : "i" (reg)	\
 	);				\
 	cr;				\
 })
