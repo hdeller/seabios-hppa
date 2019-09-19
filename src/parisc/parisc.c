@@ -1269,8 +1269,7 @@ static int pdc_soft_power(unsigned int *arg)
 
     switch (option) {
         case PDC_SOFT_POWER_ENABLE:
-            if (ARG3 == 0) // put soft power button under hardware control.
-                hlt();
+            /* put soft power button under hardware (ARG3=0) or software (ARG3=1) control. */
             return PDC_OK;
     }
     // dprintf(0, "\n\nSeaBIOS: PDC_SOFT_POWER called with ARG2=%x ARG3=%x ARG4=%x\n", ARG2, ARG3, ARG4);
