@@ -684,94 +684,14 @@ static void init_stable_storage(void)
     stable_storage[0x5f] = 0x0f;
 }
 
-
-/*
- * Trivial time conversion helper functions.
- * Not accurate before year 2000 and beyond year 2099.
- * Taken from:
- * https://codereview.stackexchange.com/questions/38275/convert-between-date-time-and-time-stamp-without-using-standard-library-routines
- */
-
-static unsigned short days[4][12] =
+static unsigned long lasi_rtc_read(void)
 {
-    {   0,  31,  60,  91, 121, 152, 182, 213, 244, 274, 305, 335},
-    { 366, 397, 425, 456, 486, 517, 547, 578, 609, 639, 670, 700},
-    { 731, 762, 790, 821, 851, 882, 912, 943, 974,1004,1035,1065},
-    {1096,1127,1155,1186,1216,1247,1277,1308,1339,1369,1400,1430},
-};
-
-static inline int rtc_from_bcd(int a)
-{
-    return ((a >> 4) * 10) + (a & 0x0f);
+    return *(u32 *)LASI_RTC_HPA;
 }
 
-#define SECONDS_2000_JAN_1 946684800
-/* assumption: only dates between 01/01/2000 and 31/12/2099 */
-
-static unsigned long seconds_since_1970(void)
+static void lasi_rtc_write(u32 val)
 {
-    unsigned long ret;
-    unsigned int second = rtc_from_bcd(rtc_read(CMOS_RTC_SECONDS));
-    unsigned int minute = rtc_from_bcd(rtc_read(CMOS_RTC_MINUTES));
-    unsigned int hour   = rtc_from_bcd(rtc_read(CMOS_RTC_HOURS));
-    unsigned int day    = rtc_from_bcd(rtc_read(CMOS_RTC_DAY_MONTH)) - 1;
-    unsigned int month  = rtc_from_bcd(rtc_read(CMOS_RTC_MONTH)) - 1;
-    unsigned int year   = rtc_from_bcd(rtc_read(CMOS_RTC_YEAR));
-    ret = (((year/4*(365*4+1)+days[year%4][month]+day)*24+hour)*60+minute)
-        *60+second + SECONDS_2000_JAN_1;
-
-    if (year >= 100)
-        printf("\nSeaBIOS WARNING: READ RTC_YEAR=%d is above year 2100.\n", year);
-
-    return ret;
-}
-
-static inline int rtc_to_bcd(int a)
-{
-    return ((a / 10) << 4) | (a % 10);
-}
-
-int epoch_to_date_time(unsigned long epoch)
-{
-    epoch -= SECONDS_2000_JAN_1;
-
-    unsigned int second = epoch%60; epoch /= 60;
-    unsigned int minute = epoch%60; epoch /= 60;
-    unsigned int hour   = epoch%24; epoch /= 24;
-
-    unsigned int years = epoch/(365*4+1)*4; epoch %= 365*4+1;
-
-    unsigned int year;
-    for (year=3; year>0; year--)
-    {
-        if (epoch >= days[year][0])
-            break;
-    }
-
-    unsigned int month;
-    for (month=11; month>0; month--)
-    {
-        if (epoch >= days[year][month])
-            break;
-    }
-
-    unsigned int rtc_year  = years + year;
-    unsigned int rtc_month = month + 1;
-    unsigned int rtc_day   = epoch - days[year][month] + 1;
-
-    /* set date into RTC */
-    rtc_write(CMOS_RTC_SECONDS, rtc_to_bcd(second));
-    rtc_write(CMOS_RTC_MINUTES, rtc_to_bcd(minute));
-    rtc_write(CMOS_RTC_HOURS, rtc_to_bcd(hour));
-    rtc_write(CMOS_RTC_DAY_MONTH, rtc_to_bcd(rtc_day));
-    rtc_write(CMOS_RTC_MONTH, rtc_to_bcd(rtc_month));
-    if (rtc_year < 100) { /* < year 2100? */
-        rtc_write(CMOS_RTC_YEAR, rtc_to_bcd(rtc_year));
-        return PDC_OK;
-    }
-
-    printf("\nSeaBIOS WARNING: WRITE RTC_YEAR=%d above year 2100.\n", rtc_year);
-    return PDC_INVALID_ARG;
+    *(u32 *)LASI_RTC_HPA = val;
 }
 
 /* values in PDC_CHASSIS */
@@ -1075,15 +995,12 @@ static int pdc_tod(unsigned int *arg)
 
     switch (option) {
         case PDC_TOD_READ:
-            result[0] = seconds_since_1970();
+            result[0] = lasi_rtc_read();
             result[1] = result[2] = result[3] = 0;
             return PDC_OK;
         case PDC_TOD_WRITE:
-            // HP-UX 10.20 tries to write TOD clock with too small values (e.g. 0x432e)...
-            if (ARG2 < SECONDS_2000_JAN_1)
-                return PDC_INVALID_ARG;
-            /* we ignore the usecs in ARG3 */
-            return epoch_to_date_time(ARG2);
+            lasi_rtc_write(ARG2);
+            return PDC_OK;
         case 2: /* PDC_TOD_CALIBRATE_TIMERS */
             /* double-precision floating-point with frequency of Interval Timer in megahertz: */
             *(double*)&result[0] = (double)CPU_CLOCK_MHZ;
