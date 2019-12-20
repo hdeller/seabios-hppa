@@ -168,5 +168,10 @@ void sti_putc(const char c)
         }
         return;
     }
+
+    /* wrap to next line or scroll screen if EOL reached */
+    if (col >= ((sti_glob_cfg.onscreen_x / font->width) - 1))
+	sti_putc('\n');
+
     sti_putchar(rom, row, col++, c);
 }
