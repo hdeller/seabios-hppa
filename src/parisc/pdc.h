@@ -401,7 +401,8 @@ struct zeropage {
 	int	vec_pad[10];		
 	
 	/* [0x040] reserved processor dependent */
-	int	pad0[112];
+	int	pad0[112];              /* in QEMU pad0[0] holds "SeaBIOS\0" */
+                                        /* and pad0[2] holds soft power button */
 
 	/* [0x200] reserved */
 	int	pad1[84];

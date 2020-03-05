@@ -135,6 +135,13 @@ static unsigned long GoldenMemory = MIN_RAM_SIZE;
 
 static unsigned int chassis_code = 0;
 
+/*
+ * For QEMU we emulate the power switch button flag in pad0[2] in PAGE0.
+ * Bit 31 (the lowest bit) is the status of the power switch.
+ * This bit is "1" if the button is NOT pressed.
+ */
+#define powersw_button PAGE0->pad0[2]
+
 void __VISIBLE __noreturn hlt(void)
 {
     if (pdc_debug)
@@ -144,12 +151,22 @@ void __VISIBLE __noreturn hlt(void)
     while (1);
 }
 
+static void check_powersw_button(void)
+{
+    /* halt immediately if power button was pressed. */
+    if ((powersw_button & 1) == 0) {
+        printf("SeaBIOS machine power switch was pressed.\n");
+        hlt();
+    }
+}
+
 void __noreturn reset(void)
 {
     if (pdc_debug)
         printf("RESET initiated from %p\n",  __builtin_return_address(0));
     printf("SeaBIOS wants SYSTEM RESET.\n"
             "***************************\n");
+    check_powersw_button();
     PAGE0->imm_soft_boot = 1;
     asm volatile("\t.word 0xfffdead1": : :"memory");
     while (1);
@@ -1266,10 +1283,17 @@ static int pdc_system_map(unsigned int *arg)
 static int pdc_soft_power(unsigned int *arg)
 {
     unsigned long option = ARG1;
+    unsigned long *result = (unsigned long *)ARG2;
 
     switch (option) {
+        case PDC_SOFT_POWER_INFO:
+            result[0] = (unsigned long) &(powersw_button);
+            return PDC_OK;
         case PDC_SOFT_POWER_ENABLE:
-            /* put soft power button under hardware (ARG3=0) or software (ARG3=1) control. */
+            /* put soft power button under hardware (ARG3=0) or
+             * software (ARG3=1) control. */
+            powersw_button = (ARG3 & 1) << 8 | (powersw_button & 1);
+            check_powersw_button();
             return PDC_OK;
     }
     // dprintf(0, "\n\nSeaBIOS: PDC_SOFT_POWER called with ARG2=%x ARG3=%x ARG4=%x\n", ARG2, ARG3, ARG4);
@@ -1729,6 +1753,7 @@ void __VISIBLE start_parisc_firmware(void)
     /* Put QEMU/SeaBIOS marker in PAGE0.
      * The Linux kernel will search for it. */
     memcpy((char*)&PAGE0->pad0, "SeaBIOS", 8);
+    powersw_button = 0x01; /* button not pressed, hw controlled. */
 
     PAGE0->imm_hpa = MEMORY_HPA;
     PAGE0->imm_spa_size = ram_size;
