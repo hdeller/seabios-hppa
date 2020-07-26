@@ -144,7 +144,7 @@ $(OUT)%.lds: %.lds.S
 
 $(OUT)head.o: src/parisc/head.S $(OUT)autoconf.h $(OUT)autoversion.h
 	@echo "  Compile checking $@"
-	$(Q)$(CC) $(CFLAGS32FLAT) -c $< -o $@
+	$(Q)$(CC) $(CFLAGS32FLAT) -D__ASSEMBLY__ -c $< -o $@
 
 
 ################ Main BIOS build rules
