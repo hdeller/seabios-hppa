@@ -96,7 +96,8 @@ romfile_loadint(const char *name, u64 defval)
     int ret = file->copy(file, &val, sizeof(val));
     if (ret < 0)
         return defval;
-    return val;
+    /* romfile interface stores values in little endian */
+    return le64_to_cpu(val);
 }
 
 struct const_romfile_s {
