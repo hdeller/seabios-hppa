@@ -1745,6 +1745,13 @@ void __VISIBLE start_parisc_firmware(void)
     /* Initialize qemu fw_cfg interface */
     qemu_cfg_init();
 
+    i = romfile_loadint("/etc/firmware-min-version", 0);
+    if (i && i > SEABIOS_HPPA_VERSION) {
+        printf("\nSeaBIOS firmware is version %d, but version %d is required. "
+            "Please update.\n", (int)SEABIOS_HPPA_VERSION, i);
+        hlt();
+    }
+
     tlb_entries = romfile_loadint("/etc/cpu/tlb_entries", 256);
     dprintf(0, "fw_cfg: TLB entries %d\n", tlb_entries);
 
