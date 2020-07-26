@@ -31,6 +31,8 @@
 
 #include "vgabios.h"
 
+#define SEABIOS_HPPA_VERSION 1
+
 /*
  * Various variables which are needed by x86 code.
  * Defined here to be able to link seabios.
@@ -95,6 +97,9 @@ extern unsigned long boot_args[];
 #define initrd_end		(boot_args[4])
 #define smp_cpus		(boot_args[5])
 #define pdc_debug		0 // (boot_args[6])
+
+unsigned int tlb_entries = 256;
+unsigned int btlb_entries = 8;
 
 #define PARISC_SERIAL_CONSOLE   PORT_SERIAL1
 
@@ -884,9 +889,8 @@ static int pdc_cache(unsigned int *arg)
     switch (option) {
         case PDC_CACHE_INFO:
             BUG_ON(sizeof(cache_info) != sizeof(*machine_cache_info));
-            // XXX: number of TLB entries should be aligned with qemu
-            machine_cache_info->it_size = 256;
-            machine_cache_info->dt_size = 256;
+            machine_cache_info->it_size = tlb_entries;
+            machine_cache_info->dt_size = tlb_entries;
             machine_cache_info->it_loop = 1;
             machine_cache_info->dt_loop = 1;
 
@@ -1149,9 +1153,17 @@ static int pdc_block_tlb(unsigned int *arg)
 
     switch (option) {
         case PDC_BTLB_INFO:
-            /* tell operating system that we don't have any BTLBs */
             memset(info, 0, sizeof(*info));
+            if (btlb_entries) {
+                /* TODO: fill in BTLB info */
+            }
             return PDC_OK;
+        case PDC_BTLB_INSERT:
+        case PDC_BTLB_PURGE:
+        case PDC_BTLB_PURGE_ALL:
+            /* TODO: implement above functions */
+            return PDC_BAD_OPTION;
+
     }
     return PDC_BAD_OPTION;
 }
@@ -1730,6 +1742,14 @@ void __VISIBLE start_parisc_firmware(void)
     if (ram_size >= FIRMWARE_START)
         ram_size = FIRMWARE_START;
 
+    /* Initialize qemu fw_cfg interface */
+    qemu_cfg_init();
+
+    tlb_entries = romfile_loadint("/etc/cpu/tlb_entries", 256);
+    dprintf(0, "fw_cfg: TLB entries %d\n", tlb_entries);
+
+    btlb_entries = romfile_loadint("/etc/cpu/btlb_entries", 8);
+    dprintf(0, "fw_cfg: BTLB entries %d\n", btlb_entries);
 
     /* Initialize PAGE0 */
     memset((void*)PAGE0, 0, sizeof(*PAGE0));
@@ -1820,13 +1840,13 @@ void __VISIBLE start_parisc_firmware(void)
     block_setup();
 
     printf("\n");
-    printf("Firmware Version 6.1\n"
+    printf("SeaBIOS PA-RISC Firmware Version %d\n"
             "\n"
             "Duplex Console IO Dependent Code (IODC) revision 1\n"
             "\n"
-            "Memory Test/Initialization Completed\n\n");
+            "Memory Test/Initialization Completed\n\n", SEABIOS_HPPA_VERSION);
     printf("------------------------------------------------------------------------------\n"
-            "  (c) Copyright 2017-2019 Helge Deller <deller@gmx.de> and SeaBIOS developers.\n"
+            "  (c) Copyright 2017-2020 Helge Deller <deller@gmx.de> and SeaBIOS developers.\n"
             "------------------------------------------------------------------------------\n\n");
     printf( "  Processor   Speed            State           Coprocessor State  Cache Size\n"
             "  ---------  --------   ---------------------  -----------------  ----------\n");
