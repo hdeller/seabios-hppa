@@ -2,24 +2,6 @@
 #define HPPA_H
 /* this file is included by x86.h */
 
-#if 0
-// CPU flag bitdefs
-#define F_CF (1<<0)
-#define F_ZF (1<<6)
-#define F_IF (1<<9)
-#define F_ID (1<<21)
-
-// CR0 flags
-#define CR0_PG (1<<31) // Paging
-#define CR0_CD (1<<30) // Cache disable
-#define CR0_NW (1<<29) // Not Write-through
-#define CR0_PE (1<<0)  // Protection enable
-
-// PORT_A20 bitdefs
-#define PORT_A20 0x0092
-#define A20_ENABLE_BIT 0x02
-#endif
-
 #include "parisc/hppa_hardware.h"
 
 #ifndef __ASSEMBLY__
