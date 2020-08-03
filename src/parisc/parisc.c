@@ -141,11 +141,11 @@ static unsigned long GoldenMemory = MIN_RAM_SIZE;
 static unsigned int chassis_code = 0;
 
 /*
- * For QEMU we emulate the power switch button flag in pad0[2] in PAGE0.
+ * Emulate the power switch button flag in head section of firmware.
  * Bit 31 (the lowest bit) is the status of the power switch.
  * This bit is "1" if the button is NOT pressed.
  */
-#define powersw_button PAGE0->pad0[2]
+extern int powersw_button; /* in head.S */
 
 void __VISIBLE __noreturn hlt(void)
 {
