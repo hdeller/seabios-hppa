@@ -575,6 +575,14 @@ struct drive_s *select_parisc_boot_drive(char bootdrive)
 		return pos->drive;
 	}
     }
+    /* if none found, choose first bootable device */
+    hlist_for_each_entry(pos, &BootList, node) {
+	if ((pos->type == IPL_TYPE_CDROM) ||
+	    (pos->type == IPL_TYPE_HARDDISK)) {
+                printf("\nAuto-Booting from %s\n",pos->description);
+		return pos->drive;
+	}
+    }
     return NULL;
 }
 #endif
