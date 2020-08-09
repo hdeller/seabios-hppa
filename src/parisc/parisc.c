@@ -1511,6 +1511,11 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
 	case PDC_MEM_MAP:
             return pdc_mem_map(arg);
 
+        case 134:
+            if (ARG1 == 1 || ARG1 == 513) /* HP-UX 11.11 ask for it. */
+                return PDC_BAD_PROC;
+            break;
+
         case PDC_IO:
             return pdc_io(arg);
 
@@ -1521,6 +1526,11 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
 
         case PDC_LAN_STATION_ID:
             return pdc_lan_station_id(arg);
+
+        case PDC_SYSTEM_INFO:
+            if (ARG1 == PDC_SYSINFO_RETURN_INFO_SIZE)
+                return PDC_BAD_PROC;
+            break;
 
         case PDC_PCI_INDEX:
             return pdc_pci_index(arg);
