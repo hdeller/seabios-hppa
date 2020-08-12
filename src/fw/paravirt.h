@@ -35,8 +35,7 @@ static inline int runningOnKVM(void) {
 #define PORT_SMI_CMD                0x00b2
 #define PORT_SMI_STATUS             0x00b3
 #if CONFIG_PARISC
-// #define PORT_QEMU_CFG_CTL           0xf0800100
-#define PORT_QEMU_CFG_CTL           (MEMORY_HPA + 0x80)
+extern unsigned long PORT_QEMU_CFG_CTL;
 #define PORT_QEMU_CFG_DATA          (PORT_QEMU_CFG_CTL + 4)
 #define PORT_QEMU_CFG_DMA_ADDR_HIGH (PORT_QEMU_CFG_CTL + 8)
 #define PORT_QEMU_CFG_DMA_ADDR_LOW  (PORT_QEMU_CFG_CTL + 12)

@@ -97,7 +97,9 @@ extern unsigned long boot_args[];
 #define initrd_end		(boot_args[4])
 #define smp_cpus		(boot_args[5])
 #define pdc_debug		0 // (boot_args[6])
+#define fw_cfg_port		(boot_args[7])
 
+unsigned long PORT_QEMU_CFG_CTL;
 unsigned int tlb_entries = 256;
 unsigned int btlb_entries = 8;
 
@@ -1753,6 +1755,7 @@ void __VISIBLE start_parisc_firmware(void)
         ram_size = FIRMWARE_START;
 
     /* Initialize qemu fw_cfg interface */
+    PORT_QEMU_CFG_CTL = fw_cfg_port;
     qemu_cfg_init();
 
     i = romfile_loadint("/etc/firmware-min-version", 0);
@@ -1790,6 +1793,8 @@ void __VISIBLE start_parisc_firmware(void)
     /* Put QEMU/SeaBIOS marker in PAGE0.
      * The Linux kernel will search for it. */
     memcpy((char*)&PAGE0->pad0, "SeaBIOS", 8);
+    PAGE0->pad0[2] = ((unsigned long long)PORT_QEMU_CFG_CTL) >> 32; /* store as 64bit value */
+    PAGE0->pad0[3] = PORT_QEMU_CFG_CTL;
     powersw_button = 0x01; /* button not pressed, hw controlled. */
 
     PAGE0->imm_hpa = MEMORY_HPA;
