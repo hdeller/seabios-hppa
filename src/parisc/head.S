@@ -83,10 +83,6 @@ reset_entry:
 	.stringz "https://github.com/hdeller/seabios-hppa"
 	.stringz BUILD_VERSION
 
-        .align 0x80
-ENTRY(powersw_button) /* instead of 0xf0140000 on B160L */
-        .word   0
-
 /*******************************************************
 	Firmware startup code
  *******************************************************/

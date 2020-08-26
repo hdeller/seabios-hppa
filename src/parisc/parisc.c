@@ -147,7 +147,8 @@ static unsigned int chassis_code = 0;
  * Bit 31 (the lowest bit) is the status of the power switch.
  * This bit is "1" if the button is NOT pressed.
  */
-extern int powersw_button; /* in head.S */
+int powersw_nop;
+int *powersw_ptr;
 
 void __VISIBLE __noreturn hlt(void)
 {
@@ -161,7 +162,7 @@ void __VISIBLE __noreturn hlt(void)
 static void check_powersw_button(void)
 {
     /* halt immediately if power button was pressed. */
-    if ((powersw_button & 1) == 0) {
+    if ((*powersw_ptr & 1) == 0) {
         printf("SeaBIOS machine power switch was pressed.\n");
         hlt();
     }
@@ -1301,12 +1302,12 @@ static int pdc_soft_power(unsigned int *arg)
 
     switch (option) {
         case PDC_SOFT_POWER_INFO:
-            result[0] = (unsigned long) &(powersw_button);
+            result[0] = (unsigned long) powersw_ptr;
             return PDC_OK;
         case PDC_SOFT_POWER_ENABLE:
             /* put soft power button under hardware (ARG3=0) or
              * software (ARG3=1) control. */
-            powersw_button = (ARG3 & 1) << 8 | (powersw_button & 1);
+            *powersw_ptr = (ARG3 & 1) << 8 | (*powersw_ptr & 1);
             check_powersw_button();
             return PDC_OK;
     }
@@ -1771,6 +1772,9 @@ void __VISIBLE start_parisc_firmware(void)
     btlb_entries = romfile_loadint("/etc/cpu/btlb_entries", 8);
     dprintf(0, "fw_cfg: BTLB entries %d\n", btlb_entries);
 
+    powersw_ptr = (int *) (unsigned long)
+        romfile_loadint("/etc/power-button-addr", (unsigned long)&powersw_nop);
+
     /* Initialize PAGE0 */
     memset((void*)PAGE0, 0, sizeof(*PAGE0));
 
@@ -1795,7 +1799,7 @@ void __VISIBLE start_parisc_firmware(void)
     memcpy((char*)&PAGE0->pad0, "SeaBIOS", 8);
     PAGE0->pad0[2] = ((unsigned long long)PORT_QEMU_CFG_CTL) >> 32; /* store as 64bit value */
     PAGE0->pad0[3] = PORT_QEMU_CFG_CTL;
-    powersw_button = 0x01; /* button not pressed, hw controlled. */
+    *powersw_ptr = 0x01; /* button not pressed, hw controlled. */
 
     PAGE0->imm_hpa = MEMORY_HPA;
     PAGE0->imm_spa_size = ram_size;
