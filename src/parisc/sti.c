@@ -27,6 +27,7 @@ static struct sti_init_flags sti_init_flags = {
         .no_chg_bet = 1,
         .no_chg_bei = 1,
         .init_cmap_tx = 1,
+        .clear = 1,
 };
 
 static struct sti_glob_cfg_ext sti_glob_ext_cfg = {
