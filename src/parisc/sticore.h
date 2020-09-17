@@ -224,7 +224,7 @@ struct sti_rom_font {
 
 struct font {
     struct sti_rom_font hdr;
-    char font[16*256];
+    unsigned char font[16*256];
 };
 
 /* STI font printing function structs */
