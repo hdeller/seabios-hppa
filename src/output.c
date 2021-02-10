@@ -151,9 +151,13 @@ puts_cs(struct putcinfo *action, const char *s)
 
 // Output an unsigned integer.
 static void
+#if CONFIG_X86
 putuint(struct putcinfo *action, u32 val)
+#else
+putuint(struct putcinfo *action, u64 val)
+#endif
 {
-    char buf[12];
+    char buf[40];
     char *d = &buf[sizeof(buf) - 1];
     *d-- = '\0';
     for (;;) {
@@ -197,9 +201,9 @@ puthex(struct putcinfo *action, u32 val, int width, int uc)
 
 // Output an integer in hexadecimal with a minimum width.
 static void
-putprettyhex(struct putcinfo *action, u32 val, int width, char padchar, int uc)
+putprettyhex(struct putcinfo *action, u64 val, int width, char padchar, int uc)
 {
-    u32 tmp = val;
+    u64 tmp = val;
     int count = 1;
     while (tmp >>= 4)
         count++;
@@ -264,26 +268,29 @@ bvprintf(struct putcinfo *action, const char *fmt, va_list args)
             c = GET_GLOBAL(*(u8*)n);
         }
         s32 val;
+        s64 val64;
         const char *sarg;
         switch (c) {
         case '%':
             putc(action, '%');
             break;
         case 'd':
-            val = va_arg(args, s32);
             if (is64)
-                va_arg(args, s32);
-            if (val < 0) {
+                val64 = va_arg(args, s64);
+            else
+                val64 = va_arg(args, s32);
+            if (val64 < 0) {
                 putc(action, '-');
-                val = -val;
+                val64 = -val64;
             }
-            putuint(action, val);
+            putuint(action, val64);
             break;
         case 'u':
-            val = va_arg(args, s32);
             if (is64)
-                va_arg(args, s32);
-            putuint(action, val);
+                val64 = va_arg(args, s64);
+            else
+                val64 = va_arg(args, s32);
+            putuint(action, val64);
             break;
         case 'p':
             val = va_arg(args, s32);
@@ -300,16 +307,11 @@ bvprintf(struct putcinfo *action, const char *fmt, va_list args)
         case 'X':
         case 'x':
             uc = (c == 'X');
-            val = va_arg(args, s32);
-            if (is64) {
-                u32 upper = va_arg(args, s32);
-                if (upper) {
-                    putprettyhex(action, upper, field_width - 8, padchar, uc);
-                    puthex(action, val, 8, uc);
-                    break;
-                }
-            }
-            putprettyhex(action, val, field_width, padchar, uc);
+            if (is64)
+               val64 = va_arg(args, s64);
+            else
+               val64 = va_arg(args, s32);
+            putprettyhex(action, val64, field_width, padchar, uc);
             break;
         case 'c':
             val = va_arg(args, int);
