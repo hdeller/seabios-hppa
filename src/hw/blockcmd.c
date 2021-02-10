@@ -111,12 +111,15 @@ scsi_fill_cmd(struct disk_op_s *op, void *cdbcmd, int maxcdb)
     switch (op->command) {
     case CMD_READ:
     case CMD_WRITE: ;
-        struct cdb_rwdata_10 *cmd = cdbcmd;
-        memset(cmd, 0, maxcdb);
-        cmd->command = (op->command == CMD_READ ? CDB_CMD_READ_10
+        // PA-RISC: Beware alignment: do not write u64 to unaligned address.
+        struct cdb_rwdata_10 cmd;
+        memset(cdbcmd, 0, maxcdb);
+        memset(&cmd, 0, sizeof(cmd));
+        cmd.command = (op->command == CMD_READ ? CDB_CMD_READ_10
                         : CDB_CMD_WRITE_10);
-        cmd->lba = cpu_to_be32(op->lba);
-        cmd->count = cpu_to_be16(op->count);
+        cmd.lba = cpu_to_be32(op->lba);
+        cmd.count = cpu_to_be16(op->count);
+        memcpy(cdbcmd, &cmd, sizeof(cmd));
         return GET_FLATPTR(op->drive_fl->blksize);
     case CMD_SCSI:
         if (MODESEGMENT)
