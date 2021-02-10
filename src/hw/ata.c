@@ -358,9 +358,9 @@ struct sff_dma_prd {
 static int
 ata_try_dma(struct disk_op_s *op, int iswrite, int blocksize)
 {
-    ASSERT16();
     if (! CONFIG_ATA_DMA)
         return -1;
+    ASSERT16(); // behind ATA_DMA, needed on parisc to boot via ata
     u32 dest = (u32)op->buf_fl;
     if (dest & 1)
         // Need minimum alignment of 1.
