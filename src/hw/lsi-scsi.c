@@ -14,6 +14,7 @@
 #include "block.h" // struct drive_s
 #include "blockcmd.h" // scsi_drive_setup
 #include "config.h" // CONFIG_*
+#include "byteorder.h" // cpu_to_*
 #include "fw/paravirt.h" // runningOnQEMU
 #include "malloc.h" // free
 #include "output.h" // dprintf
@@ -105,6 +106,9 @@ lsi_scsi_process_op(struct disk_op_s *op)
         0x00000000,
     };
     u32 dsp = (u32)MAKE_FLATPTR(GET_SEG(SS), &script);
+
+    /* convert to little endian for PCI */
+    convert_to_le32(script, sizeof(script));
 
     outb(dsp         & 0xff, iobase + LSI_REG_DSP0);
     outb((dsp >>  8) & 0xff, iobase + LSI_REG_DSP1);
