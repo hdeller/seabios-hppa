@@ -217,6 +217,10 @@ static void mch_isa_bridge_setup(struct pci_device *dev, void *arg)
 
 static void storage_ide_setup(struct pci_device *pci, void *arg)
 {
+    /* On parisc, keep PCI IDE IO ports in PCI mem space */
+    if (CONFIG_PARISC)
+	return;
+
     /* IDE: we map it as in ISA mode */
     pci_set_io_region_addr(pci, 0, PORT_ATA1_CMD_BASE, 0);
     pci_set_io_region_addr(pci, 1, PORT_ATA1_CTRL_BASE, 0);
@@ -505,6 +509,36 @@ static void mch_mem_addr_setup(struct pci_device *dev, void *arg)
         pci_io_low_end = acpi_pm_base;
 }
 
+#if CONFIG_PARISC
+static int dino_pci_slot_get_irq(struct pci_device *pci, int pin)
+{
+    int slot = pci_bdf_to_dev(pci->bdf);
+    return slot & 0x03;
+}
+
+static void dino_mem_addr_setup(struct pci_device *dev, void *arg)
+{
+    pcimem_start = 0xf2000000ULL;
+    pcimem_end   = 0xff800000ULL;
+
+    /* Setup DINO PCI I/O and mem window */
+
+    outl(DINO_HPA | 1, 0xfffc0020); /* Set Dino Flex (Address) */
+    outl(0x00000080, DINO_HPA + 0x038); /* IO_CONTROL - enable DINO PCI */
+    // outl(0x00000000, DINO_HPA + 0x804); /* Set PAMR */
+    // outl(0x00000000, DINO_HPA + 0x808); /* Set PAPR */
+    outl(0x7ffffffe, DINO_HPA + 0x060); /* Set DINO_IO_ADDR_EN */
+    // outl(0x00000001, DINO_HPA + 0x05c); /* Set IO_FBB_EN */
+    // outl(0x0000006f, DINO_HPA + 0x810); /* Set PCICMD */
+
+    pci_slot_get_irq = dino_pci_slot_get_irq;
+
+    /* setup io address space */
+    pci_io_low_end = 0xa000;
+}
+#endif /* CONFIG_PARISC */
+
+
 static const struct pci_device_id pci_platform_tbl[] = {
     PCI_DEVICE(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82441,
                i440fx_mem_addr_setup),
@@ -516,9 +550,16 @@ static const struct pci_device_id pci_platform_tbl[] = {
 static void pci_bios_init_platform(void)
 {
     struct pci_device *pci;
-    foreachpci(pci) {
-        pci_init_device(pci_platform_tbl, pci, NULL);
+
+    if (CONFIG_X86) {
+        foreachpci(pci) {
+             pci_init_device(pci_platform_tbl, pci, NULL);
+        }
     }
+
+#if CONFIG_PARISC
+    dino_mem_addr_setup(NULL, NULL);
+#endif
 }
 
 static u8 pci_find_resource_reserve_capability(u16 bdf)
@@ -997,8 +1038,8 @@ static int pci_bios_init_root_regions_io(struct pci_bus *bus)
      */
     struct pci_region *r_io = &bus->r[PCI_REGION_TYPE_IO];
     u64 sum = pci_region_sum(r_io);
-    if (sum < 0x4000) {
-        /* traditional region is big enougth, use it */
+    if (sum < 0x4000 && !CONFIG_PARISC) {
+        /* traditional region is big enough, use it */
         r_io->base = 0xc000;
     } else if (sum < pci_io_low_end - 0x1000) {
         /* use the larger region at 0x1000 */
@@ -1044,9 +1085,9 @@ pci_region_map_one_entry(struct pci_region_entry *entry, u64 addr)
 {
     if (entry->bar >= 0) {
         dprintf(1, "PCI: map device bdf=%pP"
-                "  bar %d, addr %08llx, size %08llx [%s]\n",
+                "  bar %d, addr %08llx, size %08llx [%d: %s]\n",
                 entry->dev,
-                entry->bar, addr, entry->size, region_type_name[entry->type]);
+                entry->bar, addr, entry->size, entry->type, region_type_name[entry->type]);
 
         pci_set_io_region_addr(entry->dev, entry->bar, addr, entry->is64);
         return;
