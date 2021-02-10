@@ -6,6 +6,7 @@
 #ifndef __FARPTR_H
 #define __FARPTR_H
 
+#include "autoconf.h"
 #include "x86.h" // insb
 
 // Dummy definitions used to make sure gcc understands dependencies
@@ -131,10 +132,15 @@ DECL_SEGFUNCS(SS)
 
 // Macros for converting to/from 32bit flat mode pointers to their
 // equivalent 16bit segment/offset values.
+#if CONFIG_X86
 #define FLATPTR_TO_SEG(p) (((u32)(p)) >> 4)
 #define FLATPTR_TO_OFFSET(p) (((u32)(p)) & 0xf)
 #define MAKE_FLATPTR(seg,off) ((void*)(((u32)(seg)<<4)+(u32)(off)))
-
+#elif CONFIG_PARISC
+#define FLATPTR_TO_SEG(p) (((u32)(p)) >> 16)
+#define FLATPTR_TO_OFFSET(p) (((u32)(p)) & 0xffff)
+#define MAKE_FLATPTR(seg,off) ((void*)(unsigned long)(off))
+#endif
 
 #if MODESEGMENT == 1
 
@@ -176,10 +182,16 @@ static inline void outsl_fl(u16 port, void *ptr_fl, u16 count) {
 #else
 
 // In 32-bit flat mode there is no need to mess with the segments.
+#if CONFIG_X86
 #define GET_FARVAR(seg, var) \
     (*((typeof(&(var)))MAKE_FLATPTR((seg), &(var))))
 #define SET_FARVAR(seg, var, val) \
     do { GET_FARVAR((seg), (var)) = (val); } while (0)
+#elif CONFIG_PARISC
+#define GET_FARVAR(seg, var)		GET_VAR(seg, var)
+#define SET_FARVAR(seg, var, val)	SET_VAR(seg, var, val)
+#endif
+
 #define GET_VAR(seg, var) (var)
 #define SET_VAR(seg, var, val) do { (var) = (val); } while (0)
 #define SET_SEG(SEG, value) ((void)(value))
