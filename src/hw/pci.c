@@ -8,11 +8,16 @@
 #include "output.h" // dprintf
 #include "pci.h" // pci_config_writel
 #include "pci_regs.h" // PCI_VENDOR_ID
+#include "byteorder.h" // cpu_to_le16
 #include "util.h" // udelay
 #include "x86.h" // outl
 
+#if CONFIG_X86
 #define PORT_PCI_CMD           0x0cf8
 #define PORT_PCI_DATA          0x0cfc
+#elif CONFIG_PARISC
+#include "parisc/hppa_hardware.h"
+#endif
 
 static u32 mmconfig;
 
@@ -32,7 +37,7 @@ void pci_config_writel(u16 bdf, u32 addr, u32 val)
         writel(mmconfig_addr(bdf, addr), val);
     } else {
         outl(ioconfig_cmd(bdf, addr), PORT_PCI_CMD);
-        outl(val, PORT_PCI_DATA);
+        outl(cpu_to_le32(val), PORT_PCI_DATA);
     }
 }
 
@@ -42,7 +47,7 @@ void pci_config_writew(u16 bdf, u32 addr, u16 val)
         writew(mmconfig_addr(bdf, addr), val);
     } else {
         outl(ioconfig_cmd(bdf, addr), PORT_PCI_CMD);
-        outw(val, PORT_PCI_DATA + (addr & 2));
+        outw(cpu_to_le16(val), PORT_PCI_DATA + (addr & 2));
     }
 }
 
@@ -62,7 +67,7 @@ u32 pci_config_readl(u16 bdf, u32 addr)
         return readl(mmconfig_addr(bdf, addr));
     } else {
         outl(ioconfig_cmd(bdf, addr), PORT_PCI_CMD);
-        return inl(PORT_PCI_DATA);
+        return le32_to_cpu(inl(PORT_PCI_DATA));
     }
 }
 
@@ -72,7 +77,7 @@ u16 pci_config_readw(u16 bdf, u32 addr)
         return readw(mmconfig_addr(bdf, addr));
     } else {
         outl(ioconfig_cmd(bdf, addr), PORT_PCI_CMD);
-        return inw(PORT_PCI_DATA + (addr & 2));
+        return le16_to_cpu(inw(PORT_PCI_DATA + (addr & 2)));
     }
 }
 
