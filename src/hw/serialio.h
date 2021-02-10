@@ -3,12 +3,20 @@
 
 #include "types.h" // u16
 
+#if CONFIG_X86
 #define PORT_LPT2              0x0278
 #define PORT_SERIAL4           0x02e8
 #define PORT_SERIAL2           0x02f8
 #define PORT_LPT1              0x0378
 #define PORT_SERIAL3           0x03e8
 #define PORT_SERIAL1           0x03f8
+#elif CONFIG_PARISC
+#include "parisc/hppa_hardware.h"
+#define PORT_LPT2              0
+#define PORT_SERIAL4           0
+#define PORT_LPT1              0
+#define PORT_SERIAL3           0
+#endif
 
 // Serial port offsets
 #define SEROFF_DATA    0
