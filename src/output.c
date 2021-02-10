@@ -18,6 +18,9 @@
 #include "stacks.h" // call16_int
 #include "string.h" // memset
 #include "util.h" // ScreenAndDebug
+#if CONFIG_PARISC
+#include "parisc/sticore.h"
+#endif
 
 struct putcinfo {
     void (*func)(struct putcinfo *info, char c);
@@ -44,7 +47,8 @@ debug_putc(struct putcinfo *action, char c)
     qemu_debug_putc(c);
     if (!MODESEGMENT)
         coreboot_debug_putc(c);
-    serial_debug_putc(c);
+    if (!CONFIG_PARISC)
+        serial_debug_putc(c);
 }
 
 // Flush any pending output to debug port(s).
@@ -74,6 +78,7 @@ static struct putcinfo debuginfo = { debug_putc };
 static void
 screenc(char c)
 {
+#if CONFIG_X86
     if (!MODESEGMENT && GET_IVT(0x10).segoff == FUNC16(entry_10).segoff)
         // No need to thunk to 16bit mode if vgabios is not present
         return;
@@ -84,6 +89,9 @@ screenc(char c)
     br.al = c;
     br.bl = 0x07;
     call16_int(0x10, &br);
+#else
+    parisc_screenc(c);
+#endif
 }
 
 // Handle a character from a printf request.
@@ -92,7 +100,7 @@ screen_putc(struct putcinfo *action, char c)
 {
     if (ScreenAndDebug)
         debug_putc(&debuginfo, c);
-    if (c == '\n')
+    if (CONFIG_X86 && c == '\n')
         screenc('\r');
     screenc(c);
 }
