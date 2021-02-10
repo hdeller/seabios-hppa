@@ -2,6 +2,21 @@
 
 mainmenu "SeaBIOS Configuration"
 
+choice
+    prompt "Processor architecture"
+    default X86
+
+    config X86
+        bool "Intel/AMD x86"
+        help
+            Build PC BIOS.
+
+    config PARISC
+        bool "PA-RISC"
+        help
+            Build PA-RISC firmware for QEMU.
+endchoice
+
 menu "General Features"
 
 choice
@@ -9,7 +24,7 @@ choice
     default QEMU
 
     config COREBOOT
-        bool "Build for coreboot"
+        bool "Build for coreboot" if X86
         help
             Configure as a coreboot payload.
 
@@ -20,7 +35,7 @@ choice
             Configure for an emulated machine (QEMU, Xen, KVM, or Bochs).
 
     config CSM
-       bool "Build as Compatibility Support Module for EFI BIOS"
+       bool "Build as Compatibility Support Module for EFI BIOS" if X86
        help
            Configure to be used by EFI firmware as Compatibility Support
            module (CSM) to provide legacy BIOS services.
@@ -35,7 +50,7 @@ endchoice
             running on an emulator.
 
     config XEN
-        depends on QEMU
+        depends on QEMU && !PARISC
         bool "Support Xen HVM"
         default y
         help
@@ -43,6 +58,7 @@ endchoice
 
     config THREADS
         bool "Parallelize hardware init"
+        depends on !PARISC
         default y
         help
             Support running hardware initialization in parallel.
@@ -50,6 +66,7 @@ endchoice
     config RELOCATE_INIT
         bool "Copy init code to high memory"
         default y
+        depends on X86
         help
             Support relocating the one time initialization code to high memory.
 
@@ -60,7 +77,7 @@ endchoice
         help
             Support an interactive boot menu at end of post.
     config BOOTSPLASH
-        depends on BOOTMENU
+        depends on BOOTMENU && !PARISC
         bool "Graphical boot splash screen"
         default y
         help
@@ -113,6 +130,7 @@ endchoice
     config ENTRY_EXTRASTACK
         bool "Use internal stack for 16bit interrupt entry points"
         default y
+        depends on X86
         help
             Utilize an internal stack for all the legacy 16bit
             interrupt entry points.  This reduces the amount of space
@@ -123,6 +141,7 @@ endchoice
     config MALLOC_UPPERMEMORY
         bool "Allocate memory that needs to be in first Meg above 0xc0000"
         default y
+        depends on X86
         help
             Use the "Upper Memory Block" area (0xc0000-0xf0000) for
             internal "low memory" allocations.  If this is not
@@ -168,25 +187,25 @@ menu "Hardware support"
         help
             Support for AHCI disk code.
     config SDCARD
-        depends on DRIVES
+        depends on DRIVES && !PARISC
         bool "SD controllers"
         default y
         help
             Support for SD cards on PCI host controllers.
     config VIRTIO_BLK
-        depends on DRIVES && QEMU_HARDWARE
+        depends on DRIVES && QEMU_HARDWARE && !PARISC
         bool "virtio-blk controllers"
         default y
         help
             Support boot from virtio-blk storage.
     config VIRTIO_SCSI
-        depends on DRIVES && QEMU_HARDWARE
+        depends on DRIVES && QEMU_HARDWARE && !PARISC
         bool "virtio-scsi controllers"
         default y
         help
             Support boot from virtio-scsi storage.
     config PVSCSI
-        depends on DRIVES && QEMU_HARDWARE
+        depends on DRIVES && QEMU_HARDWARE && !PARISC
         bool "PVSCSI controllers"
         default y
         help
@@ -222,20 +241,20 @@ menu "Hardware support"
         help
             Support boot from LSI MPT Fusion scsi storage.
     config FLOPPY
-        depends on DRIVES && HARDWARE_IRQ
+        depends on DRIVES && HARDWARE_IRQ && !PARISC
         bool "Floppy controller"
         default y
         help
             Support floppy drive access.
     config FLASH_FLOPPY
-        depends on DRIVES
+        depends on DRIVES && !PARISC
         bool "Floppy images from CBFS or fw_cfg"
         default y
         help
             Support floppy images stored in coreboot flash or from
             QEMU fw_cfg.
     config NVME
-        depends on DRIVES
+        depends on DRIVES && !PARISC
         bool "NVMe controllers"
         default y
         help
@@ -272,7 +291,7 @@ menu "Hardware support"
         help
             Support USB EHCI controllers.
     config USB_XHCI
-        depends on USB
+        depends on USB && !PARISC
         bool "USB XHCI controllers"
         default y
         help
@@ -325,7 +344,7 @@ menu "Hardware support"
             Support parallel ports. This also enables int 17 parallel port calls.
     config RTC_TIMER
         bool "Real Time Clock (RTC) scheduling"
-        depends on HARDWARE_IRQ
+        depends on HARDWARE_IRQ && !PARISC
         default y
         help
             Support MC146818 Real Time Clock chip timer
@@ -336,6 +355,7 @@ menu "Hardware support"
 
     config HARDWARE_IRQ
         bool "Hardware interrupts"
+        depends on X86
         default y
         help
             Program and support hardware interrupts using the i8259
@@ -345,7 +365,7 @@ menu "Hardware support"
             not to support irq routing.
 
     config USE_SMM
-        depends on QEMU
+        depends on QEMU && X86
         bool "System Management Mode (SMM)"
         default y
         help
@@ -355,7 +375,7 @@ menu "Hardware support"
         depends on USE_SMM
         default y
     config MTRR_INIT
-        depends on QEMU
+        depends on QEMU && X86
         bool "Initialize MTRRs"
         default y
         help
@@ -363,6 +383,7 @@ menu "Hardware support"
     config PMTIMER
         bool "Support ACPI timer"
         default y
+        depends on X86
         help
             Detect and use the ACPI timer for timekeeping.
     config TSC_TIMER
@@ -409,6 +430,7 @@ menu "BIOS interfaces"
         help
             Support PnP BIOS entry point.
     config OPTIONROMS
+        depends on !PARISC
         bool "Option ROMS"
         default y
         help
@@ -481,7 +503,7 @@ menu "BIOS interfaces"
 endmenu
 
 menu "BIOS Tables"
-    depends on QEMU
+    depends on QEMU && X86
     config PIRTABLE
         bool "PIR table"
         default y
