@@ -257,7 +257,7 @@ void
 map_hd_drive(struct drive_s *drive)
 {
     ASSERT32FLAT();
-    struct bios_data_area_s *bda = MAKE_FLATPTR(SEG_BDA, 0);
+    struct bios_data_area_s *bda = get_bda_ptr();
     int hdid = bda->hdcount;
     dprintf(3, "Mapping hd drive %p to %d\n", drive, hdid);
     add_drive(IDMap[EXTTYPE_HD], &bda->hdcount, drive);
