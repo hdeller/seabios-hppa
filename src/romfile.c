@@ -5,6 +5,7 @@
 // This file may be distributed under the terms of the GNU LGPLv3 license.
 
 #include "config.h" // CONFIG_*
+#include "byteorder.h" // cpu_to_le16
 #include "malloc.h" // free
 #include "output.h" // dprintf
 #include "romfile.h" // struct romfile_s
@@ -96,7 +97,8 @@ romfile_loadint(const char *name, u64 defval)
     int ret = file->copy(file, &val, sizeof(val));
     if (ret < 0)
         return defval;
-    return val;
+    /* romfile interface stores values in little endian */
+    return le64_to_cpu(val);
 }
 
 struct const_romfile_s {
