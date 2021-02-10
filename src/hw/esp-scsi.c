@@ -184,7 +184,7 @@ esp_scsi_add_lun(u32 lun, struct drive_s *tmpl_drv)
     boot_lchs_find_scsi_device(llun->pci, llun->target, llun->lun,
                                &(llun->drive.lchs));
     int prio = bootprio_find_scsi_device(llun->pci, llun->target, llun->lun);
-    int ret = scsi_drive_setup(&llun->drive, name, prio);
+    int ret = scsi_drive_setup(&llun->drive, name, prio, llun->target, llun->lun);
     free(name);
     if (ret)
         goto fail;

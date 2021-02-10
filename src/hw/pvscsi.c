@@ -276,7 +276,7 @@ pvscsi_add_lun(struct pci_device *pci, void *iobase,
     boot_lchs_find_scsi_device(pci, target, lun, &(plun->drive.lchs));
     char *name = znprintf(MAXDESCSIZE, "pvscsi %pP %d:%d", pci, target, lun);
     int prio = bootprio_find_scsi_device(pci, target, lun);
-    int ret = scsi_drive_setup(&plun->drive, name, prio);
+    int ret = scsi_drive_setup(&plun->drive, name, prio, target, lun);
     free(name);
     if (ret)
         goto fail;
