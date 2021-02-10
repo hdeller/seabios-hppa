@@ -101,7 +101,7 @@ serial_debug_flush(void)
  * QEMU debug port
  ****************************************************************/
 
-u16 DebugOutputPort VARFSEG = 0x402;
+portaddr_t DebugOutputPort VARFSEG = 0x402;
 
 void
 qemu_debug_preinit(void)

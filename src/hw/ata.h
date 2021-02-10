@@ -6,9 +6,9 @@
 #include "types.h" // u8
 
 struct ata_channel_s {
-    u16 iobase1;
-    u16 iobase2;
-    u16 iomaster;
+    portaddr_t iobase1;
+    portaddr_t iobase2;
+    portaddr_t iomaster;
     u8  irq;
     u8  chanid;
     u8  ataid;

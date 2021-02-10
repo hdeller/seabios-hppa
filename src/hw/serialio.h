@@ -23,7 +23,7 @@
 void serial_debug_preinit(void);
 void serial_debug_putc(char c);
 void serial_debug_flush(void);
-extern u16 DebugOutputPort;
+extern portaddr_t DebugOutputPort;
 void qemu_debug_preinit(void);
 void qemu_debug_putc(char c);
 
