@@ -790,6 +790,54 @@ interactive_bootmenu(void)
     hlist_add_head(&boot->node, &BootList);
 }
 
+#if CONFIG_PARISC
+void find_initial_parisc_boot_drives(struct drive_s **harddisc,
+            struct drive_s **cdrom)
+{
+    struct bootentry_s *pos;
+    hlist_for_each_entry(pos, &BootList, node) {
+	if ((pos->type == IPL_TYPE_CDROM) && (*cdrom == NULL))
+            *cdrom = pos->drive;
+	if ((pos->type == IPL_TYPE_HARDDISK) && (*harddisc == NULL))
+            *harddisc = pos->drive;
+    }
+}
+
+struct drive_s *select_parisc_boot_drive(char bootdrive)
+{
+    printf("Available boot devices:\n");
+
+    // Show menu items
+    int maxmenu = 0;
+    struct bootentry_s *pos;
+    hlist_for_each_entry(pos, &BootList, node) {
+        char desc[77];
+        maxmenu++;
+        printf("%d. %s\n", maxmenu
+               , strtcpy(desc, pos->description, ARRAY_SIZE(desc)));
+    }
+
+    /* try each boot device */
+    hlist_for_each_entry(pos, &BootList, node) {
+	if (((bootdrive == 'd') && (pos->type == IPL_TYPE_CDROM)) ||
+	    ((bootdrive != 'd') && (pos->type == IPL_TYPE_HARDDISK))) {
+                printf("\nBooting from %s\n",pos->description);
+		return pos->drive;
+	}
+    }
+    /* if none found, choose first bootable device */
+    hlist_for_each_entry(pos, &BootList, node) {
+	if ((pos->type == IPL_TYPE_CDROM) ||
+	    (pos->type == IPL_TYPE_HARDDISK)) {
+                printf("\nAuto-Booting from %s\n",pos->description);
+		return pos->drive;
+	}
+    }
+    return NULL;
+}
+#endif
+
+
 // BEV (Boot Execution Vector) list
 struct bev_s {
     int type;
