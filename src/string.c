@@ -86,24 +86,33 @@ strcmp(const char *s1, const char *s2)
 inline void
 memset_far(u16 d_seg, void *d_far, u8 c, size_t len)
 {
+#if CONFIG_X86
     SET_SEG(ES, d_seg);
     asm volatile(
         "rep stosb %%es:(%%di)"
         : "+c"(len), "+D"(d_far)
         : "a"(c), "m" (__segment_ES)
         : "cc", "memory");
+#else
+    memset(d_far, c, len);
+#endif
 }
 
 inline void
 memset16_far(u16 d_seg, void *d_far, u16 c, size_t len)
 {
     len /= 2;
+#if CONFIG_X86
     SET_SEG(ES, d_seg);
     asm volatile(
         "rep stosw %%es:(%%di)"
         : "+c"(len), "+D"(d_far)
         : "a"(c), "m" (__segment_ES)
         : "cc", "memory");
+#else
+    while (len)
+        ((u16 *)d_far)[--len] = c;
+#endif
 }
 
 void *
@@ -126,6 +135,7 @@ void memset_fl(void *ptr, u8 val, size_t size)
 inline void
 memcpy_far(u16 d_seg, void *d_far, u16 s_seg, const void *s_far, size_t len)
 {
+#if CONFIG_X86
     SET_SEG(ES, d_seg);
     u16 bkup_ds;
     asm volatile(
@@ -136,6 +146,9 @@ memcpy_far(u16 d_seg, void *d_far, u16 s_seg, const void *s_far, size_t len)
         : "=&r"(bkup_ds), "+c"(len), "+S"(s_far), "+D"(d_far)
         : "r"(s_seg), "m" (__segment_ES)
         : "cc", "memory");
+#else
+    memcpy(d_far, s_far, len);
+#endif
 }
 
 inline void
@@ -149,13 +162,14 @@ memcpy_fl(void *d_fl, const void *s_fl, size_t len)
         memcpy(d_fl, s_fl, len);
 }
 
-void *
+void * __VISIBLE
 #undef memcpy
 memcpy(void *d1, const void *s1, size_t len)
 #if MODESEGMENT == 0
 #define memcpy __builtin_memcpy
 #endif
 {
+#if CONFIG_X86
     SET_SEG(ES, GET_SEG(SS));
     void *d = d1;
     if (((u32)d1 | (u32)s1 | len) & 3) {
@@ -173,6 +187,13 @@ memcpy(void *d1, const void *s1, size_t len)
         : "+c"(len), "+S"(s1), "+D"(d)
         : "m" (__segment_ES) : "cc", "memory");
     return d1;
+#else
+    char *d = (char *)d1;
+    char *s = (char *)s1;
+    while (len--)
+        *d++ = *s++;
+    return d1;
+#endif
 }
 
 // Copy to/from memory mapped IO.  IO mem is very slow, so yield
@@ -180,6 +201,7 @@ memcpy(void *d1, const void *s1, size_t len)
 void
 iomemcpy(void *d, const void *s, u32 len)
 {
+#if CONFIG_X86
     ASSERT32FLAT();
     yield();
     while (len > 3) {
@@ -197,6 +219,9 @@ iomemcpy(void *d, const void *s, u32 len)
     if (len)
         // Copy any remaining bytes.
         memcpy(d, s, len);
+#else
+    memcpy(d, s, len);
+#endif
 }
 
 void *
