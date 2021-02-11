@@ -2,6 +2,7 @@
 #ifndef __STACKS_H
 #define __STACKS_H
 
+#include "autoconf.h" // CONFIG_*
 #include "types.h" // u32
 
 #define CALL32SMM_CMDID    0xb5
@@ -28,20 +29,32 @@ int on_extra_stack(void);
 struct bregs;
 void farcall16(struct bregs *callregs);
 void farcall16big(struct bregs *callregs);
+#if CONFIG_X86
 void __call16_int(struct bregs *callregs, u16 offset);
 #define call16_int(nr, callregs) do {                           \
         extern void irq_trampoline_ ##nr (void);                \
         __call16_int((callregs), (u32)&irq_trampoline_ ##nr );  \
     } while (0)
+#elif CONFIG_PARISC
+#define call16_int(nr, callregs) do {} while(0)
+#endif
 void reset(void);
 extern struct thread_info MainThread;
 struct thread_info *getCurThread(void);
-void yield(void);
 void yield_toirq(void);
-void thread_setup(void);
+#if CONFIG_THREADS
 int threads_during_optionroms(void);
+void yield(void);
+void thread_setup(void);
 void run_thread(void (*func)(void*), void *data);
 void wait_threads(void);
+#else
+#define threads_during_optionroms() (0)
+#define yield() while (0)
+#define thread_setup() while (0)
+#define run_thread(func,data) func(data)
+#define wait_threads() while (0)
+#endif
 struct mutex_s { u32 isLocked; };
 void mutex_lock(struct mutex_s *mutex);
 void mutex_unlock(struct mutex_s *mutex);
