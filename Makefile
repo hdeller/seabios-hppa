@@ -95,6 +95,7 @@ endif
 -include $(KCONFIG_CONFIG)
 
 target-y :=
+target-$(CONFIG_PARISC) += $(OUT)hppa-warning.bin
 target-$(CONFIG_QEMU) += $(OUT)bios.bin
 target-$(CONFIG_CSM) += $(OUT)Csm16.bin
 target-$(CONFIG_COREBOOT) += $(OUT)bios.bin.elf
@@ -102,8 +103,11 @@ target-$(CONFIG_BUILD_VGABIOS) += $(OUT)vgabios.bin
 
 all: $(target-y)
 
+parisc: FORCE
+	DIRS="" $(MAKE) -f Makefile.parisc all
+
 # Make definitions
-.PHONY : all clean distclean FORCE
+.PHONY : all clean distclean parisc FORCE
 .DELETE_ON_ERROR:
 
 
@@ -209,6 +213,9 @@ $(OUT)bios.bin.elf: $(OUT)rom.o $(OUT)bios.bin.prep
 	@echo "  Creating $@"
 	$(Q)$(STRIP) -R .comment $< -o $(OUT)bios.bin.elf
 
+$(OUT)hppa-warning.bin:
+	@echo "  Run 'make parisc' to build parisc firmware"
+	@/bin/false
 
 ################ VGA build rules
 
