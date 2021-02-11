@@ -18,6 +18,8 @@
 #define PORT_A20 0x0092
 #define A20_ENABLE_BIT 0x02
 
+#if defined(__i386__) || defined(__x86_64__)
+
 #ifndef __ASSEMBLY__
 
 #include "types.h" // u32
@@ -280,5 +282,9 @@ static inline u8 set_a20(u8 cond) {
 void cpuid(u32 index, u32 *eax, u32 *ebx, u32 *ecx, u32 *edx);
 
 #endif // !__ASSEMBLY__
+
+#elif defined(__hppa__)
+#include "parisc/hppa.h"        /* replacement functions for parisc architecture */
+#endif
 
 #endif // x86.h
