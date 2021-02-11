@@ -544,6 +544,10 @@ static int
 process_op_both(struct disk_op_s *op)
 {
     switch (GET_FLATPTR(op->drive_fl->type)) {
+#if CONFIG_PARISC
+    case DTYPE_ATA:
+        return ata_process_op(op);
+#endif
     case DTYPE_ATA_ATAPI:
         return ata_atapi_process_op(op);
     case DTYPE_USB:
@@ -624,7 +628,9 @@ process_op(struct disk_op_s *op)
             , op->count, op->command);
 
     int ret, origcount = op->count;
-    if (origcount * GET_FLATPTR(op->drive_fl->blksize) > 64*1024) {
+    /* Only x86 arch has problems with large reads/writes greater than 64kb */
+    if (CONFIG_X86 &&
+	(origcount * GET_FLATPTR(op->drive_fl->blksize) > 64*1024)) {
         op->count = 0;
         return DISK_RET_EBOUNDARY;
     }
