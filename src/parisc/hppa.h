@@ -192,6 +192,11 @@ static inline u32 rol(u32 val, u16 rol) {
     return res;
 }
 
+static inline u32 ror(u32 word, unsigned int shift)
+{
+        return (word >> (shift & 31)) | (word << ((-shift) & 31));
+}
+
 #define pci_ioport_addr(port) ((port >= 0x1000)  && (port < FIRMWARE_START))
 
 static inline void outl(u32 value, portaddr_t port) {
