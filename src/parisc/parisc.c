@@ -31,7 +31,7 @@
 
 #include "vgabios.h"
 
-#define SEABIOS_HPPA_VERSION 1
+#define SEABIOS_HPPA_VERSION 2
 
 /*
  * Various variables which are needed by x86 code.
