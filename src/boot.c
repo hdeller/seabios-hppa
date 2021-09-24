@@ -49,7 +49,11 @@ glob_prefix(const char *glob, const char *str)
     }
 }
 
+#if CONFIG_PARISC
+#define FW_PCI_DOMAIN "/dino-pcihost"
+#else
 #define FW_PCI_DOMAIN "/pci@i0cf8"
+#endif
 
 static char *
 build_pci_path(char *buf, int max, const char *devname, struct pci_device *pci)
