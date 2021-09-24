@@ -1778,9 +1778,15 @@ void __VISIBLE start_parisc_firmware(void)
     if (ram_size >= FIRMWARE_START)
         ram_size = FIRMWARE_START;
 
+    /* Initialize malloc stack */
+    malloc_preinit();
+
     /* Initialize qemu fw_cfg interface */
     PORT_QEMU_CFG_CTL = fw_cfg_port;
     qemu_cfg_init();
+
+    /* Initialize boot structures. Needs working fw_cfg for bootprio option. */
+    boot_init();
 
     i = romfile_loadint("/etc/firmware-min-version", 0);
     if (i && i > SEABIOS_HPPA_VERSION) {
@@ -1858,8 +1864,6 @@ void __VISIBLE start_parisc_firmware(void)
     init_stable_storage();
 
     chassis_code = 0;
-
-    malloc_preinit();
 
     // set Qemu serial debug port
     DebugOutputPort = PARISC_SERIAL_CONSOLE;
