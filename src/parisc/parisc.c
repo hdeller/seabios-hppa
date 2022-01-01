@@ -839,16 +839,17 @@ static int pdc_pim(unsigned int *arg)
     return PDC_BAD_PROC;
 }
 
+static struct pdc_model model = { PARISC_PDC_MODEL };
+
 static int pdc_model(unsigned int *arg)
 {
-    static unsigned long model[] = { PARISC_PDC_MODEL };
     static const char model_str[] = PARISC_MODEL;
     unsigned long option = ARG1;
     unsigned long *result = (unsigned long *)ARG2;
 
     switch (option) {
         case PDC_MODEL_INFO:
-            memcpy(result, model, sizeof(model));
+            memcpy(result, &model, sizeof(model));
             return PDC_OK;
         case PDC_MODEL_VERSIONS:
             switch (ARG3) {
@@ -866,7 +867,7 @@ static int pdc_model(unsigned int *arg)
             return PDC_OK;
         case PDC_MODEL_ENSPEC:
         case PDC_MODEL_DISPEC:
-            if (ARG3 != model[7])
+            if (ARG3 != model.pot_key)
                 return -20;
             return PDC_OK;
         case PDC_MODEL_CPU_ID:
@@ -1806,6 +1807,9 @@ void __VISIBLE start_parisc_firmware(void)
 
     /* use -fw_cfg opt/pdc_debug,string=255 to enable all firmware debug infos */
     pdc_debug = romfile_loadstring_to_int("opt/pdc_debug", 0);
+
+    model.sw_id = romfile_loadstring_to_int("opt/hostid", model.sw_id);
+    dprintf(0, "fw_cfg: machine hostid %lu\n", model.sw_id);
 
     /* Initialize PAGE0 */
     memset((void*)PAGE0, 0, sizeof(*PAGE0));
