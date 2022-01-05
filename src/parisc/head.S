@@ -46,10 +46,11 @@ name:
 #define SHLREG	shld
 #define ANDCM   andcm,*
 #define	COND(x)	* ## x
-#define RP_OFFSET	16
 #define FRAME_SIZE	128
 #define CALLEE_REG_FRAME_SIZE	144
 #define ASM_ULONG_INSN	.dword
+#define WORD_LEN 8
+#define INT_LEN 4
 #else	/* CONFIG_64BIT */
 #define LDREG	ldw
 #define STREG	stw
@@ -60,10 +61,11 @@ name:
 #define SHLREG	shlw
 #define ANDCM   andcm
 #define COND(x)	x
-#define RP_OFFSET	20
 #define FRAME_SIZE	64
 #define CALLEE_REG_FRAME_SIZE	128
 #define ASM_ULONG_INSN	.word
+#define WORD_LEN 4
+#define INT_LEN 4
 #endif
 
 	.import	$global$
@@ -72,12 +74,13 @@ name:
 
 	/* On HPMC, the CPUs will start here at 0xf0000000 */
 hpmc_entry:
-	b,n .	/* TODO! */
+        b,n toc_asm_entry       /* TOC and HPMC */
 
 reset_entry:
 	/* at reset, the CPU begins fetching instructions from address 0xf0000004. */
 	b,n startup
 
+marker:
 	/* file identification */
 	.stringz "PA-RISC/HPPA PDC Firmware (SeaBIOS fork)"
 	.stringz "https://github.com/hdeller/seabios-hppa"
@@ -186,6 +189,108 @@ END(startup)
 
 
 /*******************************************************
+  TOC handler
+  Write all GRs, CRs, SRs and the iaoq_back and iasq_back registers (in
+  r24/r25) into PIM area (when it's not filled yet). This is done by trashing the
+  shadow registers.
+  In a second step call the arificial getshadowregs asm instruction to restore
+  the shadow registers to their real values and store them in PIM as well.  Then
+  call the C-code.
+ *******************************************************/
+
+/* uses the shadow registers: 1,8,9,16,17,24,25 */
+#define PIM_PTR         %r1
+#define TEMP            %r8
+#define TEMP2           %r9
+#define PIM_SAVE        %r16
+#define IASQ_BACK       %r24    /* provided by qemu */
+#define IAOQ_BACK       %r25    /* provided by qemu */
+
+        .import pim_toc_data, data
+ENTRY(toc_asm_entry)
+        /* serialize CPUs on entry */
+        load32  BOOTADDR(toc_lock),TEMP
+0:      ldcw,co 0(TEMP),TEMP2
+        cmpib,= 0,TEMP2,0b
+        nop
+
+        mfctl   CPU_HPA_CR_REG, TEMP2   /* get CPU HPA from cr7 */
+        extru   TEMP2,31-12,4, TEMP     /* extract cpu id */
+
+        load32  BOOTADDR(pim_toc_data), PIM_PTR
+
+1:      comib,= 0,TEMP,2f
+        ldo     -1(TEMP),TEMP
+        ldo     (PIM_STORAGE_SIZE)(PIM_PTR), PIM_PTR /* find PIM entry */
+        b 1b
+
+2:      copy    PIM_PTR, PIM_SAVE
+        mtsp    %r0,%sr0
+
+        /* save registers into PIM only if cpu_state field is empty */
+        ldw     ((32+32+8+2)*WORD_LEN + 1*INT_LEN)(PIM_SAVE), TEMP
+        comib,<>,n 0, TEMP, 5f
+
+        /* save all general registers */
+        .set loop,0
+        .rept 32
+        STREGM  loop, WORD_LEN(PIM_PTR)
+        .set loop,loop+1
+        .endr
+
+        /* save all control registers */
+        .set loop,0
+        .rept 32
+        mfctl   loop,TEMP
+        STREGM  TEMP, WORD_LEN(PIM_PTR)
+        .set loop,loop+1
+        .endr
+
+        /* save all space registers */
+        .set loop,0
+        .rept 8
+        mfsp    loop,TEMP
+        STREGM  TEMP, WORD_LEN(PIM_PTR)
+        .set loop,loop+1
+        .endr
+
+        /* save IASQ_back and IAOQ_back as provided by qemu */
+        STREG   IASQ_BACK, ((32+32+8+0)*WORD_LEN)(PIM_SAVE)
+        STREG   IAOQ_BACK, ((32+32+8+1)*WORD_LEN)(PIM_SAVE)
+
+        /* restore shadow registers, can not use PIM_SAVE reg for this */
+        copy    PIM_SAVE, %r26
+        .word 0xfffdead2 /* qemu artificial getshadowregs asm instruction */
+        STREG   %r1, (1*WORD_LEN)(%r26)
+        STREG   %r8, (8*WORD_LEN)(%r26)
+        STREG   %r9, (9*WORD_LEN)(%r26)
+        STREG   %r16, (16*WORD_LEN)(%r26)
+        STREG   %r17, (17*WORD_LEN)(%r26)
+        STREG   %r24, (24*WORD_LEN)(%r26)
+        STREG   %r25, (25*WORD_LEN)(%r26)
+
+#ifdef CONFIG_64BIT
+        /* cr11 (sar) is a funny one.  5 bits on PA1.1 and 6 bit on PA2.0
+         * For PA2.0 mtsar or mtctl always write 6 bits, but mfctl only
+         * reads 5 bits.  Use mfctl,w to read all six bits.  Otherwise
+         * we lose the 6th bit on a save/restore. */
+        mfctl,w %cr11, TEMP
+        STREG   TEMP, ((32+11)*WORD_LEN)(%r26)
+#endif
+
+5:      /* call the "C" toc_handler in SeaBIOS */
+        loadgp
+        load32  BOOTADDR(parisc_stack), %sp
+        b,l     toc_handler, %r2
+        ldo     FRAME_SIZE(%sp),%sp
+
+        /* call OS handler, in case it returns reset the system */
+        load32  BOOTADDR(reset), %rp
+        bv,n    0(%ret0)
+END(toc_asm_entry)
+
+
+/*******************************************************
 	SMP Interrupt vector table (IVT)
  *******************************************************/
 
@@ -276,7 +381,6 @@ ENTRY(boot_args)
         .word 0 /* r20: pdc_debug */
         .word 0 /* r19: fw_cfg port */
 END(boot_args)
-
 
 /****************************************************************
  * Rom Header for VGA / STI

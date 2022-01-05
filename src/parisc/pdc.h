@@ -398,7 +398,9 @@ struct zeropage {
 	/* int	(*vec_rendz)(void); */
 	unsigned int vec_rendz;
 	int	vec_pow_fail_flen;
-	int	vec_pad[10];
+	int	vec_pad0[3];
+	unsigned int vec_toc_hi;
+	int	vec_pad1[6];
 
 	/* [0x040] reserved processor dependent */
 	int	pad0[112];              /* in QEMU pad0[0] holds "SeaBIOS\0" */
@@ -687,6 +689,42 @@ struct pdc_hpmc_pim_20 { /* PDC_PIM */
 	unsigned long long responder_addr;
 	unsigned long long requestor_addr;
 	unsigned long long fr[32];
+};
+
+struct pim_cpu_state_cf {
+	union {
+	unsigned int
+		iqv : 1,	/* IIA queue Valid */
+		iqf : 1,	/* IIA queue Failure */
+		ipv : 1,	/* IPRs Valid */
+		grv : 1,	/* GRs Valid */
+		crv : 1,	/* CRs Valid */
+		srv : 1,	/* SRs Valid */
+		trv : 1,	/* CR24 through CR31 valid */
+		pad : 24,	/* reserved */
+		td  : 1;	/* TOC did not cause any damage to the system state */
+	unsigned int val;
+	};
+};
+
+struct pdc_toc_pim_11 {
+	unsigned int gr[32];
+	unsigned int cr[32];
+	unsigned int sr[8];
+	unsigned int iasq_back;
+	unsigned int iaoq_back;
+	unsigned int check_type;
+	struct pim_cpu_state_cf cpu_state;
+};
+
+struct pdc_toc_pim_20 {
+	unsigned long long gr[32];
+	unsigned long long cr[32];
+	unsigned long long sr[8];
+	unsigned long long iasq_back;
+	unsigned long long iaoq_back;
+	unsigned int check_type;
+	struct pim_cpu_state_cf cpu_state;
 };
 
 #endif /* !defined(__ASSEMBLY__) */
