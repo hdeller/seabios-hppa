@@ -130,7 +130,7 @@ ENTRY(enter_smp_idle_loop)
 	/* enable CPU local interrupts */
 #define CR_EIEM 15
 #define PSW_I 1
-	ldi	-1, %r1	/* allow IRQ0 (Timer) */
+	load32	1<<31, %r1	/* allow IRQ0 (Timer) */
 	mtctl	%r1, CR_EIEM
 	ssm	PSW_I, %r9
 
@@ -140,7 +140,6 @@ $smp_idle_loop:
 	or %r10,%r10,%r10
 
 $smp_exit_loop:
-	mtsm	%r9
 	mtctl	%r0, CR_EIEM
 
 	/* on 64bit: Address of PDCE_PROC for each non-monarch processor in GR26. */
