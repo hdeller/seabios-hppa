@@ -112,6 +112,11 @@ extern unsigned long boot_args[];
 #define DEBUG_PDC       0x0001
 #define DEBUG_IODC      0x0002
 
+int pdc_console;
+/* flags for pdc_console */
+#define CONSOLE_SERIAL    0x0001
+#define CONSOLE_GRAPHICS  0x0002
+
 unsigned long PORT_QEMU_CFG_CTL;
 unsigned int tlb_entries = 256;
 unsigned int btlb_entries = 8;
@@ -1895,6 +1900,7 @@ void __VISIBLE start_parisc_firmware(void)
 {
     unsigned int i, cpu_hz;
     unsigned long iplstart, iplend;
+    char *str;
 
     unsigned long interactive = (linux_kernel_entry == 1) ? 1:0;
     char bootdrive = (char)cmdline; // c = hdd, d = CD/DVD
@@ -1935,6 +1941,15 @@ void __VISIBLE start_parisc_firmware(void)
     /* use -fw_cfg opt/pdc_debug,string=255 to enable all firmware debug infos */
     pdc_debug = romfile_loadstring_to_int("opt/pdc_debug", 0);
 
+    pdc_console = 0; /* default */
+    str = romfile_loadfile("opt/console", NULL);
+    if (str) {
+	if (strcmp(str, "serial") == 0)
+		pdc_console = CONSOLE_SERIAL;
+	if (strcmp(str, "graphics") == 0)
+		pdc_console = CONSOLE_GRAPHICS;
+    }
+
     model.sw_id = romfile_loadstring_to_int("opt/hostid", model.sw_id);
     dprintf(0, "fw_cfg: machine hostid %lu\n", model.sw_id);
 
@@ -1969,18 +1984,23 @@ void __VISIBLE start_parisc_firmware(void)
     PAGE0->imm_spa_size = ram_size;
     PAGE0->imm_max_mem = ram_size;
 
-    // Initialize boot paths (disc, display & keyboard)
+    /* initialize graphics (if available) */
     if (artist_present()) {
         sti_rom_init();
         sti_console_init(&sti_proc_rom);
-        ps2port_setup();
-        prepare_boot_path(&(PAGE0->mem_cons), &mem_cons_sti_boot, 0x60);
-        prepare_boot_path(&(PAGE0->mem_kbd),  &mem_kbd_sti_boot, 0xa0);
         PAGE0->proc_sti = (u32)&sti_proc_rom;
+        ps2port_setup();
     } else {
         remove_from_keep_list(LASI_GFX_HPA);
         remove_from_keep_list(LASI_PS2KBD_HPA);
         remove_from_keep_list(LASI_PS2MOU_HPA);
+    }
+
+    // Initialize boot paths (graphics & keyboard)
+    if (artist_present() && (pdc_console != CONSOLE_SERIAL)) {
+        prepare_boot_path(&(PAGE0->mem_cons), &mem_cons_sti_boot, 0x60);
+        prepare_boot_path(&(PAGE0->mem_kbd),  &mem_kbd_sti_boot, 0xa0);
+    } else {
         prepare_boot_path(&(PAGE0->mem_cons), &mem_cons_boot, 0x60);
         prepare_boot_path(&(PAGE0->mem_kbd),  &mem_kbd_boot, 0xa0);
     }
