@@ -104,6 +104,9 @@ target-$(CONFIG_BUILD_VGABIOS) += $(OUT)vgabios.bin
 all: $(target-y)
 
 parisc: FORCE
+ifneq "$(CONFIG_PARISC)" "y"
+	@echo "ERROR: run 'make config' and select PA-RISC before building the parisc target."
+endif
 	DIRS="" $(MAKE) -f Makefile.parisc all
 
 # Make definitions
