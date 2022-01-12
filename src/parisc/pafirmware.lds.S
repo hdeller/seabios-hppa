@@ -32,6 +32,7 @@ SECTIONS
                 *(.sti.text.dma_ctrl)
                 *(.sti.text)
                 *(.sti.data)
+                *(.sti.font)
                 *(.sti.text.end)
                 . = ALIGN(4096);
                 _sti_rom_end = .;

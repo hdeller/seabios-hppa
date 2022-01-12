@@ -117,6 +117,8 @@ int pdc_console;
 #define CONSOLE_SERIAL    0x0001
 #define CONSOLE_GRAPHICS  0x0002
 
+int sti_font;
+
 unsigned long PORT_QEMU_CFG_CTL;
 unsigned int tlb_entries = 256;
 unsigned int btlb_entries = 8;
@@ -1949,6 +1951,9 @@ void __VISIBLE start_parisc_firmware(void)
 	if (strcmp(str, "graphics") == 0)
 		pdc_console = CONSOLE_GRAPHICS;
     }
+
+    /* 0,1 = default 8x16 font, 2 = 16x32 font */
+    sti_font = romfile_loadstring_to_int("opt/font", 0);
 
     model.sw_id = romfile_loadstring_to_int("opt/hostid", model.sw_id);
     dprintf(0, "fw_cfg: machine hostid %lu\n", model.sw_id);
