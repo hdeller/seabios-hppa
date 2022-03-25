@@ -1195,6 +1195,11 @@ static int pdc_proc(unsigned int *arg)
         case 1:
             if (ARG2 != 0)
                 return PDC_BAD_PROC;
+            if (pdc_debug & DEBUG_PDC)
+                printf("\nSeaBIOS: CPU%d enters rendenzvous loop.\n",
+                        index_of_CPU_HPA(mfctl(CPU_HPA_CR_REG)));
+            /* wait until all outstanding timer irqs arrived. */
+            msleep(500);
             /* let the current CPU sleep until rendenzvous. */
             enter_smp_idle_loop();
             return PDC_OK;
