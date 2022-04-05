@@ -1,7 +1,7 @@
 /*
  * Startup glue code for parisc firmware
  *
- *   (C) 2017-2021 Helge Deller <deller@gmx.de>
+ *   (C) 2017-2022 Helge Deller <deller@gmx.de>
  */
 
 #include "parisc/hppa_hardware.h"
@@ -68,6 +68,14 @@ name:
 #define INT_LEN 4
 #endif
 
+/* various control register and irq bits */
+#define PSW_I		1
+#define CR_EIRR		23
+#define CR_IVA		14
+#define CR_EIEM		15
+#define PSW_W_SM	0x200
+#define PSW_W_BIT       36
+
 	.import	$global$
 	.section ".head.text","ax"
 	 .level 1.1
@@ -78,7 +86,7 @@ hpmc_entry:
 
 reset_entry:
 	/* at reset, the CPU begins fetching instructions from address 0xf0000004. */
-	b,n startup
+	b,n reset_cpu_entry
 
 marker:
 	/* file identification */
@@ -98,17 +106,17 @@ ENTRY(startup)
 	mtsp    %r0,%sr2
 	mtsp    %r0,%sr3
 	mtsp    %r0,%sr4
-	mtsp    %r0,%sr5
-	mtsp    %r0,%sr6
-	mtsp    %r0,%sr7
-
-#define PSW_W_SM	0x200
-#define PSW_W_BIT       36
 
 	;! nuke the W bit
 	.level 2.0
 	rsm	PSW_W_SM, %r0
 	.level 1.1
+
+	/* If CPU HPA is already set in CPU_HPA_CR_REG then the
+	 * CPU is already initialized, but the machine was reset */
+	mfctl   CPU_HPA_CR_REG, %r1
+	comib,<> 0,%r1,reset_cpu_entry
+	nop
 
 	/* Save CPU HPA in cr7, hopefully HP-UX will not use that register. */
 	mtctl   %r5, CPU_HPA_CR_REG /* store CPU HPA */
@@ -122,31 +130,27 @@ ENTRY(enter_smp_idle_loop)
 	/* IDLE LOOP for SMP CPUs - wait for rendenzvous. */
 	mfctl   CPU_HPA_CR_REG, %r25 /* get CPU HPA from cr7 */
 
-#define PSW_I 1
 	rsm	PSW_I, %r0	/* disable local irqs */
 
 	/* EIRR : clear all pending external intr */
-#define CR_EIRR 23
 	load32	-1,%r1
 	mtctl	%r1, CR_EIRR
 	mfctl	CR_EIRR, %r0
 	mtctl	%r0, CR_EIRR
 
 	/* Load IVT for SMT tiny loop exit */
-#define CR_IVA 14
 	load32	BOOTADDR(smp_ivt),%r1
 	mtctl	%r1, CR_IVA
 
 	/* enable CPU local interrupts */
-#define CR_EIEM 15
 	load32	1<<31, %r1	/* allow IRQ0 (Timer) */
 	mtctl	%r1, CR_EIEM
 	ssm	PSW_I, %r0	/* enable local irqs */
 
-	/* endless idle loop, exits to $smp_exit_loop by IRQ only */
+	/* endless idle loop for secondary CPUs. Exits to $smp_exit_loop by IRQ only */
 $smp_idle_loop:
 	b $smp_idle_loop
-	or %r10,%r10,%r10
+	or %r10,%r10,%r10	/* qemu sleep instruction */
 
 $smp_exit_loop:
 	mtctl	%r0, CR_EIEM
@@ -166,6 +170,18 @@ $smp_exit_loop:
 
 
 $is_monarch_cpu:
+	/* Save boot_args */
+        load32          BOOTADDR(0x040 + 10*4),%r1
+        stw,ma          %r26,4(%r1)
+        stw,ma          %r25,4(%r1)
+        stw,ma          %r24,4(%r1)
+        stw,ma          %r23,4(%r1)
+        stw,ma          %r22,4(%r1)
+        stw,ma          %r21,4(%r1)
+        stw,ma          %r20,4(%r1)
+        stw,ma          %r19,4(%r1)
+
+$is_monarch_cpu_reboot:
 	/* Initialize stack pointer */
 	load32	BOOTADDR(parisc_stack),%r1
 	ldo	FRAME_SIZE(%r1),%sp
@@ -183,21 +199,32 @@ $bss_loop:
 	cmpb,<<,n %r3,%r4,$bss_loop
 	stw,ma	%r0,4(%r3)
 
-	/* Save boot args */
-        load32          BOOTADDR(boot_args),%r1
-        stw,ma          %r26,4(%r1)
-        stw,ma          %r25,4(%r1)
-        stw,ma          %r24,4(%r1)
-        stw,ma          %r23,4(%r1)
-        stw,ma          %r22,4(%r1)
-        stw,ma          %r21,4(%r1)
-        stw,ma          %r20,4(%r1)
-        stw,ma          %r19,4(%r1)
-
 	load32	BOOTADDR(start_parisc_firmware),%r3
 	bv	0(%r3)
 	copy	%r0,%r2
 END(startup)
+
+ENTRY(reset_cpu_entry)
+	/* Make sure space registers are set to zero */
+	mtsp    %r0,%sr0
+	mtsp    %r0,%sr1
+	mtsp    %r0,%sr2
+	mtsp    %r0,%sr3
+	mtsp    %r0,%sr4
+
+	/* Get current CPU HPA. */
+	mfctl   CPU_HPA_CR_REG, %r5
+
+	/* branch if this is the monarch cpu */
+	load32 CPU_HPA,%r1
+	comb,= %r5,%r1,$is_monarch_cpu_reboot
+	nop
+
+	/* we assume the monarch CPU is in idle loop. wake it up. */
+	load32	1<<31, %r3	/* trigger IRQ0 (Timer) */
+	b	enter_smp_idle_loop
+	stw	%r3, 0(%r1)
+END(reset_cpu_entry)
 
 
 /*******************************************************
@@ -381,18 +408,6 @@ ENTRY(iodc_entry)
 	bv %r0(%rp)
 	ldw -32(%sp),%dp
 END(iodc_entry)
-
-	.data
-ENTRY(boot_args)
-        .word 0 /* r26: ramsize */
-        .word 0 /* r25: kernel entry point */
-        .word 0 /* r24: cmdline */
-        .word 0 /* r23: initrd_start */
-        .word 0 /* r22: initrd_end */
-        .word 0 /* r21: num CPUs */
-        .word 0 /* r20: pdc_debug */
-        .word 0 /* r19: fw_cfg port */
-END(boot_args)
 
 /****************************************************************
  * Rom Header for VGA / STI

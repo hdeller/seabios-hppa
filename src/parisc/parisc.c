@@ -1,6 +1,6 @@
 // Glue code for parisc architecture
 //
-// Copyright (C) 2017-2021  Helge Deller <deller@gmx.de>
+// Copyright (C) 2017-2022  Helge Deller <deller@gmx.de>
 // Copyright (C) 2019 Sven Schnelle <svens@stackframe.org>
 //
 // This file may be distributed under the terms of the GNU LGPLv3 license.
@@ -94,19 +94,15 @@ void wrmsr_smp(u32 index, u64 val) { }
  * PA-RISC specific constants and functions.
  ********************************************************/
 
-/* Pointer to zero-page of PA-RISC */
-#define PAGE0 ((volatile struct zeropage *) 0UL)
-
-/* variables provided by qemu */
-extern unsigned long boot_args[];
-#define ram_size		(boot_args[0])
-#define linux_kernel_entry	(boot_args[1])
-#define cmdline			(boot_args[2])
-#define initrd_start		(boot_args[3])
-#define initrd_end		(boot_args[4])
-#define smp_cpus		(boot_args[5])
-#define pdc_debug               (boot_args[6])
-#define fw_cfg_port		(boot_args[7])
+/* variables provided by qemu - boot_args starting at pad0[10] */
+#define ram_size		PAGE0->pad0[10]
+#define linux_kernel_entry	PAGE0->pad0[11]
+#define cmdline			PAGE0->pad0[12]
+#define initrd_start		PAGE0->pad0[13]
+#define initrd_end		PAGE0->pad0[14]
+#define smp_cpus		PAGE0->pad0[15]
+#define pdc_debug		PAGE0->pad0[16]
+#define fw_cfg_port		PAGE0->pad0[17]
 
 /* flags for pdc_debug */
 #define DEBUG_PDC       0x0001
@@ -1963,8 +1959,8 @@ void __VISIBLE start_parisc_firmware(void)
     model.sw_id = romfile_loadstring_to_int("opt/hostid", model.sw_id);
     dprintf(0, "fw_cfg: machine hostid %lu\n", model.sw_id);
 
-    /* Initialize PAGE0 */
-    memset((void*)PAGE0, 0, sizeof(*PAGE0));
+    /* Do not initialize PAGE0. We have the boot args stored there. */
+    /* memset((void*)PAGE0, 0, sizeof(*PAGE0)); */
 
     /* copy pdc_entry entry into low memory. */
     memcpy((void*)MEM_PDC_ENTRY, &pdc_entry_table, 3*4);
@@ -2033,13 +2029,13 @@ void __VISIBLE start_parisc_firmware(void)
     // PlatformRunningOn = PF_QEMU;  // emulate runningOnQEMU()
 
     cpu_hz = 100 * PAGE0->mem_10msec; /* Hz of this PARISC */
-    dprintf(1, "\nPARISC SeaBIOS Firmware, %ld x PA7300LC (PCX-L2) at %d.%06d MHz, %lu MB RAM.\n",
+    dprintf(1, "\nPARISC SeaBIOS Firmware, %d x PA7300LC (PCX-L2) at %d.%06d MHz, %d MB RAM.\n",
             smp_cpus, cpu_hz / 1000000, cpu_hz % 1000000,
             ram_size/1024/1024);
 
     if (ram_size < MIN_RAM_SIZE) {
         printf("\nSeaBIOS: Machine configured with too little "
-                "memory (%ld MB), minimum is %d MB.\n\n",
+                "memory (%d MB), minimum is %d MB.\n\n",
                 ram_size/1024/1024, MIN_RAM_SIZE/1024/1024);
         hlt();
     }
@@ -2073,9 +2069,9 @@ void __VISIBLE start_parisc_firmware(void)
                 " MHz    %s                 Functional            0 KB\n",
                 i < 10 ? " ":"", i, i?"Idle  ":"Active");
     printf("\n\n");
-    printf("  Available memory:     %llu MB\n"
+    printf("  Available memory:     %u MB\n"
             "  Good memory required: %d MB\n\n",
-            (unsigned long long)ram_size/1024/1024, MIN_RAM_SIZE/1024/1024);
+            ram_size/1024/1024, MIN_RAM_SIZE/1024/1024);
 
     // search boot devices
     find_initial_parisc_boot_drives(&parisc_boot_harddisc, &parisc_boot_cdrom);
@@ -2125,6 +2121,7 @@ void __VISIBLE start_parisc_firmware(void)
 
         printf("Autobooting Linux kernel which was loaded by qemu...\n\n");
         start_kernel = (void *) linux_kernel_entry;
+        linux_kernel_entry = 0;	/* zero out entry point in case we reset the machine */
         start_kernel(PAGE0->mem_free, cmdline, initrd_start, initrd_end);
         hlt(); /* this ends the emulator */
     }
