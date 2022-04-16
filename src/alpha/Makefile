@@ -1,4 +1,4 @@
-CROSS = alphaev67-linux-
+CROSS = alpha-linux-gnu-
 CC = $(CROSS)gcc
 LD = $(CROSS)ld
 
