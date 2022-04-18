@@ -28,7 +28,7 @@
         extern void func (void);                        \
         SEGOFF(SEG_BIOS, (u32)func - BUILD_BIOS_ADDR);  \
     })
-#elif CONFIG_PARISC
+#elif CONFIG_PARISC || CONFIG_ALPHA
 extern struct segoff_s ivt_table[256];
 
 #define GET_IVT(vector)		ivt_table[vector]
@@ -47,7 +47,7 @@ get_bda_ptr(void)
 {
 #if CONFIG_X86
     return MAKE_FLATPTR(SEG_BDA, 0);
-#elif CONFIG_PARISC
+#elif CONFIG_PARISC || CONFIG_ALPHA
     extern struct bios_data_area_s bios_data_area;
     return &bios_data_area;
 #endif
@@ -59,7 +59,7 @@ get_bda_ptr(void)
     GET_FARVAR(SEG_BDA, ((struct bios_data_area_s *)0)->var)
 #define SET_BDA(var, val) \
     SET_FARVAR(SEG_BDA, ((struct bios_data_area_s *)0)->var, (val))
-#elif CONFIG_PARISC
+#elif CONFIG_PARISC || CONFIG_ALPHA
 #define GET_BDA(var)		get_bda_ptr()->var
 #define SET_BDA(var, val)	get_bda_ptr()->var = (val)
 #endif
@@ -127,7 +127,7 @@ static inline u16 get_global_seg(void) {
 #define GET_GLOBAL(var)                                                 \
     GET_VAR(GLOBAL_SEGREG, *(typeof(&(var)))((void*)&(var)              \
                                              + get_global_offset()))
-#elif CONFIG_PARISC
+#elif CONFIG_PARISC || CONFIG_ALPHA
 #define GET_GLOBAL(var) (var)
 #endif
 

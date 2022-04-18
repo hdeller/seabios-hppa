@@ -20,8 +20,9 @@
 
 #include "protos.h"
 #include "console.h"
-#include "vgatables.h"
+#include "vgabios.h"
 
+#define SEG_CTEXT                      0xB800
 
 static void
 output_crnl(void)
@@ -91,7 +92,7 @@ static inline void set_console_alarm(void)
   set_alarm_rel(10 * 1000 * 1000);
 }
 
-void
+void __VISIBLE
 do_entInt(unsigned long type, unsigned long vector)
 {
   switch (type)
@@ -111,7 +112,7 @@ do_entInt(unsigned long type, unsigned long vector)
     }
 }
 
-void
+void __VISIBLE
 do_console(void)
 {
   char line[256];

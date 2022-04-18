@@ -34,6 +34,9 @@ typedef unsigned long  size_t;
 #define true           1
 #define false          0
 
+#ifdef SEABIOS
+#include "types.h"
+#else
 #define offsetof(type, member) __builtin_offsetof(type, member)
 
 typedef __builtin_va_list va_list;
@@ -42,6 +45,7 @@ typedef __builtin_va_list va_list;
 #define va_end(ap)             __builtin_va_end(ap)
 
 #define NULL                   ((void *)0)
+#endif /* SEABIOS */
 
 extern void *memset(void *, int, size_t);
 extern void *memcpy(void *, const void *, size_t);
@@ -227,18 +231,6 @@ extern unsigned int pci_vga_dev;
 
 extern void do_console(void);
 extern void entInt(void);
-
-/*
- * Utils
- */
-
-extern int printf(const char *, ...);
-extern void ndelay(unsigned long nsec);
-
-static inline void udelay(unsigned long msec)
-{
-  ndelay(msec * 1000);
-}
 
 /*
  * Initialization

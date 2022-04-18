@@ -4,7 +4,7 @@
 #include "autoconf.h"
 #include "types.h" // u32
 
-#if CONFIG_X86
+#if CONFIG_X86 || CONFIG_ALPHA
 #define TARGET_LITTLE_ENDIAN
 #elif CONFIG_PARISC
 #define TARGET_BIG_ENDIAN
@@ -31,6 +31,18 @@ static inline u32 __swab32(u32 val) {
         "shd %0, %1, 8, %0"		/* shift abcdcbab -> dcba */
         : "=r" (val), "=&r" (temp)
         : "0" (val));
+#elif CONFIG_ALPHA
+	u64 t0, t1, t2, t3;
+
+	t0 = __builtin_alpha_inslh(val, 7);	/* t0 : 0000000000AABBCC */
+	t1 = __builtin_alpha_inswl(val, 3);	/* t1 : 000000CCDD000000 */
+	t1 |= t0;			/* t1 : 000000CCDDAABBCC */
+	t2 = t1 >> 16;			/* t2 : 0000000000CCDDAA */
+	t0 = t1 & 0xFF00FF00;		/* t0 : 00000000DD00BB00 */
+	t3 = t2 & 0x00FF00FF;		/* t3 : 0000000000CC00AA */
+	t1 = t0 + t3;			/* t1 : ssssssssDDCCBBAA */
+
+	val = t1;
 #else
     #error "unknown arch"
 #endif

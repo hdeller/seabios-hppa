@@ -42,7 +42,7 @@ ramdisk_setup(void)
         warn_noalloc();
         return;
     }
-    e820_add((u32)pos, size, E820_RESERVED);
+    e820_add((u32)(unsigned long)pos, size, E820_RESERVED);
 
     // Copy image into ram.
     int ret = file->copy(file, pos, size);

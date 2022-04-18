@@ -14,7 +14,11 @@ typedef unsigned int u32;
 typedef signed int s32;
 typedef unsigned long long u64;
 typedef signed long long s64;
+#if defined(__alpha__)
+typedef unsigned long size_t;
+#else
 typedef u32 size_t;
+#endif
 
 union u64_u32_u {
     struct { u32 lo, hi; };
@@ -23,6 +27,8 @@ union u64_u32_u {
 
 #if MODE16 == 1
 typedef u16 portaddr_t;
+#elif defined(__alpha__)
+typedef unsigned long long portaddr_t;
 #else
 typedef unsigned int portaddr_t;
 #endif

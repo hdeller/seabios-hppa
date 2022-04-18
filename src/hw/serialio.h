@@ -3,7 +3,7 @@
 
 #include "types.h" // u16
 
-#if CONFIG_X86
+#if CONFIG_X86 | CONFIG_ALPHA
 #define PORT_LPT2              0x0278
 #define PORT_SERIAL4           0x02e8
 #define PORT_SERIAL2           0x02f8

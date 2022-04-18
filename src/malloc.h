@@ -18,9 +18,10 @@ void malloc_init(void);
 void malloc_prepboot(void);
 unsigned long malloc_palloc(struct zone_s *zone, u32 size, u32 align);
 void *parisc_malloc(u32 size, u32 align);
+void *arch_malloc(unsigned long size, unsigned long align);
 void *x86_malloc(struct zone_s *zone, u32 size, u32 align);
 #define _malloc(zone, size, align) \
-    (CONFIG_X86 ? x86_malloc(zone, size, align) : parisc_malloc(size, align))
+    (CONFIG_X86 ? x86_malloc(zone, size, align) : CONFIG_PARISC ? parisc_malloc(size, align) : arch_malloc(size, align))
 int malloc_pfree(u32 data);
 void free(void *data);
 u32 malloc_getspace(struct zone_s *zone);

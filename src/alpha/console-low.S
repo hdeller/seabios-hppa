@@ -23,6 +23,8 @@
 	.text
 	.cfi_sections .debug_frame
 
+        .globl do_entInt, code
+
 #define SAVE_ALL_SIZE	(18*8)
 
 	.globl	entInt

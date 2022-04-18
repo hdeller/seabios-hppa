@@ -3,6 +3,7 @@
 #define __UTIL_H
 
 #include "types.h" // u32
+#include "config.h" // CONFIG_*
 
 // apm.c
 void apm_shutdown(void);

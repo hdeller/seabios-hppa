@@ -3,14 +3,19 @@
 
 #include "types.h" // u32
 
+#if CONFIG_ALPHA
+#define PAGE_SIZE 8192
+#define PAGE_SHIFT 13
+#else
 // A typical OS page size
 #define PAGE_SIZE 4096
 #define PAGE_SHIFT 12
+#endif
 
 static inline u32 virt_to_phys(void *v) {
-    return (u32)v;
+    return (unsigned long)v;
 }
-static inline void *memremap(u32 addr, u32 len) {
+static inline void *memremap(unsigned long addr, u32 len) {
     return (void*)addr;
 }
 

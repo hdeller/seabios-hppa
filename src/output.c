@@ -20,6 +20,8 @@
 #include "util.h" // ScreenAndDebug
 #if CONFIG_PARISC
 #include "parisc/sticore.h"
+#elif CONFIG_ALPHA
+#include "alpha/console.h" // crb_puts
 #endif
 
 struct putcinfo {
@@ -89,8 +91,12 @@ screenc(char c)
     br.al = c;
     br.bl = 0x07;
     call16_int(0x10, &br);
-#else
+#elif CONFIG_PARISC
     parisc_screenc(c);
+#elif CONFIG_ALPHA
+    crb_puts(0, &c, 1);
+#else
+#error UNKNOWN ARCH
 #endif
 }
 
@@ -486,12 +492,14 @@ dump_regs(struct bregs *regs)
         dprintf(1, "  NULL\n");
         return;
     }
+#if !CONFIG_ALPHA
     dprintf(1, "   a=%08x  b=%08x  c=%08x  d=%08x ds=%04x es=%04x ss=%04x\n"
             , regs->eax, regs->ebx, regs->ecx, regs->edx
             , regs->ds, regs->es, GET_SEG(SS));
     dprintf(1, "  si=%08x di=%08x bp=%08x sp=%08x cs=%04x ip=%04x  f=%04x\n"
             , regs->esi, regs->edi, regs->ebp, (u32)&regs[1]
             , regs->code.seg, regs->code.offset, regs->flags);
+#endif
 }
 
 // Report entry to an Interrupt Service Routine (ISR).

@@ -11,8 +11,6 @@
 #include "ioport.h"
 #include "ps2port.h"
 
-typedef uint64_t u64;
-
 #define dprintf(lvl, fmt, ...)
 #define warn_timeout()
 

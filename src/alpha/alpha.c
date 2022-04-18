@@ -18,15 +18,20 @@
    along with this program; see the file COPYING.  If not see
    <http://www.gnu.org/licenses/>.  */
 
+#include "config.h"
+#include "util.h"
+#include "bregs.h" // struct bregs
+#include "stacks.h" // struct mutex_s
+#include "std/bda.h" // struct bios_data_area_s
+#include "vgabios.h" // struct vgamode_s
 #include "hwrpb.h"
 #include "osf.h"
 #include "ioport.h"
 #include "uart.h"
 #include "protos.h"
+#include "memmap.h"
 #include SYSTEM_H
 
-#define PAGE_SHIFT	13
-#define PAGE_SIZE	(1ul << PAGE_SHIFT)
 #define PAGE_OFFSET	0xfffffc0000000000UL
 
 #define VPTPTR		0xfffffffe00000000UL
@@ -36,6 +41,58 @@
 
 #define HZ	1024
 
+/*
+ * Various variables which are needed by x86 code.
+ * Defined here to be able to link seabios.
+ */
+int HaveRunPost;
+u8 ExtraStack[BUILD_EXTRA_STACK_SIZE+1] __aligned(8);
+u8 *StackPos;
+
+volatile int num_online_cpus;
+
+u8 BiosChecksum;
+
+char zonefseg_start, zonefseg_end;  // SYMBOLS
+char varlow_start, varlow_end, final_varlow_start;
+char final_readonly_start;
+char code32flat_start, code32flat_end;
+char zonelow_base;
+
+struct bios_data_area_s __VISIBLE bios_data_area;
+struct vga_bda_s	__VISIBLE vga_bios_data_area;
+struct floppy_dbt_s diskette_param_table;
+struct bregs regs;
+unsigned long parisc_vga_mem;
+unsigned long parisc_vga_mmio;
+struct segoff_s ivt_table[256];
+
+void mtrr_setup(void) { }
+void mouse_init(void) { }
+void pnp_init(void) { }
+u16  get_pnp_offset(void) { return 0; }
+void mathcp_setup(void) { }
+void smp_setup(void) { }
+void bios32_init(void) { }
+void yield_toirq(void) { }
+void farcall16(struct bregs *callregs) { }
+void farcall16big(struct bregs *callregs) { }
+void mutex_lock(struct mutex_s *mutex) { }
+void mutex_unlock(struct mutex_s *mutex) { }
+void start_preempt(void) { }
+void finish_preempt(void) { }
+int wait_preempt(void) { return 0; }
+int acpi_dsdt_present_eisaid(u16 eisaid) { return 0; }
+
+void cpuid(u32 index, u32 *eax, u32 *ebx, u32 *ecx, u32 *edx)
+{
+    *eax = *ebx = *ecx = *edx = 0;
+}
+
+void wrmsr_smp(u32 index, u64 val) { }
+
+
+/* alpha code */
 /* Upon entry, register a2 contains configuration information from the VM:
 
    bits 0-5 -- ncpus
@@ -71,8 +128,8 @@ bool have_vga;
 unsigned int pci_vga_bus;
 unsigned int pci_vga_dev;
 
-static void *
-alloc (unsigned long size, unsigned long align)
+void *
+arch_malloc(unsigned long size, unsigned long align)
 {
   void *p = (void *)(((unsigned long)last_alloc + align - 1) & ~(align - 1));
   last_alloc = p + size;
@@ -113,7 +170,7 @@ set_pte (unsigned long addr, void *page)
     pt = pte_page (pt[index]);
   else
     {
-      unsigned long *npt = alloc(PAGE_SIZE, PAGE_SIZE);
+      unsigned long *npt = arch_malloc(PAGE_SIZE, PAGE_SIZE);
       pt[index] = build_pte (npt);
       pt = npt;
     }
@@ -123,7 +180,7 @@ set_pte (unsigned long addr, void *page)
     pt = pte_page (pt[index]);
   else
     {
-      unsigned long *npt = alloc(PAGE_SIZE, PAGE_SIZE);
+      unsigned long *npt = arch_malloc(PAGE_SIZE, PAGE_SIZE);
       pt[index] = build_pte (npt);
       pt = npt;
     }
@@ -329,7 +386,7 @@ swppal(void *entry, void *pcb, unsigned long vptptr, unsigned long pv)
   __builtin_unreachable ();
 }
 
-void
+void __VISIBLE
 do_start(unsigned long memsize, void (*kernel_entry)(void),
          unsigned long config)
 {
@@ -341,7 +398,9 @@ do_start(unsigned long memsize, void (*kernel_entry)(void),
   uart_init();
   ps2port_setup();
   pci_setup();
+#if 0
   vgahw_init();
+#endif
   init_hwrpb(memsize, config);
 
   void *new_pc = kernel_entry ? kernel_entry : do_console;
@@ -349,7 +408,19 @@ do_start(unsigned long memsize, void (*kernel_entry)(void),
   swppal(new_pc, &pcb, VPTPTR, (unsigned long)new_pc);
 }
 
-void
+void __VISIBLE __noreturn hlt(void)
+{
+    /* TODO */
+    while (1);
+}
+
+void __VISIBLE __noreturn reset(void)
+{
+    /* TODO */
+    while (1);
+}
+
+void __VISIBLE
 do_start_wait(unsigned long cpuid)
 {
   while (1)

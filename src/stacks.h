@@ -35,7 +35,7 @@ void __call16_int(struct bregs *callregs, u16 offset);
         extern void irq_trampoline_ ##nr (void);                \
         __call16_int((callregs), (u32)&irq_trampoline_ ##nr );  \
     } while (0)
-#elif CONFIG_PARISC
+#elif CONFIG_PARISC || CONFIG_ALPHA
 #define call16_int(nr, callregs) do {} while(0)
 #endif
 void reset(void);

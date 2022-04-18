@@ -7,9 +7,9 @@
 #include "config.h" // CONFIG_*
 #include "x86.h" // rdtscll()
 #include "util.h" // timer_setup
-#include "parisc/pdc.h"
+#include "protos.h"
 
-#define PAGE0 ((volatile struct zeropage *) 0UL)
+#define ALPHA_CLOCK_HZ  250
 
 // Setup internal timers.
 void
@@ -25,13 +25,13 @@ pmtimer_setup(u16 ioport)
 // Return the number of milliseconds in 'ticks' number of timer irqs.
 u32 ticks_to_ms(u32 ticks)
 {
-    return (10 * ticks / PAGE0->mem_10msec);
+    return (ticks / ALPHA_CLOCK_HZ);
 }
 
 
 u32 ticks_from_ms(u32 ms)
 {
-    return (ms * PAGE0->mem_10msec / 10);
+    return (ms * ALPHA_CLOCK_HZ);
 }
 
 
@@ -52,7 +52,7 @@ timer_read(void)
 int
 timer_check(u32 end)
 {
-    return (s32)(timer_read() - end) > 0;
+    return (s64)(timer_read() - end) > 0;
 }
 
 static void
@@ -64,14 +64,30 @@ timer_sleep(u32 diff)
         /* idle wait */;
 }
 
-void ndelay(u32 count) {
-    timer_sleep((count * PAGE0->mem_10msec / 10) / 1000 / 1000);
+
+static inline long
+ndelay_with_int(u32 nsec)
+{
+  register long a0 __asm__("16") = nsec;
+  register long v0 __asm__("0");
+  asm volatile ("call_pal 3" : "=r"(v0) : "r"(a0));
+  return v0;
 }
+
+void
+ndelay(u32 nsec)
+{
+  long left = nsec;
+  do {
+    left = ndelay_with_int(left);
+  } while (left > 0);
+}
+
 void udelay(u32 count) {
-    timer_sleep((count * PAGE0->mem_10msec / 10) / 1000);
+    ndelay(count * 1000UL);
 }
 void mdelay(u32 count) {
-    timer_sleep((count * PAGE0->mem_10msec / 10));
+    ndelay(count * 1000UL * 1000UL);
 }
 
 void nsleep(u32 count) {
@@ -88,12 +104,12 @@ void msleep(u32 count) {
 u32
 timer_calc(u32 msecs)
 {
-    return (msecs * PAGE0->mem_10msec / 10) + timer_read();
+    return msecs + timer_read();
 }
 u32
 timer_calc_usec(u32 usecs)
 {
-    return ((usecs * PAGE0->mem_10msec / 10) / 1000) + timer_read();
+    return (usecs / 1000) + timer_read();
 }
 
 

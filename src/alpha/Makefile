@@ -26,10 +26,10 @@ clean:
 	rm -f *.o
 	rm -f palcode-*
 
-pal.o: pal.S osf.h sys-$(SYSTEM).h core-$(CORE).h
-init.o: init.c protos.h hwrpb.h osf.h uart.h sys-$(SYSTEM).h core-$(CORE).h
-printf.o: printf.c uart.h
-uart.o: uart.c uart.h protos.h
-crb.o: crb.c hwrpb.h protos.h console.h uart.h
-console.o: console.c console.h protos.h
-pci.o: pci.c protos.h pci.h pci_regs.h
+# pal.o: pal.S osf.h sys-$(SYSTEM).h core-$(CORE).h
+# init.o: init.c protos.h hwrpb.h osf.h uart.h sys-$(SYSTEM).h core-$(CORE).h
+# printf.o: printf.c uart.h
+# uart.o: uart.c uart.h protos.h
+# crb.o: crb.c hwrpb.h protos.h console.h uart.h
+# console.o: console.c console.h protos.h
+# pci.o: pci.c protos.h pci.h pci_regs.h

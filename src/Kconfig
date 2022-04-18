@@ -15,6 +15,11 @@ choice
         bool "PA-RISC"
         help
             Build PA-RISC firmware for QEMU.
+
+    config ALPHA
+        bool "ALPHA EV67"
+        help
+            Build Alpha processor firmware for QEMU.
 endchoice
 
 menu "General Features"
@@ -50,7 +55,7 @@ endchoice
             running on an emulator.
 
     config XEN
-        depends on QEMU && !PARISC
+        depends on QEMU && !(PARISC || ALPHA)
         bool "Support Xen HVM"
         default y
         help
@@ -58,7 +63,7 @@ endchoice
 
     config THREADS
         bool "Parallelize hardware init"
-        depends on !PARISC
+        depends on !(PARISC || ALPHA)
         default y
         help
             Support running hardware initialization in parallel.
@@ -77,7 +82,7 @@ endchoice
         help
             Support an interactive boot menu at end of post.
     config BOOTSPLASH
-        depends on BOOTMENU && !PARISC
+        depends on BOOTMENU && !(PARISC || ALPHA)
         bool "Graphical boot splash screen"
         default y
         help
@@ -187,25 +192,25 @@ menu "Hardware support"
         help
             Support for AHCI disk code.
     config SDCARD
-        depends on DRIVES && !PARISC
+        depends on DRIVES && !(PARISC || ALPHA)
         bool "SD controllers"
         default y
         help
             Support for SD cards on PCI host controllers.
     config VIRTIO_BLK
-        depends on DRIVES && QEMU_HARDWARE && !PARISC
+        depends on DRIVES && QEMU_HARDWARE && !(PARISC || ALPHA)
         bool "virtio-blk controllers"
         default y
         help
             Support boot from virtio-blk storage.
     config VIRTIO_SCSI
-        depends on DRIVES && QEMU_HARDWARE && !PARISC
+        depends on DRIVES && QEMU_HARDWARE && !(PARISC || ALPHA)
         bool "virtio-scsi controllers"
         default y
         help
             Support boot from virtio-scsi storage.
     config PVSCSI
-        depends on DRIVES && QEMU_HARDWARE && !PARISC
+        depends on DRIVES && QEMU_HARDWARE && !(PARISC || ALPHA)
         bool "PVSCSI controllers"
         default y
         help
@@ -241,20 +246,20 @@ menu "Hardware support"
         help
             Support boot from LSI MPT Fusion scsi storage.
     config FLOPPY
-        depends on DRIVES && HARDWARE_IRQ && !PARISC
+        depends on DRIVES && HARDWARE_IRQ && !(PARISC || ALPHA)
         bool "Floppy controller"
         default y
         help
             Support floppy drive access.
     config FLASH_FLOPPY
-        depends on DRIVES && !PARISC
+        depends on DRIVES && !(PARISC || ALPHA)
         bool "Floppy images from CBFS or fw_cfg"
         default y
         help
             Support floppy images stored in coreboot flash or from
             QEMU fw_cfg.
     config NVME
-        depends on DRIVES && !PARISC
+        depends on DRIVES && !(PARISC || ALPHA)
         bool "NVMe controllers"
         default y
         help
@@ -270,6 +275,7 @@ menu "Hardware support"
     config USB
         bool "USB"
         default y
+        depends on !ALPHA
         help
             Support USB devices.
     config USB_UHCI
@@ -291,7 +297,7 @@ menu "Hardware support"
         help
             Support USB EHCI controllers.
     config USB_XHCI
-        depends on USB && !PARISC
+        depends on USB && !(PARISC || ALPHA)
         bool "USB XHCI controllers"
         default y
         help
@@ -344,7 +350,7 @@ menu "Hardware support"
             Support parallel ports. This also enables int 17 parallel port calls.
     config RTC_TIMER
         bool "Real Time Clock (RTC) scheduling"
-        depends on HARDWARE_IRQ && !PARISC
+        depends on HARDWARE_IRQ && !(PARISC || ALPHA)
         default y
         help
             Support MC146818 Real Time Clock chip timer
@@ -430,7 +436,7 @@ menu "BIOS interfaces"
         help
             Support PnP BIOS entry point.
     config OPTIONROMS
-        depends on !PARISC
+        depends on !(PARISC || ALPHA)
         bool "Option ROMS"
         default y
         help
@@ -465,6 +471,7 @@ menu "BIOS interfaces"
 
     config S3_RESUME
         bool "S3 resume"
+        depends on X86
         default y
         help
             Support S3 resume handler.

@@ -115,6 +115,7 @@ memset16_far(u16 d_seg, void *d_far, u16 c, size_t len)
 #endif
 }
 
+#if !CONFIG_ALPHA
 void *
 memset(void *s, int c, size_t n)
 {
@@ -122,6 +123,7 @@ memset(void *s, int c, size_t n)
         ((char *)s)[--n] = c;
     return s;
 }
+#endif
 
 void memset_fl(void *ptr, u8 val, size_t size)
 {
@@ -162,6 +164,7 @@ memcpy_fl(void *d_fl, const void *s_fl, size_t len)
         memcpy(d_fl, s_fl, len);
 }
 
+#if !CONFIG_ALPHA
 void * __VISIBLE
 #undef memcpy
 memcpy(void *d1, const void *s1, size_t len)
@@ -195,6 +198,7 @@ memcpy(void *d1, const void *s1, size_t len)
     return d1;
 #endif
 }
+#endif
 
 // Copy to/from memory mapped IO.  IO mem is very slow, so yield
 // periodically.

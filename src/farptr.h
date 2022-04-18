@@ -140,6 +140,10 @@ DECL_SEGFUNCS(SS)
 #define FLATPTR_TO_SEG(p) (((u32)(p)) >> 16)
 #define FLATPTR_TO_OFFSET(p) (((u32)(p)) & 0xffff)
 #define MAKE_FLATPTR(seg,off) ((void*)(unsigned long)(off))
+#elif CONFIG_ALPHA
+#define FLATPTR_TO_SEG(p) (((u64)(p)) >> 16)
+#define FLATPTR_TO_OFFSET(p) (((u64)(p)) & 0xffff)
+#define MAKE_FLATPTR(seg,off) ((void*)(unsigned long)(off))
 #endif
 
 #if MODESEGMENT == 1
@@ -187,7 +191,7 @@ static inline void outsl_fl(u16 port, void *ptr_fl, u16 count) {
     (*((typeof(&(var)))MAKE_FLATPTR((seg), &(var))))
 #define SET_FARVAR(seg, var, val) \
     do { GET_FARVAR((seg), (var)) = (val); } while (0)
-#elif CONFIG_PARISC
+#elif CONFIG_PARISC || CONFIG_ALPHA
 #define GET_FARVAR(seg, var)		GET_VAR(seg, var)
 #define SET_FARVAR(seg, var, val)	SET_VAR(seg, var, val)
 #endif

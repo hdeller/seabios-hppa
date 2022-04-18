@@ -285,6 +285,8 @@ void cpuid(u32 index, u32 *eax, u32 *ebx, u32 *ecx, u32 *edx);
 
 #elif defined(__hppa__)
 #include "parisc/hppa.h"        /* replacement functions for parisc architecture */
+#elif defined(__alpha__)
+#include "alpha/alpha.h"        /* replacement functions for alpha architecture */
 #endif
 
 #endif // x86.h

@@ -96,6 +96,7 @@ endif
 
 target-y :=
 target-$(CONFIG_PARISC) += $(OUT)hppa-warning.bin
+target-$(CONFIG_ALPHA) += $(OUT)alpha-warning.bin
 target-$(CONFIG_QEMU) += $(OUT)bios.bin
 target-$(CONFIG_CSM) += $(OUT)Csm16.bin
 target-$(CONFIG_COREBOOT) += $(OUT)bios.bin.elf
@@ -108,6 +109,12 @@ ifneq "$(CONFIG_PARISC)" "y"
 	@echo "ERROR: run 'make config' and select PA-RISC before building the parisc target."
 endif
 	DIRS="" $(MAKE) -f Makefile.parisc all
+
+alpha: FORCE
+ifneq "$(CONFIG_ALPHA)" "y"
+	@echo "ERROR: run 'make config' and select ALPHA CPU before building the alpha target."
+endif
+	DIRS="" $(MAKE) -f Makefile.alpha all
 
 # Make definitions
 .PHONY : all clean distclean parisc FORCE
@@ -218,6 +225,10 @@ $(OUT)bios.bin.elf: $(OUT)rom.o $(OUT)bios.bin.prep
 
 $(OUT)hppa-warning.bin:
 	@echo "  Run 'make parisc' to build parisc firmware"
+	@/bin/false
+
+$(OUT)alpha-warning.bin:
+	@echo "  Run 'make alpha' to build alpha firmware"
 	@/bin/false
 
 ################ VGA build rules

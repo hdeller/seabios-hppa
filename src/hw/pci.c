@@ -19,7 +19,7 @@
 #include "parisc/hppa_hardware.h"
 #endif
 
-static u32 mmconfig;
+static unsigned long mmconfig;
 
 static void *mmconfig_addr(u16 bdf, u32 addr)
 {
