@@ -3,7 +3,9 @@
 
 #include "types.h" // u32
 
+#if !CONFIG_ALPHA
 #define PORT_PCI_REBOOT        0x0cf9
+#endif
 
 static inline u8 pci_bdf_to_bus(u16 bdf) {
     return bdf >> 8;

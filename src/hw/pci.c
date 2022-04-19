@@ -23,7 +23,7 @@ static unsigned long mmconfig;
 
 static void *mmconfig_addr(u16 bdf, u32 addr)
 {
-    return (void*)(mmconfig + ((u32)bdf << 12) + addr);
+    return (void*)(mmconfig + ((u32)bdf << 8) + addr);
 }
 
 static u32 ioconfig_cmd(u16 bdf, u32 addr)
@@ -102,7 +102,7 @@ pci_config_maskw(u16 bdf, u32 addr, u16 off, u16 on)
 void
 pci_enable_mmconfig(u64 addr, const char *name)
 {
-    if (addr >= 0x100000000ll)
+    if (!CONFIG_ALPHA && addr >= 0x100000000ll)
         return;
     dprintf(1, "PCIe: using %s mmconfig at 0x%llx\n", name, addr);
     mmconfig = addr;
@@ -165,7 +165,7 @@ int
 pci_probe_host(void)
 {
     outl(0x80000000, PORT_PCI_CMD);
-    if (inl(PORT_PCI_CMD) != 0x80000000) {
+    if (!CONFIG_ALPHA && inl(PORT_PCI_CMD) != 0x80000000) {
         dprintf(1, "Detected non-PCI system\n");
         return -1;
     }

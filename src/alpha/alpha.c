@@ -397,6 +397,7 @@ do_start(unsigned long memsize, void (*kernel_entry)(void),
   init_i8259();
   uart_init();
   ps2port_setup();
+  pci_enable_mmconfig((unsigned long)pci_conf_base, "clipper");
   pci_setup();
 #if 0
   vgahw_init();

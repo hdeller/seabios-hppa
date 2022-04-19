@@ -182,33 +182,34 @@ static inline void set_alarm_abs(unsigned long nsec)
 
 extern void *pci_io_base;
 extern void *pci_mem_base;
+extern void *pci_conf_base;
 
-static inline uint8_t inb(unsigned long port)
+static inline uint8_t inb(portaddr_t port)
 {
   return *(volatile uint8_t *)(pci_io_base + port);
 }
 
-static inline uint16_t inw(unsigned long port)
+static inline uint16_t inw(portaddr_t port)
 {
   return *(volatile uint16_t *)(pci_io_base + port);
 }
 
-static inline uint32_t inl(unsigned long port)
+static inline uint32_t inl(portaddr_t port)
 {
   return *(volatile uint32_t *)(pci_io_base + port);
 }
 
-static inline void outb(uint8_t val, unsigned long port)
+static inline void outb(uint8_t val, portaddr_t port)
 {
   *(volatile uint8_t *)(pci_io_base + port) = val;
 }
 
-static inline void outw(uint16_t val, unsigned long port)
+static inline void outw(uint16_t val, portaddr_t port)
 {
   *(volatile uint16_t *)(pci_io_base + port) = val;
 }
 
-static inline void outl(uint32_t val, unsigned long port)
+static inline void outl(uint32_t val, portaddr_t port)
 {
   *(volatile uint32_t *)(pci_io_base + port) = val;
 }

@@ -51,6 +51,8 @@ debug_putc(struct putcinfo *action, char c)
         coreboot_debug_putc(c);
     if (!CONFIG_PARISC)
         serial_debug_putc(c);
+    if (CONFIG_ALPHA)
+        crb_puts(0, &c, 1);
 }
 
 // Flush any pending output to debug port(s).
@@ -205,6 +207,13 @@ puthex(struct putcinfo *action, u32 val, int width, int uc)
     }
 }
 
+static void
+puthex64(struct putcinfo *action, u64 val, int width, int uc)
+{
+    puthex(action, val >> 32, 8, uc);
+    puthex(action, (u32) val, 8, uc);
+}
+
 // Output an integer in hexadecimal with a minimum width.
 static void
 putprettyhex(struct putcinfo *action, u64 val, int width, char padchar, int uc)
@@ -299,16 +308,22 @@ bvprintf(struct putcinfo *action, const char *fmt, va_list args)
             putuint(action, val64);
             break;
         case 'p':
-            val = va_arg(args, s32);
+            if (CONFIG_ALPHA)
+                val64 = va_arg(args, u64);
+            else
+                val = va_arg(args, s32);
             if (!MODESEGMENT && GET_GLOBAL(*(u8*)(n+1)) == 'P') {
                 // %pP is 'struct pci_device' printer
-                put_pci_device(action, (void*)val);
+                put_pci_device(action, (void*) CONFIG_ALPHA ? val64 : val);
                 n++;
                 break;
             }
             putc(action, '0');
             putc(action, 'x');
-            puthex(action, val, 8, 0);
+            if (CONFIG_ALPHA)
+                puthex64(action, val64, 8, 0);
+            else
+                puthex(action, val, 8, 0);
             break;
         case 'X':
         case 'x':

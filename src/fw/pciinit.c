@@ -551,7 +551,7 @@ static void pci_bios_init_platform(void)
 {
     struct pci_device *pci;
 
-    if (CONFIG_X86) {
+    if (CONFIG_X86 || CONFIG_ALPHA) {
         foreachpci(pci) {
              pci_init_device(pci_platform_tbl, pci, NULL);
         }
@@ -559,6 +559,10 @@ static void pci_bios_init_platform(void)
 
 #if CONFIG_PARISC
     dino_mem_addr_setup(NULL, NULL);
+#elif CONFIG_ALPHA
+    pcimem_start = 256 * 1024 * 1024;;
+    pcimem_end   = pcimem_start + 256 * 1024 * 1024;
+    pci_slot_get_irq = piix_pci_slot_get_irq;
 #endif
 }
 

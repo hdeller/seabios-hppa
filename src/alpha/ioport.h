@@ -9,6 +9,8 @@
 #ifndef IOPORT_H
 #define IOPORT_H
 
+#include "core-typhoon.h"
+
 #define PORT_DMA_ADDR_2        0x0004
 #define PORT_DMA_CNT_2         0x0005
 #define PORT_DMA1_MASK_REG     0x000a
@@ -55,9 +57,9 @@
 #define PORT_SERIAL1           0x03f8
 #define PORT_PIC1_ELCR         0x04d0
 #define PORT_PIC2_ELCR         0x04d1
-#define PORT_PCI_CMD           0x0cf8
-#define PORT_PCI_REBOOT        0x0cf9
-#define PORT_PCI_DATA          0x0cfc
+#define PORT_PCI_CMD           (TYPHOON_PCHIP0_PCI_CONF - TYPHOON_PCHIP0_PCI_IO)
+#define PORT_PCI_REBOOT        (0x0cf9 + 0xfe000000ull)
+#define PORT_PCI_DATA          (PORT_PCI_CMD + 4)
 #define PORT_BIOS_DEBUG        0x0402
 #define PORT_QEMU_CFG_CTL      0x0510
 #define PORT_QEMU_CFG_DATA     0x0511
