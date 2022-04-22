@@ -548,8 +548,6 @@ bootentry_add(int type, int prio, unsigned long data, const char *desc)
     struct hlist_node **pprev;
     struct bootentry_s *pos;
     hlist_for_each_entry_pprev(pos, pprev, &BootList, node) {
-    dprintf(3, "Loop bootable: %s (type:%d prio:%d data:%x)\n"
-            , pos->description, pos->type, pos->priority, pos->data);
         if (be->priority < pos->priority)
             break;
         if (be->priority > pos->priority)

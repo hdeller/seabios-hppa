@@ -451,7 +451,7 @@ static int alpha_boot_menu(unsigned long *iplstart, unsigned long *iplend,
     disk_op.lba = 0;
     printf("blocksize is %d, count is %d\n", disk_op.drive_fl->blksize, disk_op.count);
     ret = process_op(&disk_op);
-    printf("DISK_READ(count=%d) = %d\n", disk_op.count, ret);
+    // printf("DISK_READ(count=%d) = %d\n", disk_op.count, ret);
     if (ret)
         return 0;
 
@@ -474,6 +474,10 @@ printf("bootloader says: %s\n", (char *)target);
 
     /* TODO: calc checksum of bootblock and verify */
 
+    if ((ipl_size * SECT_SIZE) > BOOTLOADER_MAXSIZE) {
+        printf("FAIL: bootloader too big.\n");
+        return 0;
+    }
     /* check LIF header of bootblock */
     if (ipl_magic != 0) {
         printf("FAIL: Not an ALPHA boot disc. Magic is wrong.\n");
@@ -501,7 +505,7 @@ printf("bootloader says: %s\n", (char *)target);
     disk_op.count = (ipl_size * SECT_SIZE / disk_op.drive_fl->blksize) + 1;
     disk_op.lba = ipl_sect / (disk_op.drive_fl->blksize / SECT_SIZE);
     ret = process_op(&disk_op);
-    printf("DISK_READ IPL returned %d  count=%d  lba=%d\n", ret, disk_op.count, disk_op.lba);
+    // printf("DISK_READ IPL returned %d  count=%d  lba=%d\n", ret, disk_op.count, disk_op.lba);
 
     printf("First word at %p is 0x%lx\n", target, target[0]);
 
