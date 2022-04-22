@@ -39,32 +39,6 @@ u32 ticks_from_ms(u32 ms)
  * Internal timer reading
  ****************************************************************/
 
-u32 TimerLast VARLOW;
-
-// Sample the current timer value.
-static u32
-timer_read(void)
-{
-    return get_wall_time();
-}
-
-// Check if the current time is past a previously calculated end time.
-int
-timer_check(u32 end)
-{
-    return (s64)(timer_read() - end) > 0;
-}
-
-static void
-timer_sleep(u32 diff)
-{
-    u32 start = timer_read();
-    u32 end = start + diff;
-    while (!timer_check(end))
-        /* idle wait */;
-}
-
-
 static inline long
 ndelay_with_int(u32 nsec)
 {
@@ -100,18 +74,32 @@ void msleep(u32 count) {
     mdelay(count);
 }
 
+// Sample the current timer value.
+static u32
+timer_read(void)
+{
+    return get_wall_time();
+}
+
+// Check if the current time is past a previously calculated end time.
+int
+timer_check(u32 end)
+{
+    return (s64)(timer_read() - end) > 0;
+}
+
 // Return the TSC value that is 'msecs' time in the future.
 u32
 timer_calc(u32 msecs)
 {
-    return msecs + timer_read();
+    return (msecs * 1000) + timer_read();
 }
+
 u32
 timer_calc_usec(u32 usecs)
 {
     return (usecs / 1000) + timer_read();
 }
-
 
 void
 pit_setup(void)

@@ -194,9 +194,15 @@ stdvga_load_font(u16 seg, void *src_far, u16 count
     u16 blockaddr = ((destflags & 0x03) << 14) + ((destflags & 0x04) << 11);
     void *dest_far = (void*)(blockaddr + start*32);
     u16 i;
-    for (i = 0; i < count; i++)
+    for (i = 0; i < count; i++) {
+#if CONFIG_ALPHA
+        unsigned char *font_ptr = pci_mem_base + SEG_GRAPH*16;
+        __builtin_memcpy(font_ptr + i*32, src_far + i*fontsize, fontsize);
+#else
         memcpy_far(SEG_GRAPH, dest_far + i*32
                    , seg, src_far + i*fontsize, fontsize);
+#endif
+    }
     release_font_access();
 }
 
@@ -476,6 +482,7 @@ stdvga_enable_video_addressing(u8 disable)
 int
 stdvga_setup(void)
 {
+dprintf(1, "XXXXXXXXXXXXXXXXXXXX stdvga_setup\n");
     // switch to color mode and enable CPU access 480 lines
     stdvga_misc_write(0xc3);
     // more than 64k 3C4/04

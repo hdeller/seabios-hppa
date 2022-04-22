@@ -433,6 +433,9 @@ stdvga_override_crtc(int mode, u8 *crtc)
 static void
 clear_screen(struct vgamode_s *vmode_g)
 {
+#if CONFIG_ALPHA
+    return;
+#endif
     switch (GET_GLOBAL(vmode_g->memmodel)) {
     case MM_TEXT:
         memset16_far(GET_GLOBAL(vmode_g->sstart), 0, 0x0720, 32*1024);
@@ -454,6 +457,7 @@ stdvga_set_mode(struct vgamode_s *vmode_g, int flags)
         warn_internalerror();
         return -1;
     }
+dprintf(1,"111111111111\n");
     struct stdvga_mode_s *stdmode_g = container_of(
         vmode_g, struct stdvga_mode_s, info);
 
@@ -477,6 +481,7 @@ stdvga_set_mode(struct vgamode_s *vmode_g, int flags)
             stdvga_perform_gray_scale_summing(0x00, 0x100);
     }
 
+dprintf(1,"111111111111\n");
     // Set Attribute Ctl
     u8 *regs = GET_GLOBAL(stdmode_g->actl_regs);
     int i;
@@ -518,11 +523,13 @@ stdvga_set_mode(struct vgamode_s *vmode_g, int flags)
     if (!(flags & MF_NOCLEARMEM))
         clear_screen(vmode_g);
 
+dprintf(1,"2222\n");
     // Write the fonts in memory
     u8 memmodel = GET_GLOBAL(vmode_g->memmodel);
     if (memmodel == MM_TEXT)
         stdvga_load_font(get_global_seg(), vgafont16, 0x100, 0, 0, 16);
 
+dprintf(1,"333333333333\n");
     return 0;
 }
 

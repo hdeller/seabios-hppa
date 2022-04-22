@@ -44,7 +44,12 @@ struct vgamode_s {
 
 // Custom internal storage in BDA (don't change here without also
 // updating vgaentry.S)
+#if CONFIG_x86
 #define VGA_CUSTOM_BDA 0xb9
+#else
+extern struct vga_bda_s vga_bios_data_area;
+#define VGA_CUSTOM_BDA &vga_bios_data_area
+#endif
 
 struct vga_bda_s {
     u8 flags;

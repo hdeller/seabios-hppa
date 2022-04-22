@@ -63,8 +63,6 @@ struct bios_data_area_s __VISIBLE bios_data_area;
 struct vga_bda_s	__VISIBLE vga_bios_data_area;
 struct floppy_dbt_s diskette_param_table;
 struct bregs regs;
-unsigned long parisc_vga_mem;
-unsigned long parisc_vga_mmio;
 struct segoff_s ivt_table[256];
 
 void mtrr_setup(void) { }

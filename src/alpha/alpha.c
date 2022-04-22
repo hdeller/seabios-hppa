@@ -24,6 +24,11 @@
 #include "stacks.h" // struct mutex_s
 #include "std/bda.h" // struct bios_data_area_s
 #include "vgabios.h" // struct vgamode_s
+#include "hw/pci.h" // pci_enable_mmconfig
+#include "block.h" // disk_op_s
+#include "hw/blockcmd.h" // scsi_is_ready()
+#include "output.h" // printf()
+#include "vgahw.h"
 #include "hwrpb.h"
 #include "osf.h"
 #include "ioport.h"
@@ -39,6 +44,11 @@
 #define PA(VA)		((unsigned long)(VA) & 0xfffffffffful)
 #define VA(PA)		((void *)(PA) + PAGE_OFFSET)
 
+#define INIT_BOOTLOADER (char *) 0x20000000
+#define BOOTLOADER_MAXSIZE      128*1024
+unsigned long *bootloader_code;
+#define SECT_SIZE 512
+
 #define HZ	1024
 
 /*
@@ -50,6 +60,8 @@ u8 ExtraStack[BUILD_EXTRA_STACK_SIZE+1] __aligned(8);
 u8 *StackPos;
 
 volatile int num_online_cpus;
+
+struct drive_s *boot_drive;
 
 u8 BiosChecksum;
 
@@ -63,8 +75,6 @@ struct bios_data_area_s __VISIBLE bios_data_area;
 struct vga_bda_s	__VISIBLE vga_bios_data_area;
 struct floppy_dbt_s diskette_param_table;
 struct bregs regs;
-unsigned long parisc_vga_mem;
-unsigned long parisc_vga_mmio;
 struct segoff_s ivt_table[256];
 
 void mtrr_setup(void) { }
@@ -197,10 +207,9 @@ init_page_table(void)
 
   set_pte ((unsigned long)INIT_HWRPB, &hwrpb);
   
+  set_pte ((unsigned long)INIT_BOOTLOADER, &hwrpb);
   /* ??? SRM maps some amount of memory at 0x20000000 for use by programs
-     started from the console prompt.  Including the bootloader.  While
-     we're emulating MILO, don't bother as we jump straight to the kernel
-     loaded into KSEG.  */
+     started from the console prompt.  Including the bootloader. */
 }
 
 static void
@@ -386,6 +395,138 @@ swppal(void *entry, void *pcb, unsigned long vptptr, unsigned long pv)
   __builtin_unreachable ();
 }
 
+/********************************************************
+ * BOOT MENU
+ ********************************************************/
+
+extern void find_initial_parisc_boot_drives(
+        struct drive_s **harddisc,
+        struct drive_s **cdrom);
+extern struct drive_s *select_parisc_boot_drive(char bootdrive);
+
+static int alpha_boot_menu(unsigned long *iplstart, unsigned long *iplend,
+        char bootdrive)
+{
+    int ret;
+    unsigned long *target;
+
+    bootloader_code = arch_malloc(BOOTLOADER_MAXSIZE, PAGE_SIZE);
+    target = bootloader_code;
+    dprintf(1, "bootloader will be loaded to %p\n", bootloader_code);
+
+    struct disk_op_s disk_op = {
+        .buf_fl = target,
+        .command = CMD_SEEK,
+        .count = 0,
+        .lba = 0,
+    };
+
+    boot_drive = select_parisc_boot_drive(bootdrive);
+    disk_op.drive_fl = boot_drive;
+    if (boot_drive == NULL) {
+        printf("SeaBIOS: No boot device.\n");
+        return 0;
+    }
+
+    /* seek to beginning of disc/CD */
+    disk_op.drive_fl = boot_drive;
+    ret = process_op(&disk_op);
+    printf("DISK_SEEK returned %d\n", ret);
+    if (ret)
+        return 0;
+
+    // printf("Boot disc type is 0x%x\n", boot_drive->type);
+    disk_op.drive_fl = boot_drive;
+    if (boot_drive->type == DTYPE_ATA_ATAPI ||
+            boot_drive->type == DTYPE_ATA) {
+        disk_op.command = CMD_ISREADY;
+        ret = process_op(&disk_op);
+    } else {
+        ret = scsi_is_ready(&disk_op);
+    }
+    printf("DISK_READY returned %d\n", ret);
+
+    /* read boot sector of disc/CD */
+    disk_op.drive_fl = boot_drive;
+    disk_op.buf_fl = target;
+    disk_op.command = CMD_READ;
+    disk_op.count = 1;
+    disk_op.lba = 0;
+    printf("blocksize is %d, count is %d\n", disk_op.drive_fl->blksize, disk_op.count);
+    ret = process_op(&disk_op);
+    printf("DISK_READ(count=%d) = %d\n", disk_op.count, ret);
+    if (ret)
+        return 0;
+
+#if 0
+00000000  4c 69 6e 75 78 2f 41 6c  70 68 61 20 61 62 6f 6f  |Linux/Alpha aboo|
+00000010  74 20 66 6f 72 20 49 53  4f 20 66 69 6c 65 73 79  |t for ISO filesy|
+00000020  73 74 65 6d 2e 00 00 00  00 00 00 00 00 00 00 00  |stem............|
+00000030  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+*
+000001e0  a3 00 00 00 00 00 00 00  24 0f 00 00 00 00 00 00  |........$.......|
+000001f0  00 00 00 00 00 00 00 00  b9 96 01 dc e6 17 6d a8  |..............m.|
+00000200  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+#endif
+printf("bootloader says: %s\n", (char *)target);
+
+    unsigned int  ipl_size = target[0x1e0/sizeof(long)];
+    unsigned long ipl_sect = target[0x1e8/sizeof(long)];
+    unsigned long ipl_magic= target[0x1f0/sizeof(long)];
+    unsigned long ipl_sum  = target[0x1f8/sizeof(long)];
+
+    /* check LIF header of bootblock */
+    if (ipl_magic != 0) {
+        printf("FAIL: Not an ALPHA boot disc. Magic is wrong.\n");
+        return 0;
+    }
+    printf("ipl start at %ld, size %d\n", ipl_sect, ipl_size);
+
+    if ((ipl_sect * SECT_SIZE) & (disk_op.drive_fl->blksize-1)) {
+        printf("FAIL: Bootloader start sector not multiple of device block size.\n");
+        return 0;
+    }
+
+    /* seek to beginning of IPL */
+    disk_op.drive_fl = boot_drive;
+    disk_op.command = CMD_SEEK;
+    disk_op.count = 0;
+    disk_op.lba = ipl_sect * (disk_op.drive_fl->blksize / SECT_SIZE);
+    ret = process_op(&disk_op);
+    printf("DISK_SEEK to IPL returned %d\n", ret);
+
+    /* read IPL */
+    disk_op.drive_fl = boot_drive;
+    disk_op.buf_fl = target;
+    disk_op.command = CMD_READ;
+    disk_op.count = 1;
+    disk_op.lba = ipl_sect * (disk_op.drive_fl->blksize / SECT_SIZE);
+
+ipl_size = 4*4;
+
+    while (ipl_size) {
+        ret = process_op(&disk_op);
+        printf("DISK_READ IPL returned %d  count=%d  lba=%d\n", ret, disk_op.count, disk_op.lba);
+        disk_op.count = 1;
+        disk_op.buf_fl += disk_op.drive_fl->blksize;
+        disk_op.lba++;
+        ipl_size -= (disk_op.drive_fl->blksize / SECT_SIZE);
+    }
+
+    printf("First word at %p is 0x%llx\n", target, target[0]);
+
+    /* execute IPL */
+    // TODO: flush D- and I-cache, not needed in emulation ?
+#if 0
+    *iplstart = *iplend = (unsigned long) target;
+    *iplstart += ipl_entry;
+    *iplend += ALIGN(ipl_size, sizeof(unsigned long));
+#endif
+    return 1;
+}
+
+
+
 void __VISIBLE
 do_start(unsigned long memsize, void (*kernel_entry)(void),
          unsigned long config)
@@ -399,19 +540,25 @@ do_start(unsigned long memsize, void (*kernel_entry)(void),
   ps2port_setup();
   pci_enable_mmconfig((unsigned long)pci_conf_base, "clipper");
   pci_setup();
-#if 0
-  vgahw_init();
-#endif
+  vga_set_mode(0x5f, 0); // statt mode 3 / 0x5c
+  serial_setup();
+dprintf(1,"NOW block\n");
+  block_setup();
+dprintf(1,"NOW HWRP\n");
   init_hwrpb(memsize, config);
+
+  alpha_boot_menu(0,0, 'd');
 
   void *new_pc = kernel_entry ? kernel_entry : do_console;
 
+dprintf(1,"STARTING KERNEL NOW\n");
   swppal(new_pc, &pcb, VPTPTR, (unsigned long)new_pc);
 }
 
 void __VISIBLE __noreturn hlt(void)
 {
-    /* TODO */
+    /* FIXME */
+    // asm volatile ("call_pal CallPal_Halt");
     while (1);
 }
 

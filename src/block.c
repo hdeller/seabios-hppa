@@ -507,18 +507,24 @@ fill_edd(struct segoff_s edd, struct drive_s *drive_fl)
 void
 block_setup(void)
 {
+dprintf(1,"1a\n");
     floppy_setup();
+dprintf(1,"1b\n");
     ata_setup();
+dprintf(1,"1c\n");
     ahci_setup();
     sdcard_setup();
     ramdisk_setup();
+dprintf(2,"1\n");
     virtio_blk_setup();
     virtio_scsi_setup();
     lsi_scsi_setup();
     esp_scsi_setup();
+dprintf(3,"1\n");
     megasas_setup();
     pvscsi_setup();
     mpt_scsi_setup();
+dprintf(4,"1\n");
     nvme_setup();
 }
 
@@ -544,7 +550,7 @@ static int
 process_op_both(struct disk_op_s *op)
 {
     switch (GET_FLATPTR(op->drive_fl->type)) {
-#if CONFIG_PARISC
+#if !CONFIG_X86
     case DTYPE_ATA:
         return ata_process_op(op);
 #endif

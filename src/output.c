@@ -314,7 +314,11 @@ bvprintf(struct putcinfo *action, const char *fmt, va_list args)
                 val = va_arg(args, s32);
             if (!MODESEGMENT && GET_GLOBAL(*(u8*)(n+1)) == 'P') {
                 // %pP is 'struct pci_device' printer
-                put_pci_device(action, (void*) CONFIG_ALPHA ? val64 : val);
+#if CONFIG_ALPHA
+                put_pci_device(action, (void*) val64);
+#else
+                put_pci_device(action, (void*) val);
+#endif
                 n++;
                 break;
             }

@@ -109,9 +109,11 @@ memset16_far(u16 d_seg, void *d_far, u16 c, size_t len)
         : "+c"(len), "+D"(d_far)
         : "a"(c), "m" (__segment_ES)
         : "cc", "memory");
-#else
+#elif CONFIG_PARISC
     while (len)
         ((u16 *)d_far)[--len] = c;
+#else
+    /* TODO ?? */
 #endif
 }
 

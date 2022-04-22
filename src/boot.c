@@ -51,6 +51,8 @@ glob_prefix(const char *glob, const char *str)
 
 #if CONFIG_PARISC
 #define FW_PCI_DOMAIN "/dino-pcihost"
+#elif CONFIG_ALPHA
+#define FW_PCI_DOMAIN "/clipper-pcihost"
 #else
 #define FW_PCI_DOMAIN "/pci@i0cf8"
 #endif
@@ -507,7 +509,7 @@ boot_init(void)
 struct bootentry_s {
     int type;
     union {
-        u32 data;
+        unsigned long data;
         struct segoff_s vector;
         struct drive_s *drive;
     };
@@ -526,7 +528,7 @@ static struct hlist_head BootList VARVERIFY32INIT;
 #define IPL_TYPE_HALT        0xf0
 
 static void
-bootentry_add(int type, int prio, u32 data, const char *desc)
+bootentry_add(int type, int prio, unsigned long data, const char *desc)
 {
     if (! CONFIG_BOOT)
         return;
@@ -546,6 +548,8 @@ bootentry_add(int type, int prio, u32 data, const char *desc)
     struct hlist_node **pprev;
     struct bootentry_s *pos;
     hlist_for_each_entry_pprev(pos, pprev, &BootList, node) {
+    dprintf(3, "Loop bootable: %s (type:%d prio:%d data:%x)\n"
+            , pos->description, pos->type, pos->priority, pos->data);
         if (be->priority < pos->priority)
             break;
         if (be->priority > pos->priority)
@@ -560,7 +564,9 @@ bootentry_add(int type, int prio, u32 data, const char *desc)
                     && be->drive->cntl_id < pos->drive->cntl_id)))
             break;
     }
+    dprintf(3, "Registering bootable: 1111\n");
     hlist_add(&be->node, pprev);
+    dprintf(3, "Registering bootable: done\n");
 }
 
 // Return the given priority if it's set - defaultprio otherwise.
@@ -591,14 +597,14 @@ void
 boot_add_floppy(struct drive_s *drive, const char *desc, int prio)
 {
     bootentry_add(IPL_TYPE_FLOPPY, defPrio(prio, DefaultFloppyPrio)
-                  , (u32)drive, desc);
+                  , (unsigned long)drive, desc);
 }
 
 void
 boot_add_hd(struct drive_s *drive, const char *desc, int prio)
 {
     bootentry_add(IPL_TYPE_HARDDISK, defPrio(prio, DefaultHDPrio)
-                  , (u32)drive, desc);
+                  , (unsigned long)drive, desc);
 }
 
 void
@@ -615,14 +621,14 @@ boot_add_cd(struct drive_s *drive, const char *desc, int prio)
         }
     }
     bootentry_add(IPL_TYPE_CDROM, defPrio(prio, DefaultCDPrio)
-                  , (u32)drive, desc);
+                  , (unsigned long)drive, desc);
 }
 
 // Add a CBFS payload entry
 void
 boot_add_cbfs(void *data, const char *desc, int prio)
 {
-    bootentry_add(IPL_TYPE_CBFS, defPrio(prio, DEFAULT_PRIO), (u32)data, desc);
+    bootentry_add(IPL_TYPE_CBFS, defPrio(prio, DEFAULT_PRIO), (unsigned long)data, desc);
 }
 
 
@@ -794,7 +800,7 @@ interactive_bootmenu(void)
     hlist_add_head(&boot->node, &BootList);
 }
 
-#if CONFIG_PARISC
+#if CONFIG_PARISC || CONFIG_ALPHA
 void find_initial_parisc_boot_drives(struct drive_s **harddisc,
             struct drive_s **cdrom)
 {

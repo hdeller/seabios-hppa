@@ -136,7 +136,7 @@ static inline unsigned long stq_p(unsigned long port, unsigned long val)
   return v0;
 }
 
-static inline unsigned long get_wall_time(void)
+static inline unsigned long get_wall_time(void) // long seems to return wrong values !!
 {
   register unsigned long v0 __asm__("$0");
   register unsigned long a0 __asm__("$16") = 3;

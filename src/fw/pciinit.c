@@ -436,6 +436,11 @@ static void pci_enable_default_vga(void)
     foreachpci(pci) {
         if (is_pci_vga(pci)) {
             dprintf(1, "PCI: Using %pP for primary VGA\n", pci);
+#if CONFIG_ALPHA
+            have_vga = 1;
+            pci_vga_bus = pci_bdf_to_bus(pci->bdf);
+            pci_vga_dev = pci_bdf_to_dev(pci->bdf);
+#endif
             return;
         }
     }
@@ -536,6 +541,21 @@ static void dino_mem_addr_setup(struct pci_device *dev, void *arg)
     /* setup io address space */
     pci_io_low_end = 0xa000;
 }
+#elif CONFIG_ALPHA
+static int clipper_pci_slot_get_irq(struct pci_device *pci, int pin)
+{
+    int slot = pci_bdf_to_dev(pci->bdf);
+    uint8_t irq = 0xff; /* no interrupt mapping */
+
+    /* PCI-ISA bridge is hard-wired to IRQ 55 on real hardware, and comes in
+         at a different SCB vector; force the line register to 0xff.
+         Otherwise, see qemu hw/alpha/dp264.c:clipper_pci_map_irq()  */
+    if (pci->class != 0x0601 && pin >= 1 && pin <= 4)
+        irq = (slot + 1) * 4 + (pin - 1);
+
+    return irq;
+}
+
 #endif /* CONFIG_PARISC */
 
 
@@ -562,7 +582,7 @@ static void pci_bios_init_platform(void)
 #elif CONFIG_ALPHA
     pcimem_start = 256 * 1024 * 1024;;
     pcimem_end   = pcimem_start + 256 * 1024 * 1024;
-    pci_slot_get_irq = piix_pci_slot_get_irq;
+    pci_slot_get_irq = clipper_pci_slot_get_irq;
 #endif
 }
 

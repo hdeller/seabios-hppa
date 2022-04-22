@@ -170,11 +170,17 @@ $(OUT)strlen.o: src/alpha/strlen.S
 $(OUT)sys-clipper.o: src/alpha/sys-$(SYSTEM).S
 	@echo "  Compile checking $@"
 	$(Q)$(CC) $(CFLAGS32FLAT) $(ASFLAGS) -D__ASSEMBLY__ -c $< -o $@
+ALPHA_ASM_LIBS := $(OUT)pal.o $(OUT)console-low.o $(OUT)strlen.o $(OUT)sys-clipper.o
 
+$(OUT)__divqu.o: src/alpha/divide.S
+	$(Q)$(CC) $(CFLAGS32FLAT) $(ASFLAGS) -D__ASSEMBLY__ -DDIV           -c $< -o $@
+$(OUT)__remqu.o: src/alpha/divide.S
+	$(Q)$(CC) $(CFLAGS32FLAT) $(ASFLAGS) -D__ASSEMBLY__ -DREM           -c $< -o $@
 $(OUT)__divlu.o: src/alpha/divide.S
 	$(Q)$(CC) $(CFLAGS32FLAT) $(ASFLAGS) -D__ASSEMBLY__ -DDIV -DINTSIZE -c $< -o $@
 $(OUT)__remlu.o: src/alpha/divide.S
 	$(Q)$(CC) $(CFLAGS32FLAT) $(ASFLAGS) -D__ASSEMBLY__ -DREM -DINTSIZE -c $< -o $@
+DIVLIBS := $(OUT)__divlu.o $(OUT)__remlu.o $(OUT)__divqu.o $(OUT)__remqu.o
 
 
 ################ Main BIOS build rules
@@ -190,11 +196,11 @@ $(OUT)ccode32flat.o: $(OUT)autoversion.h $(OUT)autoconf.h $(patsubst %.c, $(OUT)
 $(OUT)autoversion.h:
 	$(Q)$(PYTHON) ./scripts/buildversion.py -e "$(EXTRAVERSION)" -t "$(CC);$(AS);$(LD);$(OBJCOPY);$(OBJDUMP);$(STRIP)" $(OUT)autoversion.h
 
-$(OUT)alpha-firmware.img: $(OUT)autoconf.h $(OUT)ccode32flat.o src/version.c $(OUT)pal.o $(OUT)console-low.o $(OUT)strlen.o $(OUT)sys-clipper.o $(OUT)__divlu.o $(OUT)__remlu.o
+$(OUT)alpha-firmware.img: $(OUT)autoconf.h $(OUT)ccode32flat.o src/version.c $(ALPHA_ASM_LIBS) $(DIVLIBS)
 	@echo "  Linking $@"
 	# $(Q)$(CPP) $(CPPFLAGS) -Isrc -D__ASSEMBLY__ src/alpha/pafirmware.lds.S -o $(OUT)pafirmware.lds
 	$(Q)$(CC) $(CFLAGS32FLAT) -c src/version.c -o $(OUT)version.o
-	$(Q)$(LD) -relax -N -T src/alpha/palcode.ld $(OUT)version.o $(OUT)pal.o $(OUT)console-low.o $(OUT)strlen.o $(OUT)sys-clipper.o $(OUT)__divlu.o $(OUT)__remlu.o -o $@ -Map $@.map -e __start --as-needed $(OUT)ccode32flat.o $(LIBGCC)
+	$(Q)$(LD) -relax -N -T src/alpha/palcode.ld $(OUT)version.o $(ALPHA_ASM_LIBS) $(DIVLIBS) -o $@ -Map $@.map -e __start --as-needed $(OUT)ccode32flat.o $(LIBGCC)
 
 ################ Kconfig rules
 

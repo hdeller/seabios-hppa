@@ -261,7 +261,6 @@ get_current_mode(void)
 int
 vga_set_mode(int mode, int flags)
 {
-    dprintf(1, "set VGA mode %x\n", mode);
     struct vgamode_s *vmode_g = vgahw_find_mode(mode);
     if (!vmode_g)
         return VBE_RETURN_STATUS_FAILED;
