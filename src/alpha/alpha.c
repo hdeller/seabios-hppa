@@ -207,9 +207,6 @@ init_page_table(void)
 
   set_pte ((unsigned long)INIT_HWRPB, &hwrpb);
   
-  set_pte ((unsigned long)INIT_BOOTLOADER, &hwrpb);
-  /* ??? SRM maps some amount of memory at 0x20000000 for use by programs
-     started from the console prompt.  Including the bootloader. */
 }
 
 static void
@@ -431,7 +428,7 @@ static int alpha_boot_menu(unsigned long *iplstart, unsigned long *iplend,
     /* seek to beginning of disc/CD */
     disk_op.drive_fl = boot_drive;
     ret = process_op(&disk_op);
-    printf("DISK_SEEK returned %d\n", ret);
+    // printf("DISK_SEEK returned %d\n", ret);
     if (ret)
         return 0;
 
@@ -444,7 +441,7 @@ static int alpha_boot_menu(unsigned long *iplstart, unsigned long *iplend,
     } else {
         ret = scsi_is_ready(&disk_op);
     }
-    printf("DISK_READY returned %d\n", ret);
+    // printf("DISK_READY returned %d\n", ret);
 
     /* read boot sector of disc/CD */
     disk_op.drive_fl = boot_drive;
@@ -475,12 +472,14 @@ printf("bootloader says: %s\n", (char *)target);
     unsigned long ipl_magic= target[0x1f0/sizeof(long)];
     unsigned long ipl_sum  = target[0x1f8/sizeof(long)];
 
+    /* TODO: calc checksum of bootblock and verify */
+
     /* check LIF header of bootblock */
     if (ipl_magic != 0) {
         printf("FAIL: Not an ALPHA boot disc. Magic is wrong.\n");
         return 0;
     }
-    printf("ipl start at %ld, size %d\n", ipl_sect, ipl_size);
+    printf("ipl start sector is %ld, ipl size %d\n", ipl_sect, ipl_size);
 
     if ((ipl_sect * SECT_SIZE) & (disk_op.drive_fl->blksize-1)) {
         printf("FAIL: Bootloader start sector not multiple of device block size.\n");
@@ -491,37 +490,33 @@ printf("bootloader says: %s\n", (char *)target);
     disk_op.drive_fl = boot_drive;
     disk_op.command = CMD_SEEK;
     disk_op.count = 0;
-    disk_op.lba = ipl_sect * (disk_op.drive_fl->blksize / SECT_SIZE);
+    disk_op.lba = ipl_sect / (disk_op.drive_fl->blksize / SECT_SIZE);
     ret = process_op(&disk_op);
-    printf("DISK_SEEK to IPL returned %d\n", ret);
+    // printf("DISK_SEEK to IPL returned %d\n", ret);
 
     /* read IPL */
     disk_op.drive_fl = boot_drive;
     disk_op.buf_fl = target;
     disk_op.command = CMD_READ;
-    disk_op.count = 1;
-    disk_op.lba = ipl_sect * (disk_op.drive_fl->blksize / SECT_SIZE);
+    disk_op.count = (ipl_size * SECT_SIZE / disk_op.drive_fl->blksize) + 1;
+    disk_op.lba = ipl_sect / (disk_op.drive_fl->blksize / SECT_SIZE);
+    ret = process_op(&disk_op);
+    printf("DISK_READ IPL returned %d  count=%d  lba=%d\n", ret, disk_op.count, disk_op.lba);
 
-ipl_size = 4*4;
-
-    while (ipl_size) {
-        ret = process_op(&disk_op);
-        printf("DISK_READ IPL returned %d  count=%d  lba=%d\n", ret, disk_op.count, disk_op.lba);
-        disk_op.count = 1;
-        disk_op.buf_fl += disk_op.drive_fl->blksize;
-        disk_op.lba++;
-        ipl_size -= (disk_op.drive_fl->blksize / SECT_SIZE);
-    }
-
-    printf("First word at %p is 0x%llx\n", target, target[0]);
+    printf("First word at %p is 0x%lx\n", target, target[0]);
 
     /* execute IPL */
-    // TODO: flush D- and I-cache, not needed in emulation ?
-#if 0
-    *iplstart = *iplend = (unsigned long) target;
-    *iplstart += ipl_entry;
-    *iplend += ALIGN(ipl_size, sizeof(unsigned long));
-#endif
+    ret = BOOTLOADER_MAXSIZE;
+    int pageno = 0;
+    while (ret > 0) {
+        set_pte ((unsigned long)INIT_BOOTLOADER + pageno * PAGE_SIZE, ((char*)target) + pageno * PAGE_SIZE);
+        ret -= PAGE_SIZE;
+    }
+
+    void *new_pc = target;
+    dprintf(1,"STARTING BOOTLOADER NOW at %p\n", target);
+    swppal(new_pc, &pcb, VPTPTR, (unsigned long)target);
+
     return 1;
 }
 
@@ -551,7 +546,7 @@ dprintf(1,"NOW HWRP\n");
 
   void *new_pc = kernel_entry ? kernel_entry : do_console;
 
-dprintf(1,"STARTING KERNEL NOW\n");
+dprintf(1,"STARTING KERNEL NOW at %p\n", new_pc);
   swppal(new_pc, &pcb, VPTPTR, (unsigned long)new_pc);
 }
 

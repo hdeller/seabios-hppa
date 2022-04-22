@@ -34,9 +34,7 @@
 static inline int
 await_ide(u8 mask, u8 flags, portaddr_t base, u16 timeout)
 {
-    u32 end = timer_calc(timeout);
-    u32 diff = end-timer_calc(0);
-printf("AAAAAAAAAAAAAAAAAAAAA %u timeout %d\n", diff, (int)timeout);
+    time_t end = timer_calc(timeout);
     for (;;) {
         u8 status = inb(base+ATA_CB_STAT);
         if ((status & mask) == flags)
@@ -946,9 +944,7 @@ init_controller(struct pci_device *pci, int chanid, int irq
     chan_gf->iomaster = master;
     dprintf(1, "ATA controller %d at %x/%x/%x (irq %d dev %x)\n"
             , ataid, port1, port2, master, irq, chan_gf->pci_bdf);
-dprintf(1,"start run_thread\n");
     run_thread(ata_detect, chan_gf);
-dprintf(1,"ende run_thread\n");
 }
 
 #define IRQ_ATA1 14
@@ -1050,12 +1046,9 @@ ata_setup(void)
     dprintf(3, "init hard drives\n");
 
     SpinupEnd = timer_calc(IDE_TIMEOUT);
-dprintf(1,"H1\n");
     ata_scan();
-dprintf(1,"H2\n");
 
     SET_BDA(disk_control_byte, 0xc0);
 
-dprintf(1,"H2\n");
     enable_hwirq(14, FUNC16(entry_76));
 }

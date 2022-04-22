@@ -335,15 +335,15 @@ clock_poll_irq(void)
 
 // Calculate the timer value at 'count' number of full timer ticks in
 // the future.
-u32
-irqtimer_calc_ticks(u32 count)
+time_t
+irqtimer_calc_ticks(time_t count)
 {
     return (GET_BDA(timer_counter) + count + 1) % TICKS_PER_DAY;
 }
 
 // Return the timer value that is 'msecs' time in the future.
-u32
-irqtimer_calc(u32 msecs)
+time_t
+irqtimer_calc(time_t msecs)
 {
     if (!msecs)
         return GET_BDA(timer_counter);
@@ -352,7 +352,7 @@ irqtimer_calc(u32 msecs)
 
 // Check if the given timer value has passed.
 int
-irqtimer_check(u32 end)
+irqtimer_check(time_t end)
 {
     return (((GET_BDA(timer_counter) + TICKS_PER_DAY - end) % TICKS_PER_DAY)
             < (TICKS_PER_DAY/2));

@@ -564,9 +564,7 @@ bootentry_add(int type, int prio, unsigned long data, const char *desc)
                     && be->drive->cntl_id < pos->drive->cntl_id)))
             break;
     }
-    dprintf(3, "Registering bootable: 1111\n");
     hlist_add(&be->node, pprev);
-    dprintf(3, "Registering bootable: done\n");
 }
 
 // Return the given priority if it's set - defaultprio otherwise.

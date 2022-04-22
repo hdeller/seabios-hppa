@@ -274,6 +274,8 @@ bvprintf(struct putcinfo *action, const char *fmt, va_list args)
         }
         if (c == 'l') {
             // Ignore long format indicator
+            if (CONFIG_ALPHA)
+                is64 = 1;
             n++;
             c = GET_GLOBAL(*(u8*)n);
         }

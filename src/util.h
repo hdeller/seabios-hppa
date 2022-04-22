@@ -64,12 +64,17 @@ int cdrom_boot(struct drive_s *drive_g);
 char *cdrom_media_info(struct drive_s *drive_g);
 
 // clock.c
+#if CONFIG_ALPHA
+typedef unsigned long time_t;
+#else
+typedef u32 time_t;
+#endif
 void clock_setup(void);
 void handle_1583(struct bregs *regs);
 void clock_poll_irq(void);
-u32 irqtimer_calc_ticks(u32 count);
-u32 irqtimer_calc(u32 msecs);
-int irqtimer_check(u32 end);
+time_t irqtimer_calc_ticks(time_t count);
+time_t irqtimer_calc(time_t msecs);
+int irqtimer_check(time_t end);
 void handle_1586(struct bregs *regs);
 
 // fw/acpi.c
@@ -186,17 +191,17 @@ void sdcard_setup(void);
 void timer_setup(void);
 void pmtimer_setup(u16 ioport);
 void tsctimer_setfreq(u32 khz, const char *src);
-u32 timer_calc(u32 msecs);
-u32 timer_calc_usec(u32 usecs);
-int timer_check(u32 end);
-void ndelay(u32 count);
-void udelay(u32 count);
-void mdelay(u32 count);
-void nsleep(u32 count);
-void usleep(u32 count);
-void msleep(u32 count);
-u32 ticks_to_ms(u32 ticks);
-u32 ticks_from_ms(u32 ms);
+time_t timer_calc(time_t msecs);
+time_t timer_calc_usec(time_t usecs);
+int timer_check(time_t end);
+void ndelay(time_t count);
+void udelay(time_t count);
+void mdelay(time_t count);
+void nsleep(time_t count);
+void usleep(time_t count);
+void msleep(time_t count);
+time_t ticks_to_ms(time_t ticks);
+time_t ticks_from_ms(time_t ms);
 void pit_setup(void);
 
 // jpeg.c
