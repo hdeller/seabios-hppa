@@ -514,11 +514,12 @@ printf("bootloader says: %s\n", (char *)target);
     int pageno = 0;
     while (ret > 0) {
         set_pte ((unsigned long)INIT_BOOTLOADER + pageno * PAGE_SIZE, ((char*)target) + pageno * PAGE_SIZE);
+        pageno++;
         ret -= PAGE_SIZE;
     }
 
-    void *new_pc = target;
-    dprintf(1,"STARTING BOOTLOADER NOW at %p\n", target);
+    void *new_pc = INIT_BOOTLOADER; // target;
+    dprintf(1,"STARTING BOOTLOADER NOW at %p\n", new_pc);
     swppal(new_pc, &pcb, VPTPTR, (unsigned long)target);
 
     return 1;
