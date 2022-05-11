@@ -404,7 +404,7 @@ extern struct drive_s *select_parisc_boot_drive(char bootdrive);
 static int alpha_boot_menu(unsigned long *iplstart, unsigned long *iplend,
         char bootdrive)
 {
-    int ret;
+    int i, ret;
     unsigned long *target;
 
     bootloader_code = arch_malloc(BOOTLOADER_MAXSIZE, PAGE_SIZE);
@@ -472,7 +472,14 @@ printf("bootloader says: %s\n", (char *)target);
     unsigned long ipl_magic= target[0x1f0/sizeof(long)];
     unsigned long ipl_sum  = target[0x1f8/sizeof(long)];
 
-    /* TODO: calc checksum of bootblock and verify */
+    /* calc checksum of bootblock and verify */
+    u64 sum = 0;
+    for (i = 0; i < 63; i++)
+        sum += target[i];
+    if (sum != target[63]) {
+        printf("FAIL: Bootsector checksum error.\n");
+        return 0;
+    }
 
     if ((ipl_size * SECT_SIZE) > BOOTLOADER_MAXSIZE) {
         printf("FAIL: bootloader too big.\n");

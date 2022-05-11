@@ -133,6 +133,7 @@ unsigned long
 crb_get_env(unsigned long id, char *buf, unsigned long length)
 {
   /* FIXME */
+  crb_puts(0, "HALLO\n", 6);
   return 0xc000000000000000ul;
 }
 
