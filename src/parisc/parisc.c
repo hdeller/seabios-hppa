@@ -114,6 +114,7 @@ extern unsigned long boot_args[];
 
 int pdc_console;
 /* flags for pdc_console */
+#define CONSOLE_DEFAULT   0x0000
 #define CONSOLE_SERIAL    0x0001
 #define CONSOLE_GRAPHICS  0x0002
 
@@ -583,6 +584,7 @@ int __VISIBLE parisc_iodc_ENTRY_IO(unsigned int *arg FUNC_MANY_ARGS)
             return PDC_OK;
         case ENTRY_IO_CIN: /* console input, with 5 seconds timeout */
             c = (char*)ARG6;
+            /* FIXME: Add loop to wait for up to 5 seconds for input */
             if (HPA_is_serial_device(hpa))
                 result[0] = parisc_serial_in(c, ARG7);
             else if (HPA_is_keyboard_device(hpa))
@@ -1948,7 +1950,7 @@ void __VISIBLE start_parisc_firmware(void)
     /* use -fw_cfg opt/pdc_debug,string=255 to enable all firmware debug infos */
     pdc_debug = romfile_loadstring_to_int("opt/pdc_debug", 0);
 
-    pdc_console = 0; /* default */
+    pdc_console = CONSOLE_DEFAULT;
     str = romfile_loadfile("opt/console", NULL);
     if (str) {
 	if (strcmp(str, "serial") == 0)
@@ -2007,7 +2009,13 @@ void __VISIBLE start_parisc_firmware(void)
     }
 
     // Initialize boot paths (graphics & keyboard)
-    if (artist_present() && (pdc_console != CONSOLE_SERIAL)) {
+    if (pdc_console == CONSOLE_DEFAULT) {
+	if (artist_present())
+            pdc_console = CONSOLE_GRAPHICS;
+	else
+            pdc_console = CONSOLE_SERIAL;
+    }
+    if (pdc_console == CONSOLE_GRAPHICS) {
         prepare_boot_path(&(PAGE0->mem_cons), &mem_cons_sti_boot, 0x60);
         prepare_boot_path(&(PAGE0->mem_kbd),  &mem_kbd_sti_boot, 0xa0);
     } else {
