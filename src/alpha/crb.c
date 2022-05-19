@@ -27,6 +27,10 @@
 /* All routines use the high bit to signal error.  */
 #define ERR	0x8000000000000000ul
 
+#define DEBUG_PUTSTR(txt) {             \
+    const char __x[] = txt "\n";        \
+    crb_puts(0, __x, sizeof(__x));      \
+    }
 
 unsigned long
 crb_getc(long unit)
@@ -44,6 +48,7 @@ crb_process_keycode(long unit, long keycode, long again)
   /* This routine might be needed for real keyboards, and mostly for
      internationalization stuff.  */
   /* Return Failure: routine not supported.  */
+  DEBUG_PUTSTR("crb_process_keycode");
   return 0xc000000000000000ul;
 }
 
@@ -68,6 +73,7 @@ crb_puts(long unit, const char *buf, unsigned long length)
 unsigned long
 crb_reset_term(long unit)
 {
+  DEBUG_PUTSTR("crb_reset_term");
   /* Multiple consoles not yet supported.  */
   if (unit != 0)
     return ERR;
@@ -81,6 +87,7 @@ crb_set_term_ctl(long unit, long ctb)
 {
   /* ??? The contents of the CTB do not seem to be defined anywhere.
      How, therefore, can the user set new contents?  */
+  DEBUG_PUTSTR("crb_term_ctl");
   return ERR;
 }
 
@@ -88,6 +95,7 @@ static unsigned long
 crb_set_term_int(long unit, long mask)
 {
   /* We do no buffering, therefore we don't need to support interrupts.  */
+  DEBUG_PUTSTR("term_init");
   if (unit != 0 || (mask & 0x22) != 0)
     return ERR;
   return 0;
@@ -97,6 +105,7 @@ unsigned long
 crb_open(const char *devstr,  unsigned long length)
 {
   /* FIXME */
+  DEBUG_PUTSTR("OPEN_CONSOLE");
   return ERR;
 }
 
@@ -104,6 +113,7 @@ unsigned long
 crb_close(long channel)
 {
   /* FIXME */
+  DEBUG_PUTSTR("CLOSE_CONSOLE");
   return 0;
 }
 
@@ -111,6 +121,7 @@ static unsigned long
 crb_ioctl(long channel)
 {
   /* We do not, nor will not, support virtual tapes.  */
+  DEBUG_PUTSTR("crb_ioctl");
   return ERR;
 }
 
@@ -118,6 +129,7 @@ unsigned long
 crb_read(long channel, unsigned long length, char *buf, unsigned long block)
 {
   /* FIXME */
+  DEBUG_PUTSTR("crb_read");
   return ERR;
 }
 
@@ -126,14 +138,28 @@ crb_write(long channel, unsigned long length, const char *buf,
           unsigned long block)
 {
   /* FIXME */
+  DEBUG_PUTSTR("crb_write");
   return ERR;
 }
 
 unsigned long
-crb_get_env(unsigned long id, char *buf, unsigned long length)
+crb_get_env(unsigned long id, char *buf, unsigned long len)
 {
+  char t[100];
   /* FIXME */
-  crb_puts(0, "HALLO\n", 6);
+  snprintf(t, sizeof(t)-1, "crb_get_env(id %ld, buf %p, len %lu)\n", id, buf, len);
+  crb_puts(0, t, strlen(t));
+  switch (id) {
+    case ENV_BOOTED_DEV:
+            snprintf(buf, len, "dka0");
+            return strlen(buf);
+    case ENV_BOOTED_FILE:
+            snprintf(buf, len, "vmlinux");
+            return strlen(buf);
+    case ENV_TTY_DEV:
+            snprintf(buf, len, "tty0");
+            return strlen(buf);
+  }
   return 0xc000000000000000ul;
 }
 
@@ -141,6 +167,7 @@ unsigned long
 crb_set_env(unsigned long id, const char *buf, unsigned long length)
 {
   /* FIXME */
+  DEBUG_PUTSTR("crb_set_env");
   return 0xc000000000000000ul;
 }
 
@@ -148,6 +175,7 @@ static unsigned long
 crb_reset_env(unsigned long id, char *buf, unsigned long length)
 {
   /* FIXME */
+  DEBUG_PUTSTR("crb_reset_env");
   return 0xc000000000000000ul;
 }
 
@@ -155,6 +183,7 @@ static unsigned long
 crb_save_env(void)
 {
   /* FIXME */
+  DEBUG_PUTSTR("crb_save_env");
   return 0xc000000000000000ul;
 }
 
@@ -162,6 +191,7 @@ static unsigned long
 crb_pswitch(long action, long cpu_id)
 {
   /* Why would we ever need to support switching primary processor?  */
+  DEBUG_PUTSTR("crb_pswitch");
   return ERR;
 }
 
@@ -182,6 +212,13 @@ int_crb_dispatch(long select, long a1, long a2, long a3, long a4)
       return crb_set_term_ctl(a1, a2);
     case CRB_PROCESS_KEYCODE:
       return crb_process_keycode(a1, a2, a3);
+
+    case CCB_OPEN_CONSOLE:
+        DEBUG_PUTSTR("OPEN_CONSOLE");
+        break;
+    case CCB_CLOSE_CONSOLE:
+        DEBUG_PUTSTR("CLOSE_CONSOLE");
+        break;
 
     case CRB_OPEN:
       return crb_open((const char*)a1, a2);
@@ -215,6 +252,7 @@ int_crb_fixup(unsigned long vptptr, unsigned long hwrpb)
   /* Given that this console is written to use the KSEG, and not be
      mapped into any page-table address space, it doesn't seem like
      we need to do anything at all here.  */
+  DEBUG_PUTSTR("crb_fixup");
   return 0;
 }
 

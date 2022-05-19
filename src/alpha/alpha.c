@@ -206,7 +206,6 @@ init_page_table(void)
   page_dir[pt_index(VPTPTR, 2)] = build_pte(page_dir);
 
   set_pte ((unsigned long)INIT_HWRPB, &hwrpb);
-  
 }
 
 static void
@@ -524,9 +523,10 @@ printf("bootloader says: %s\n", (char *)target);
         pageno++;
         ret -= PAGE_SIZE;
     }
+    set_pte ((unsigned long)INIT_HWRPB, &hwrpb);
 
     void *new_pc = INIT_BOOTLOADER; // target;
-    dprintf(1,"STARTING BOOTLOADER NOW at %p\n", new_pc);
+    dprintf(1,"STARTING BOOTLOADER NOW at %p\n\n", new_pc);
     swppal(new_pc, &pcb, VPTPTR, (unsigned long)target);
 
     return 1;
