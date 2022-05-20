@@ -193,10 +193,18 @@ putsinglehex(struct putcinfo *action, u32 val, int uc)
 
 // Output an integer in hexadecimal with a specified width.
 static void
-puthex(struct putcinfo *action, u32 val, int width, int uc)
+puthex(struct putcinfo *action, u64 val, int width, int uc)
 {
     switch (width) {
-    default: putsinglehex(action, (val >> 28) & 0xf, uc);
+    case 16:  putsinglehex(action, (val >> 60) & 0xf, uc);
+    case 15:  putsinglehex(action, (val >> 56) & 0xf, uc);
+    case 14:  putsinglehex(action, (val >> 52) & 0xf, uc);
+    case 13:  putsinglehex(action, (val >> 48) & 0xf, uc);
+    case 12:  putsinglehex(action, (val >> 44) & 0xf, uc);
+    case 11:  putsinglehex(action, (val >> 40) & 0xf, uc);
+    case 10:  putsinglehex(action, (val >> 36) & 0xf, uc);
+    case 9:  putsinglehex(action, (val >> 32) & 0xf, uc);
+    case 8:  putsinglehex(action, (val >> 28) & 0xf, uc);
     case 7:  putsinglehex(action, (val >> 24) & 0xf, uc);
     case 6:  putsinglehex(action, (val >> 20) & 0xf, uc);
     case 5:  putsinglehex(action, (val >> 16) & 0xf, uc);
