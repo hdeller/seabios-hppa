@@ -16,7 +16,11 @@
 
    You should have received a copy of the GNU General Public License
    along with this program; see the file COPYING.  If not see
-   <http://www.gnu.org/licenses/>.  */
+   <http://www.gnu.org/licenses/>.
+
+./qemu-system-alpha -hda hdd.img  -drive file=../qemu-images/debian-11.0.0-alpha-NETINST-1.iso,if=ide,media=cdrom -serial mon:stdio -accel tcg,thread=multi -smp cpus=1 -m 1G -bios ../seabios/out/alpha-firmware.img  -d trace:*xcchip*,trace:*conf* -nographic  #-d in_asm # -dfilter 0x0000000000000000..0x0000000020000fff #-dfilter 0xfffffc0000000080..0xfffffc0000000084  -nographic
+
+*/
 
 #include "config.h"
 #include "util.h"
@@ -39,7 +43,8 @@
 
 #define PAGE_OFFSET	0xfffffc0000000000UL
 
-#define VPTPTR		0xfffffffe00000000UL
+// #define VPTPTR		0xfffffffe00000000UL
+#define VPTPTR		0x200000000UL
 
 #define PA(VA)		((unsigned long)(VA) & 0xfffffffffful)
 #define VA(PA)		((void *)(PA) + PAGE_OFFSET)
@@ -410,6 +415,7 @@ static int alpha_boot_menu(unsigned long *iplstart, unsigned long *iplend,
     target = bootloader_code;
     dprintf(1, "bootloader will be loaded to %p\n", bootloader_code);
 
+    printf("(boot dka500.5.0.2000.0 -flags 0)\n");
     struct disk_op_s disk_op = {
         .buf_fl = target,
         .command = CMD_SEEK,
@@ -448,23 +454,12 @@ static int alpha_boot_menu(unsigned long *iplstart, unsigned long *iplend,
     disk_op.command = CMD_READ;
     disk_op.count = 1;
     disk_op.lba = 0;
-    printf("blocksize is %d, count is %d\n", disk_op.drive_fl->blksize, disk_op.count);
+    // printf("blocksize is %d, count is %d\n", disk_op.drive_fl->blksize, disk_op.count);
     ret = process_op(&disk_op);
     // printf("DISK_READ(count=%d) = %d\n", disk_op.count, ret);
     if (ret)
         return 0;
-
-#if 0
-00000000  4c 69 6e 75 78 2f 41 6c  70 68 61 20 61 62 6f 6f  |Linux/Alpha aboo|
-00000010  74 20 66 6f 72 20 49 53  4f 20 66 69 6c 65 73 79  |t for ISO filesy|
-00000020  73 74 65 6d 2e 00 00 00  00 00 00 00 00 00 00 00  |stem............|
-00000030  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
-*
-000001e0  a3 00 00 00 00 00 00 00  24 0f 00 00 00 00 00 00  |........$.......|
-000001f0  00 00 00 00 00 00 00 00  b9 96 01 dc e6 17 6d a8  |..............m.|
-00000200  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
-#endif
-printf("bootloader says: %s\n", (char *)target);
+    // printf("bootloader says: %s\n", (char *)target);
 
     unsigned int  ipl_size = target[0x1e0/sizeof(long)];
     unsigned long ipl_sect = target[0x1e8/sizeof(long)];
@@ -489,12 +484,50 @@ printf("bootloader says: %s\n", (char *)target);
         printf("FAIL: Not an ALPHA boot disc. Magic is wrong.\n");
         return 0;
     }
-    printf("ipl start sector is %ld, ipl size %d\n", ipl_sect, ipl_size);
+    // printf("ipl start sector is %ld, ipl size %d\n", ipl_sect, ipl_size);
 
     if ((ipl_sect * SECT_SIZE) & (disk_op.drive_fl->blksize-1)) {
         printf("FAIL: Bootloader start sector not multiple of device block size.\n");
         return 0;
     }
+    printf("block 0 of dka500.5.0.2000.0 is a valid boot block\n");
+
+#if 0
+>>>boot
+(boot dka500.5.0.2000.0 -flags 0)
+block 0 of dka500.5.0.2000.0 is a valid boot block
+reading 163 blocks from dka500.5.0.2000.0
+bootstrap code read in
+Building FRU table
+FRU table size = 0x912
+base = 1b8000, image_start = 0, image_bytes = 14600
+initializing HWRPB at 2000
+initializing page table at 3ffce000
+initializing machine state
+setting affinity to the primary CPU
+jumping to bootstrap code
+aboot: Linux/Alpha SRM bootloader version 1.0_pre20040408
+aboot: switching to OSF/1 PALcode version 1.45
+aboot: booting from device 'SCSI 0 2000 0 5 500 0 0'
+aboot: no disklabel found.
+iso: Max size:203726   Log zone size:2048
+iso: First datazone:19   Root inode number 38912
+aboot: loading uncompressed boot/vmlinuz...
+aboot: loading compressed boot/vmlinuz...
+aboot: zero-filling 454300 bytes at 0xfffffc0002531d24
+aboot: loading initrd (16616295 bytes/16226 blocks) at 0xfffffc003ec76000
+aboot: starting kernel boot/vmlinuz with arguments ramdisk_size=50342  root=/dev/ram devfs=mount,dall
+
+
+>>>show dev
+dka0.0.0.2000.0            DKA0               SEAGATE ST15150N  HP12
+dka500.5.0.2000.0          DKA500                        RRD46  1337
+dva0.0.0.1000.0            DVA0                               
+mka400.4.0.2000.0          MKA400                        TLZ07  553B
+ewa0.0.0.11.0              EWA0              00-00-F8-21-DD-2A
+pka0.7.0.2000.0            PKA0                  SCSI Bus ID 7  5.57
+
+#endif
 
     /* seek to beginning of IPL */
     disk_op.drive_fl = boot_drive;
@@ -505,6 +538,7 @@ printf("bootloader says: %s\n", (char *)target);
     // printf("DISK_SEEK to IPL returned %d\n", ret);
 
     /* read IPL */
+    printf("reading %d blocks from dka500.5.0.2000.0\n", ipl_size);
     disk_op.drive_fl = boot_drive;
     disk_op.buf_fl = target;
     disk_op.command = CMD_READ;
@@ -513,17 +547,56 @@ printf("bootloader says: %s\n", (char *)target);
     ret = process_op(&disk_op);
     // printf("DISK_READ IPL returned %d  count=%d  lba=%d\n", ret, disk_op.count, disk_op.lba);
 
-    printf("First word at %p is 0x%lx\n", target, target[0]);
+    printf("bootstrap code read in\n");
+    // printf("First word at %p is 0x%lx\n", target, target[0]);
 
     /* execute IPL */
     ret = BOOTLOADER_MAXSIZE;
-    int pageno = 0;
+    unsigned long pageno = 0;
     while (ret > 0) {
-        set_pte ((unsigned long)INIT_BOOTLOADER + pageno * PAGE_SIZE, ((char*)target) + pageno * PAGE_SIZE);
+        unsigned long virt, phys;
+        virt = (unsigned long)INIT_BOOTLOADER + pageno * PAGE_SIZE;
+        phys = (unsigned long)target + pageno * PAGE_SIZE;
+        set_pte (virt, phys);
+        dprintf(1, "set bootloader PTE addr 0x%lx  -> phys addr 0x%lx\n", virt, phys);
         pageno++;
         ret -= PAGE_SIZE;
     }
+    // set HWRPB pte entry
     set_pte ((unsigned long)INIT_HWRPB, &hwrpb);
+
+#if 0
+    dprintf(1, "PTE VPTR %d \n", pt_index(VPTPTR, 2));
+  unsigned long addr = 0x200802000UL;
+  // unsigned long addr = 0x200800000UL;
+  unsigned long *pt = page_dir;
+  unsigned long index;
+    set_pte (addr, &page_dir); // create page at addr for aboot
+
+    index = pt_index(addr, 2);
+    dprintf(1, "PTE VPTR 2 -> index %d  pt=0x%lx\n", index, pt);
+    pt = pte_page (pt[index]);
+    index = pt_index(addr, 1);
+    dprintf(1, "PTE VPTR 1 -> index %d  pt=0x%lx\n", index, pt);
+    pt = pte_page (pt[index]);
+    index = pt_index(addr, 0);
+    dprintf(1, "PTE VPTR 0 -> index %d  pt=0x%lx\n", index, pt);
+//     pt = pte_page (pt[index]);
+//    pt[1] = page_dir[pt_index(VPTPTR, 2)];
+    dprintf(1, "PTE VPTR pt 0x%lx \n", pt);
+
+    // L1[1023] = L1[1];
+
+    See: Bootstrap Address Space -> PDF
+#endif
+  // set level 1 page table pte entry for aboot (see: pal_init())
+    // set_pte (0x200000000UL, &page_dir); // XXX
+    set_pte (0x200802000UL, &page_dir); // store addr for aboot
+
+    unsigned long *L = &page_dir; // (unsigned long *) 0x200802000UL; /* (1<<33 | 1<<23 | 1<<13) */
+    dprintf(1, "L1  0x%lx\n", L[1]);
+    dprintf(1, "L9  0x%lx\n", L[1023]);
+    dprintf(1, "La  0x%lx\n", page_dir[pt_index(VPTPTR, 2)]);
 
     void *new_pc = INIT_BOOTLOADER; // target;
     dprintf(1,"STARTING BOOTLOADER NOW at %p\n\n", new_pc);
@@ -549,9 +622,7 @@ do_start(unsigned long memsize, void (*kernel_entry)(void),
   pci_setup();
   vga_set_mode(0x5f, 0); // statt mode 3 / 0x5c
   serial_setup();
-dprintf(1,"NOW block\n");
   block_setup();
-dprintf(1,"NOW HWRP\n");
   init_hwrpb(memsize, config);
 
   alpha_boot_menu(0,0, 'd');
