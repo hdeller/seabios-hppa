@@ -50,8 +50,11 @@
 #define VA(PA)		((void *)(PA) + PAGE_OFFSET)
 
 #define INIT_BOOTLOADER (char *) 0x20000000
-#define BOOTLOADER_MAXSIZE      128*1024
+// #define BOOTLOADER_MAXSIZE      128*1024
 unsigned long *bootloader_code;
+unsigned long bootloader_size;
+unsigned long bootloader_stack;
+unsigned long bootloader_mem;
 #define SECT_SIZE 512
 
 #define HZ	1024
@@ -410,12 +413,12 @@ static int alpha_boot_menu(unsigned long *iplstart, unsigned long *iplend,
 {
     int i, ret;
     unsigned long *target;
+    char bootblock[2048];
 
-    bootloader_code = arch_malloc(BOOTLOADER_MAXSIZE, PAGE_SIZE);
-    target = bootloader_code;
     dprintf(1, "bootloader will be loaded to %p\n", bootloader_code);
 
     printf("(boot dka500.5.0.2000.0 -flags 0)\n");
+    target = &bootblock;
     struct disk_op_s disk_op = {
         .buf_fl = target,
         .command = CMD_SEEK,
@@ -475,10 +478,12 @@ static int alpha_boot_menu(unsigned long *iplstart, unsigned long *iplend,
         return 0;
     }
 
-    if ((ipl_size * SECT_SIZE) > BOOTLOADER_MAXSIZE) {
-        printf("FAIL: bootloader too big.\n");
-        return 0;
-    }
+    bootloader_size = ipl_size * SECT_SIZE;
+    bootloader_mem = (bootloader_size + PAGE_SIZE-1) & ~(PAGE_SIZE-1);
+    bootloader_stack = bootloader_mem;
+    bootloader_mem += 256*1024;         // add 256k stack size
+    // TODO: Add 3 stack guard pages adjacent to the bootstrap stack page
+
     /* check LIF header of bootblock */
     if (ipl_magic != 0) {
         printf("FAIL: Not an ALPHA boot disc. Magic is wrong.\n");
@@ -538,6 +543,8 @@ pka0.7.0.2000.0            PKA0                  SCSI Bus ID 7  5.57
     // printf("DISK_SEEK to IPL returned %d\n", ret);
 
     /* read IPL */
+    bootloader_code = arch_malloc(bootloader_mem, PAGE_SIZE);
+    target = bootloader_code;
     printf("reading %d blocks from dka500.5.0.2000.0\n", ipl_size);
     disk_op.drive_fl = boot_drive;
     disk_op.buf_fl = target;
@@ -551,7 +558,7 @@ pka0.7.0.2000.0            PKA0                  SCSI Bus ID 7  5.57
     // printf("First word at %p is 0x%lx\n", target, target[0]);
 
     /* execute IPL */
-    ret = BOOTLOADER_MAXSIZE;
+    ret = bootloader_mem;
     unsigned long pageno = 0;
     while (ret > 0) {
         unsigned long virt, phys;
