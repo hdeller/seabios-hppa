@@ -1823,7 +1823,7 @@ static void menu_loop(void)
 {
     int scsi_boot_target;
     char input[24];
-    char *c;
+    char *c, reply;
 
     // snprintf(input, sizeof(input), "BOOT FWSCSI.%d.0", boot_drive->target);
 again:
@@ -1877,9 +1877,11 @@ again2:
     input[0] = '\0';
     enter_text(input, 1);
     parisc_putchar('\n');
-    if (input[0] == 'C' || input[0] == 'c')
+    reply = input[0];
+    if (reply == 'C' || reply == 'c')
         goto again2;
-    if (input[0] == 'Y' || input[0] == 'y')
+    // allow Z as Y. It's the key used on german keyboards.
+    if (reply == 'Y' || reply == 'y' || reply == 'Z' || reply == 'z')
         interact_ipl = 1;
 }
 
