@@ -31,7 +31,7 @@
 
 #include "vgabios.h"
 
-#define SEABIOS_HPPA_VERSION 5
+#define SEABIOS_HPPA_VERSION 6
 
 /*
  * Various variables which are needed by x86 code.
@@ -2002,13 +2002,13 @@ static const struct pz_device mem_kbd_sti_boot = {
     .cl_class = CL_KEYBD,
 };
 
-static const struct pz_device mem_cons_boot = {
+static struct pz_device mem_cons_boot = {
     .hpa = PARISC_SERIAL_CONSOLE - 0x800,
     .iodc_io = (unsigned long)&iodc_entry,
     .cl_class = CL_DUPLEX,
 };
 
-static const struct pz_device mem_kbd_boot = {
+static struct pz_device mem_kbd_boot = {
     .hpa = PARISC_SERIAL_CONSOLE - 0x800,
     .iodc_io = (unsigned long)&iodc_entry,
     .cl_class = CL_KEYBD,
@@ -2121,6 +2121,15 @@ void __VISIBLE start_parisc_firmware(void)
         printf("\nSeaBIOS firmware is version %d, but version %d is required. "
             "Please update.\n", (int)SEABIOS_HPPA_VERSION, i);
         hlt();
+    }
+    /* Qemu versions which request a SEABIOS_HPPA_VERSION < 6 have the bug that
+     * they use the DINO UART instead of the LASI UART as serial port #0.
+     * Fix it up here and switch the serial console code to use PORT_SERIAL2
+     * for such Qemu versions, so that we can still use this higher SeaBIOS
+     * version with older Qemus. */
+    if (i < 6) {
+        mem_cons_boot.hpa = PORT_SERIAL2 - 0x800;
+        mem_kbd_boot.hpa = PORT_SERIAL2 - 0x800;
     }
 
     tlb_entries = romfile_loadint("/etc/cpu/tlb_entries", 256);
