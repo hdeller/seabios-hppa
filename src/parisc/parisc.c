@@ -356,7 +356,7 @@ static const char *hpa_device_name(unsigned long hpa, int output)
 {
     return HPA_is_graphics_device(hpa) ? "GRAPHICS(1)" :
             HPA_is_keyboard_device(hpa) ? "PS2" :
-            (PARISC_SERIAL_CONSOLE == PORT_SERIAL1) ?
+            ((hpa + 0x800) == PORT_SERIAL1) ?
                 "SERIAL_1.9600.8.none" : "SERIAL_2.9600.8.none";
 }
 
