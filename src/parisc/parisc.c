@@ -514,7 +514,7 @@ static hppa_device_t *find_hppa_device_by_path(struct pdc_module_path *search,
 #define SERIAL_TIMEOUT 20
 static unsigned long parisc_serial_in(char *c, unsigned long maxchars)
 {
-    const portaddr_t addr = PARISC_SERIAL_CONSOLE;
+    portaddr_t addr = PAGE0->mem_kbd.hpa + 0x800; /* PARISC_SERIAL_CONSOLE */
     unsigned long end = timer_calc(SERIAL_TIMEOUT);
     unsigned long count = 0;
     while (count < maxchars) {
@@ -532,10 +532,10 @@ static unsigned long parisc_serial_in(char *c, unsigned long maxchars)
 
 static void parisc_serial_out(char c)
 {
+    portaddr_t addr = PAGE0->mem_cons.hpa + 0x800; /* PARISC_SERIAL_CONSOLE */
     for (;;) {
         if (c == '\n')
             parisc_serial_out('\r');
-        const portaddr_t addr = PORT_SERIAL1;
         u8 lsr = inb(addr+SEROFF_LSR);
         if ((lsr & 0x60) == 0x60) {
             // Success - can write data
