@@ -10,7 +10,7 @@ SECTIONS
   .got : { *(.got.plt) *(.got) }
   .sdata : { *(.sdata*) }
   .sbss : { *(.sbss) *(.scommon) }
-  .bss : {
+  .bss ALIGN(8192) : {
     *(.bss.page_dir)
     *(.bss.stack)
     *(COMMON)

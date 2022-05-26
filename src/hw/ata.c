@@ -842,7 +842,7 @@ powerup_await_non_bsy(portaddr_t base)
         }
         yield();
     }
-    dprintf(6, "powerup iobase=%x st=%x\n", base, status);
+    // dprintf(6, "powerup iobase=%x st=%x\n", base, status);
     return status;
 }
 

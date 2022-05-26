@@ -67,6 +67,11 @@ static inline u32 ror(u32 word, unsigned int shift)
 
 #include "alpha/protos.h"       /* for outl, outw, inb ... */
 
+static inline unsigned long rdtscll(void)
+{
+    return get_wall_time();
+}
+
 static inline void insb(portaddr_t port, u8 *data, u32 count) {
     while (count--)
 	*data++ = inb(port);

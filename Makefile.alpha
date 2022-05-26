@@ -35,7 +35,8 @@ ASFLAGS = -Wa,-m21264 -Wa,--noexecstack
 OPT= -O2
 CFLAGS = $(OPT) -g1 -Wall -fvisibility=hidden -fno-strict-aliasing \
   -msmall-text -mno-fp-regs -mbuild-constants \
-  -Wno-int-to-pointer-cast -Wno-pointer-to-int-cast
+  -Wno-int-to-pointer-cast -Wno-pointer-to-int-cast \
+  -Wno-stringop-overflow -Wno-array-bounds -Wno-address-of-packed-member
 CFLAGS += -mcpu=ev67 -DSYSTEM_H='"sys-$(SYSTEM).h"' -DSEABIOS
 
 # Source files

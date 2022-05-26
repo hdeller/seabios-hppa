@@ -529,8 +529,7 @@ void sercon_setup(void)
     seabios = FUNC16(entry_10);
     if (vgabios.seg != seabios.seg ||
         vgabios.offset != seabios.offset) {
-        dprintf(1, "sercon: configuring in splitmode (vgabios %04x:%04x)\n",
-                vgabios.seg, vgabios.offset);
+        // dprintf(1, "sercon: configuring in splitmode (vgabios %04x:%04x)\n", vgabios.seg, vgabios.offset);
         sercon_real_vga_handler = vgabios;
         SET_LOW(sercon_split, 1);
     } else {

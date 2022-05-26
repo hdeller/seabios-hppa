@@ -413,12 +413,10 @@ static int alpha_boot_menu(unsigned long *iplstart, unsigned long *iplend,
 {
     int i, ret;
     unsigned long *target;
-    char bootblock[2048];
-
-    dprintf(1, "bootloader will be loaded to %p\n", bootloader_code);
+    unsigned long bootblock[2048 / sizeof(long)];
 
     printf("(boot dka500.5.0.2000.0 -flags 0)\n");
-    target = &bootblock;
+    target = bootblock;
     struct disk_op_s disk_op = {
         .buf_fl = target,
         .command = CMD_SEEK,
@@ -467,7 +465,7 @@ static int alpha_boot_menu(unsigned long *iplstart, unsigned long *iplend,
     unsigned int  ipl_size = target[0x1e0/sizeof(long)];
     unsigned long ipl_sect = target[0x1e8/sizeof(long)];
     unsigned long ipl_magic= target[0x1f0/sizeof(long)];
-    unsigned long ipl_sum  = target[0x1f8/sizeof(long)];
+    // unsigned long ipl_sum  = target[0x1f8/sizeof(long)];
 
     /* calc checksum of bootblock and verify */
     u64 sum = 0;
@@ -544,6 +542,7 @@ pka0.7.0.2000.0            PKA0                  SCSI Bus ID 7  5.57
 
     /* read IPL */
     bootloader_code = arch_malloc(bootloader_mem, PAGE_SIZE);
+    dprintf(1, "bootloader will be loaded to %p\n", bootloader_code);
     target = bootloader_code;
     printf("reading %d blocks from dka500.5.0.2000.0\n", ipl_size);
     disk_op.drive_fl = boot_drive;
@@ -561,11 +560,13 @@ pka0.7.0.2000.0            PKA0                  SCSI Bus ID 7  5.57
     ret = bootloader_mem;
     unsigned long pageno = 0;
     while (ret > 0) {
-        unsigned long virt, phys;
+        unsigned long virt;
+        char *phys;
         virt = (unsigned long)INIT_BOOTLOADER + pageno * PAGE_SIZE;
-        phys = (unsigned long)target + pageno * PAGE_SIZE;
+        phys = (char *)target;
+        phys += pageno * PAGE_SIZE;
         set_pte (virt, phys);
-        dprintf(1, "set bootloader PTE addr 0x%lx  -> phys addr 0x%lx\n", virt, phys);
+        dprintf(1, "set bootloader PTE addr 0x%lx  -> phys addr 0x%p\n", virt, phys);
         pageno++;
         ret -= PAGE_SIZE;
     }
@@ -600,10 +601,11 @@ pka0.7.0.2000.0            PKA0                  SCSI Bus ID 7  5.57
     // set_pte (0x200000000UL, &page_dir); // XXX
     set_pte (0x200802000UL, &page_dir); // store addr for aboot
 
-    unsigned long *L = &page_dir; // (unsigned long *) 0x200802000UL; /* (1<<33 | 1<<23 | 1<<13) */
+    unsigned long *L = page_dir; // (unsigned long *) 0x200802000UL; /* (1<<33 | 1<<23 | 1<<13) */
     dprintf(1, "L1  0x%lx\n", L[1]);
     dprintf(1, "L9  0x%lx\n", L[1023]);
     dprintf(1, "La  0x%lx\n", page_dir[pt_index(VPTPTR, 2)]);
+    dprintf(1, "L1  0x%lx  0x%lx\n phys", PA((L[1] >> 32) << PAGE_SHIFT), PA(&page_dir));
 
     void *new_pc = INIT_BOOTLOADER; // target;
     dprintf(1,"STARTING BOOTLOADER NOW at %p\n\n", new_pc);
