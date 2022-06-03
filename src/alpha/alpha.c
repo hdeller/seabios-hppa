@@ -18,7 +18,15 @@
    along with this program; see the file COPYING.  If not see
    <http://www.gnu.org/licenses/>.
 
-./qemu-system-alpha -hda hdd.img  -drive file=../qemu-images/debian-11.0.0-alpha-NETINST-1.iso,if=ide,media=cdrom -serial mon:stdio -accel tcg,thread=multi -smp cpus=1 -m 1G -bios ../seabios/out/alpha-firmware.img  -d trace:*xcchip*,trace:*conf* -nographic  #-d in_asm # -dfilter 0x0000000000000000..0x0000000020000fff #-dfilter 0xfffffc0000000080..0xfffffc0000000084  -nographic
+cd /home/cvs/LINUX/qemu-alpha
+
+Architecture:
+https://download.majix.org/dec/alpha_arch_ref.pdf
+
+milo:
+https://johnvidler.co.uk/linux-journal/LJ/021/1202.html
+
+./qemu-system-alpha -hda hdd.img -kernel vmlinuz.11 -initrd ./initrd.gz.11 -append "console=tty0  "  -drive file=../qemu-images/debian-11.0.0-alpha-NETINST-1.iso,if=ide,media=cdrom -serial mon:stdio -accel tcg,thread=multi -smp cpus=1 -m 1G -bios ../seabios/out/alpha-firmware.img  -d trace:*xcchip*,trace:*conf* -nographic  -d in_asm,nochain,out_asm,exec -D log # -dfilter 0x0000000000000000..0x0000000020000fff #-dfilter 0xfffffc0000000080..0xfffffc0000000084  -nographic
 
 */
 
@@ -242,6 +250,7 @@ init_hwrpb (unsigned long memsize, unsigned long config)
 				| 'U' << 24);
 
   amask = ~__builtin_alpha_amask(-1);
+dprintf(1,"amask %lx\n", amask);
   switch (__builtin_alpha_implver())
     {
     case 0: /* EV4 */
@@ -263,6 +272,7 @@ init_hwrpb (unsigned long memsize, unsigned long config)
       break;
     }
 
+dprintf(1,"proc_type %lx\n", proc_type);
   /* This field is the WHAMI of the primary CPU.  Just initialize
      this to 0; CPU #0 is always the primary on real Alpha systems
      (except for the TurboLaser).  */
@@ -604,12 +614,15 @@ pka0.7.0.2000.0            PKA0                  SCSI Bus ID 7  5.57
     unsigned long *L = page_dir; // (unsigned long *) 0x200802000UL; /* (1<<33 | 1<<23 | 1<<13) */
     dprintf(1, "L1  0x%lx\n", L[1]);
     dprintf(1, "L9  0x%lx\n", L[1023]);
+    dprintf(1, "en  0x%lx\n", pt_index(VPTPTR, 2));
     dprintf(1, "La  0x%lx\n", page_dir[pt_index(VPTPTR, 2)]);
     dprintf(1, "L1  0x%lx  0x%lx\n phys", PA((L[1] >> 32) << PAGE_SHIFT), PA(&page_dir));
 
     void *new_pc = INIT_BOOTLOADER; // target;
     dprintf(1,"STARTING BOOTLOADER NOW at %p\n\n", new_pc);
     swppal(new_pc, &pcb, VPTPTR, (unsigned long)target);
+
+// page 27–17
 
     return 1;
 }
