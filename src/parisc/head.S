@@ -113,6 +113,11 @@ ENTRY(startup)
 	/* Save CPU HPA in cr7, hopefully HP-UX will not use that register. */
 	mtctl   %r5, CPU_HPA_CR_REG /* store CPU HPA */
 
+	/* Load IVT for SMT tiny loop exit and bug detection */
+#define CR_IVA 14
+	load32	BOOTADDR(smp_ivt),%r1
+	mtctl	%r1, CR_IVA
+
 	/* branch if this is the monarch cpu */
 	load32 CPU_HPA,%r1
 	comb,= %r5,%r1,$is_monarch_cpu
@@ -131,11 +136,6 @@ ENTRY(enter_smp_idle_loop)
 	mtctl	%r1, CR_EIRR
 	mfctl	CR_EIRR, %r0
 	mtctl	%r0, CR_EIRR
-
-	/* Load IVT for SMT tiny loop exit */
-#define CR_IVA 14
-	load32	BOOTADDR(smp_ivt),%r1
-	mtctl	%r1, CR_IVA
 
 	/* enable CPU local interrupts */
 #define CR_EIEM 15
@@ -303,20 +303,26 @@ END(toc_asm_entry)
 
 
 /*******************************************************
-	SMP Interrupt vector table (IVT)
+	Interrupt vector table (IVT)
  *******************************************************/
 
-	.macro  DEF_IVA_ENTRY
+	.macro  DEF_IVA_ENTRY num
 	.align 32
-	load32 BOOTADDR($smp_exit_loop),%r1
-	bv	0(%r1)
-	nop
+.if (\num - 4)          /* 4 = external irq, timer at SMP entry */
+        ldi     \num, %r6       /* helps to find SeaBIOS bugs */
+        .word   0xfffdead0      /* halt emulator */
+.else
+        load32 BOOTADDR($smp_exit_loop),%r1 /* start SMP CPU */
+        bv,n	0(%r1)
+.endif
+        .set \num, \num + 1
 	.endm
 
-	.align 32	/* should be 4k aligned but qemu does not check */
+	.align 32	/* should be 2k aligned but qemu does not check */
 ENTRY(smp_ivt)
+        .set index,0
 	.rept 32
-	DEF_IVA_ENTRY
+	DEF_IVA_ENTRY index
 	.endr
 END(smp_ivt)
 
