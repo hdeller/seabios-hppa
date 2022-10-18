@@ -68,6 +68,57 @@ name:
 #define INT_LEN 4
 #endif
 
+	.macro  save_reg        num
+	STREG \num, \num*4 -2*FRAME_SIZE (%sp)
+	.endm
+	.macro  restore_reg     num
+	LDREG \num*4 -2*FRAME_SIZE (%sp), \num
+	.endm
+
+	.macro	save_general
+	save_reg        2
+	save_reg        3
+	save_reg        4
+	save_reg        5
+	save_reg        6
+	save_reg        7
+	save_reg        8
+	save_reg        9
+	save_reg        10
+	save_reg        11
+	save_reg        12
+	save_reg        13
+	save_reg        14
+	save_reg        15
+	save_reg        16
+	save_reg        17
+	save_reg        18
+	save_reg        27
+	save_reg        30
+	.endm
+
+	.macro	rest_general
+	restore_reg     2
+	restore_reg     3
+	restore_reg     4
+	restore_reg     5
+	restore_reg     6
+	restore_reg     7
+	restore_reg     8
+	restore_reg     9
+	restore_reg     10
+	restore_reg     11
+	restore_reg     12
+	restore_reg     13
+	restore_reg     14
+	restore_reg     15
+	restore_reg     16
+	restore_reg     17
+	restore_reg     18
+	restore_reg     27
+	restore_reg     30
+	.endm
+
 	.import	$global$
 	.section ".head.text","ax"
 	 .level 1.1
@@ -332,8 +383,10 @@ END(smp_ivt)
  *******************************************************/
 
 ENTRY(pdc_entry)
-	stw %rp,-20(%sp)
-	stw %dp,-32(%sp)
+	ldo 2*FRAME_SIZE(%sp),%sp
+	save_general
+
+	/* save arguments */
 	stw %arg0,-36(%sp)
 	stw %arg1,-40(%sp)
 	stw %arg2,-44(%sp)
@@ -345,9 +398,9 @@ ENTRY(pdc_entry)
 	ldo FRAME_SIZE(%sp),%sp
 
 	ldo -FRAME_SIZE(%sp),%sp
-	ldw -20(%sp),%rp
+	rest_general
 	bv %r0(%rp)
-	ldw -32(%sp),%dp
+	ldo -2*FRAME_SIZE(%sp),%sp
 END(pdc_entry)
 
 /* pdc_entry_table will be copied into low memory. */
