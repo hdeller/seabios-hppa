@@ -76,6 +76,17 @@ name:
 	.endm
 
 	.macro	save_general
+
+	/* save arguments */
+	stw %arg0,-36(%sp)
+	stw %arg1,-40(%sp)
+	stw %arg2,-44(%sp)
+	stw %arg3,-48(%sp)
+	ldo -36(%sp),%arg0 /* save as input ptr */
+
+	/* make room to store registers */
+	ldo 2*FRAME_SIZE(%sp),%sp
+
 	save_reg        2
 	save_reg        3
 	save_reg        4
@@ -117,6 +128,7 @@ name:
 	restore_reg     18
 	restore_reg     27
 	restore_reg     30
+	ldo -2*FRAME_SIZE(%sp),%sp
 	.endm
 
 	.import	$global$
@@ -383,15 +395,7 @@ END(smp_ivt)
  *******************************************************/
 
 ENTRY(pdc_entry)
-	ldo 2*FRAME_SIZE(%sp),%sp
 	save_general
-
-	/* save arguments */
-	stw %arg0,-36(%sp)
-	stw %arg1,-40(%sp)
-	stw %arg2,-44(%sp)
-	stw %arg3,-48(%sp)
-	ldo -FRAME_SIZE(%sp),%arg0
 
 	loadgp
 	b,l parisc_pdc_entry, %rp
@@ -400,7 +404,7 @@ ENTRY(pdc_entry)
 	ldo -FRAME_SIZE(%sp),%sp
 	rest_general
 	bv %r0(%rp)
-	ldo -2*FRAME_SIZE(%sp),%sp
+	nop
 END(pdc_entry)
 
 /* pdc_entry_table will be copied into low memory. */
@@ -422,13 +426,7 @@ END(iodc_entry_table)
 ENTRY(iodc_entry)
 	load32 parisc_iodc_ENTRY_IO, %r1
 
-	stw %rp,-20(%sp)
-	stw %dp,-32(%sp)
-	stw %arg0,-36(%sp)
-	stw %arg1,-40(%sp)
-	stw %arg2,-44(%sp)
-	stw %arg3,-48(%sp)
-	ldo -FRAME_SIZE(%sp),%arg0
+	save_general
 
 	loadgp
 	load32 .iodc_ret, %rp
@@ -436,9 +434,9 @@ ENTRY(iodc_entry)
 	ldo FRAME_SIZE(%sp),%sp
 .iodc_ret:
 	ldo -FRAME_SIZE(%sp),%sp
-	ldw -20(%sp),%rp
+	rest_general
 	bv %r0(%rp)
-	ldw -32(%sp),%dp
+	nop
 END(iodc_entry)
 
 	.data

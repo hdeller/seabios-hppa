@@ -136,14 +136,14 @@ extern char iodc_entry[512];
 extern char iodc_entry_table[14*4];
 
 /* args as handed over for firmware calls */
-#define ARG0 arg[7-0]
-#define ARG1 arg[7-1]
-#define ARG2 arg[7-2]
-#define ARG3 arg[7-3]
-#define ARG4 arg[7-4]
-#define ARG5 arg[7-5]
-#define ARG6 arg[7-6]
-#define ARG7 arg[7-7]
+#define ARG0 arg[0]
+#define ARG1 arg[-1]
+#define ARG2 arg[-2]
+#define ARG3 arg[-3]
+#define ARG4 arg[-4]
+#define ARG5 arg[-5]
+#define ARG6 arg[-6]
+#define ARG7 arg[-7]
 
 /* size of I/O block used in HP firmware */
 #define FW_BLOCKSIZE    2048
@@ -584,12 +584,7 @@ void iodc_log_call(unsigned int *arg, const char *func)
     }
 }
 
-#define FUNC_MANY_ARGS , \
-    int a0, int a1, int a2, int a3,  int a4,  int a5,  int a6, \
-    int a7, int a8, int a9, int a10, int a11, int a12
-
-
-int __VISIBLE parisc_iodc_ENTRY_IO(unsigned int *arg FUNC_MANY_ARGS)
+int __VISIBLE parisc_iodc_ENTRY_IO(unsigned int *arg)
 {
     unsigned long hpa = ARG0;
     unsigned long option = ARG1;
@@ -661,7 +656,7 @@ int __VISIBLE parisc_iodc_ENTRY_IO(unsigned int *arg FUNC_MANY_ARGS)
 }
 
 
-int __VISIBLE parisc_iodc_ENTRY_INIT(unsigned int *arg FUNC_MANY_ARGS)
+int __VISIBLE parisc_iodc_ENTRY_INIT(unsigned int *arg)
 {
     unsigned long hpa = ARG0;
     unsigned long option = ARG1;
@@ -699,19 +694,19 @@ int __VISIBLE parisc_iodc_ENTRY_INIT(unsigned int *arg FUNC_MANY_ARGS)
     return PDC_BAD_OPTION;
 }
 
-int __VISIBLE parisc_iodc_ENTRY_SPA(unsigned int *arg FUNC_MANY_ARGS)
+int __VISIBLE parisc_iodc_ENTRY_SPA(unsigned int *arg)
 {
     iodc_log_call(arg, __FUNCTION__);
     return PDC_BAD_OPTION;
 }
 
-int __VISIBLE parisc_iodc_ENTRY_CONFIG(unsigned int *arg FUNC_MANY_ARGS)
+int __VISIBLE parisc_iodc_ENTRY_CONFIG(unsigned int *arg)
 {
     iodc_log_call(arg, __FUNCTION__);
     return PDC_BAD_OPTION;
 }
 
-int __VISIBLE parisc_iodc_ENTRY_TEST(unsigned int *arg FUNC_MANY_ARGS)
+int __VISIBLE parisc_iodc_ENTRY_TEST(unsigned int *arg)
 {
     unsigned long hpa = ARG0;
     unsigned long option = ARG1;
@@ -741,7 +736,7 @@ int __VISIBLE parisc_iodc_ENTRY_TEST(unsigned int *arg FUNC_MANY_ARGS)
     return PDC_BAD_OPTION;
 }
 
-int __VISIBLE parisc_iodc_ENTRY_TLB(unsigned int *arg FUNC_MANY_ARGS)
+int __VISIBLE parisc_iodc_ENTRY_TLB(unsigned int *arg)
 {
     unsigned long option = ARG1;
     unsigned long *result = (unsigned long *)ARG4;
@@ -1517,7 +1512,7 @@ static int pdc_initiator(unsigned int *arg)
 }
 
 
-int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
+int __VISIBLE parisc_pdc_entry(unsigned int *arg)
 {
     unsigned long proc = ARG0;
     unsigned long option = ARG1;
