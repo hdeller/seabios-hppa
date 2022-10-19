@@ -406,9 +406,11 @@ static void remove_from_keep_list(unsigned long hpa)
 
     while (keep_list[i] && keep_list[i] != hpa)
         i++;
+    if (!keep_list[i])
+        return;
     while (keep_list[i]) {
+            keep_list[i] = keep_list[i+1];
             ++i;
-            keep_list[i-1] = keep_list[i];
     }
 }
 
@@ -2271,8 +2273,8 @@ void __VISIBLE start_parisc_firmware(void)
         ps2port_setup();
     } else {
         remove_from_keep_list(LASI_GFX_HPA);
-        remove_from_keep_list(LASI_PS2KBD_HPA);
-        remove_from_keep_list(LASI_PS2MOU_HPA);
+        // remove_from_keep_list(LASI_PS2KBD_HPA);
+        // remove_from_keep_list(LASI_PS2MOU_HPA);
     }
 
     // Initialize boot paths (graphics & keyboard)
