@@ -130,6 +130,8 @@ unsigned int btlb_entries = 8;
 
 #define PARISC_SERIAL_CONSOLE   PORT_SERIAL1
 
+#define MPE_CONSOLE_HPA         0xfff84000      /* MPE sets this console. Why/How? */
+
 extern char pdc_entry;
 extern char pdc_entry_table[12];
 extern char iodc_entry[512];
@@ -280,6 +282,7 @@ static hppa_device_t parisc_devices[HPPA_MAX_CPUS+16] = { PARISC_DEVICE_LIST };
     /* DINO_SCSI_HPA, */ \
     LASI_HPA, \
     LASI_UART_HPA, \
+    /* LASI_SCSI_HPA, */ \
     LASI_LAN_HPA, \
     LASI_LPT_HPA, \
     CPU_HPA,\
@@ -335,7 +338,7 @@ static const char *hpa_name(unsigned long hpa)
             return "HPA_PCI_CARD_MMIO";
     }
 
-    return "UNKNOWN HPA";
+    return "UNKNOWN_HPA";
 }
 
 static int class_of_hpa(unsigned long hpa)
@@ -350,6 +353,7 @@ static int class_of_hpa(unsigned long hpa)
     case IDE_HPA:
     case DINO_SCSI_HPA:
     case LASI_SCSI_HPA:     return CL_RANDOM;
+    case MPE_CONSOLE_HPA:                               /* MPE hack */
     case DINO_UART_HPA:
     case LASI_UART_HPA:     return CL_DUPLEX;
     case LASI_LAN_HPA:      return CL_NULL;
@@ -487,6 +491,15 @@ static void remove_parisc_devices(unsigned int num_cpus)
         memset(&parisc_devices[t], 0, sizeof(parisc_devices[0]));
         t++;
     }
+}
+
+static int fix_hpa_hack(unsigned long hpa)
+{
+    if (hpa == IDE_HPA)
+        return DINO_SCSI_HPA;
+    if (hpa == MPE_CONSOLE_HPA) // MPE sets this value as screen output, how come?
+        return PARISC_SERIAL_CONSOLE - 0x800;
+    return hpa;
 }
 
 static int find_hpa_index(unsigned long hpa)
@@ -632,19 +645,21 @@ int __VISIBLE parisc_iodc_ENTRY_IO(ARG_LIST)
 
     if (1 &&
             (((HPA_is_serial_device(hpa) || HPA_is_graphics_device(hpa)) && option == ENTRY_IO_COUT) ||
-             ((HPA_is_serial_device(hpa) || HPA_is_graphics_device(hpa)) && option == ENTRY_IO_CIN) ||
-             (HPA_is_storage_device(hpa) && option == ENTRY_IO_BOOTIN))) {
+             ((HPA_is_serial_device(hpa) || HPA_is_graphics_device(hpa)) && option == ENTRY_IO_CIN)
+             // || (HPA_is_storage_device(hpa) && option == ENTRY_IO_BOOTIN)
+            )) {
         /* avoid debug messages */
     } else {
         iodc_log_call(ARG_REFS, __FUNCTION__);
     }
 
-    if (hpa == IDE_HPA)
-        hpa = DINO_SCSI_HPA;
-    if (hpa == 0xfff84000) // MPE sets this value as screen output, how come?
+    hpa = fix_hpa_hack(hpa);
+    if (hpa == DINO_HPA)        // MPE uses the DINO HPA as boot medium with arg3=0x3d8
+        hpa = IDE_HPA;
+    if (hpa == MPE_CONSOLE_HPA)
         hpa = PARISC_SERIAL_CONSOLE - 0x800;
-    if (find_hpa_index(hpa) < 0) {
-        dprintf(0, "parisc_iodc_ENTRY_IO  Adjusted hpa %lx\n", hpa);
+    if (find_hpa_index(hpa) < 0 && !HPA_is_storage_device(hpa)) {
+        printf("parisc_iodc_ENTRY_IO  Did not find hpa %lx\n", hpa);
         // return PDC_NE_CELL_MOD; /* Nonexistent device */
     }
 
@@ -711,8 +726,9 @@ int __VISIBLE parisc_iodc_ENTRY_INIT(ARG_LIST)
 
     iodc_log_call(ARG_REFS, __FUNCTION__);
 
+    hpa = fix_hpa_hack(hpa);
     hpa_index = find_hpa_index(hpa);
-    if (hpa_index < 0 && hpa != IDE_HPA)
+    if (hpa_index < 0)
         return PDC_NE_MOD;
 
     switch (option) {
@@ -760,8 +776,9 @@ int __VISIBLE parisc_iodc_ENTRY_TEST(ARG_LIST)
 
     iodc_log_call(ARG_REFS, __FUNCTION__);
 
+    hpa = fix_hpa_hack(hpa);
     hpa_index = find_hpa_index(hpa);
-    if (hpa_index < 0 && hpa != IDE_HPA)
+    if (hpa_index < 0 && !HPA_is_storage_device(hpa))
         return PDC_INVALID_ARG;
 
     /* The options ARG1=0 and ARG1=1 are required. Others are optional. */
@@ -1115,8 +1132,9 @@ static int pdc_iodc(ARG_LIST)
 
     hpa = ARG3;
     if (hpa == IDE_HPA) { // do NOT check for DINO_SCSI_HPA, breaks Linux which scans IO areas for unlisted io modules
-        iodc_p = &iodc_data_hpa_fff8c000; // workaround for PCI ATA
+        iodc_p = &iodc_data_hpa_fff8c000; // workaround for PCI ATA (use DINO_SCSI_HPA)
     } else {
+        hpa = fix_hpa_hack(hpa);
         hpa_index = find_hpa_index(hpa);
         if (hpa_index < 0)
             return -4; // not found
@@ -1266,7 +1284,8 @@ static int pdc_add_valid(ARG_LIST)
         return PDC_OK;
     if (ARG2 >= FIRMWARE_START && ARG2 < FIRMWARE_END) // HELGE
         return PDC_OK;
-    if (find_hpa_index(ARG2 & ~0xfff) >= 0) /* search for given hpa */
+    ARG2 = fix_hpa_hack(ARG2 & ~0xfff);
+    if (find_hpa_index(ARG2) >= 0) /* search for given hpa */
         return PDC_OK;
     dprintf(0, "\n\nSeaBIOS: FAILED!!!! PDC_ADD_VALID function %ld ARG2=%x called.\n", option, ARG2);
     return PDC_REQ_ERR_0; /* Operation completed with a requestor bus error. */
@@ -2070,7 +2089,7 @@ static struct pz_device mem_kbd_boot = {
 
 static const struct pz_device mem_boot_boot = {
     .dp.flags = PF_AUTOBOOT,
-    .hpa = IDE_HPA, // breaks Linux?   DINO_SCSI_HPA,  // IDE_HPA
+    .hpa = IDE_HPA, // workaround as LASI_SCSI_HPA and DINO_SCSI_HPA may not exist in inventory!
     .iodc_io = (unsigned long) &iodc_entry,
     .cl_class = CL_RANDOM,
 };
