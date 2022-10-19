@@ -501,7 +501,7 @@ static struct pdc_iodc iodc_data_hpa_fff10000 = {
 
 #define HPA_fffbf000_DESCRIPTION "Memory"
 static struct pdc_system_map_mod_info mod_info_hpa_fffbf000 = {
-	.mod_addr = 0xfffbf000,
+	.mod_addr = MEMORY_HPA /* due to SMP, former value: 0xfffbf000 */,
 	.mod_pgs = 0x1,
 	.add_addrs = 0x0,
 };
@@ -652,7 +652,7 @@ static struct pdc_iodc iodc_data_hpa_fff81000 = {
 		.mod_path = &mod_path_hpa_fff10000,\
 		.num_addr = HPA_fff10000_num_addr,\
 		.add_addr = { HPA_fff10000_add_addr } },\
-	{	.hpa = 0xfffbf000,\
+	{	.hpa = MEMORY_HPA /* due to SMP, former value: 0xfffbf000 */,\
 		.iodc = &iodc_data_hpa_fffbf000,\
 		.mod_info = &mod_info_hpa_fffbf000,\
 		.mod_path = &mod_path_hpa_fffbf000,\
