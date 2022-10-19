@@ -395,6 +395,9 @@ END(smp_ivt)
  *******************************************************/
 
 ENTRY(pdc_entry)
+#if NOSAVE
+	b,n parisc_pdc_entry
+#else
 	save_general
 
 	loadgp
@@ -405,6 +408,7 @@ ENTRY(pdc_entry)
 	rest_general
 	bv %r0(%rp)
 	nop
+#endif
 END(pdc_entry)
 
 /* pdc_entry_table will be copied into low memory. */
@@ -425,7 +429,10 @@ END(iodc_entry_table)
 
 ENTRY(iodc_entry)
 	load32 parisc_iodc_ENTRY_IO, %r1
-
+#if NOSAVE
+	bv %r0(%r1)
+	nop
+#else
 	save_general
 
 	loadgp
@@ -437,6 +444,7 @@ ENTRY(iodc_entry)
 	rest_general
 	bv %r0(%rp)
 	nop
+#endif
 END(iodc_entry)
 
 	.data

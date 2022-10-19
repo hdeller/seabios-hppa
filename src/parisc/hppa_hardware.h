@@ -1,6 +1,8 @@
 /* HPPA cores and system support chips.  */
 /* Be aware: This file is shared as-is with seabios-hppa. */
 
+#define NOSAVE  0
+
 #ifndef HW_HPPA_HPPA_HARDWARE_H
 #define HW_HPPA_HPPA_HARDWARE_H
 
