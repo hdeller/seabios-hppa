@@ -18,6 +18,9 @@
 	, 0x0001, 0x0060, 0xd2000, 0x0000, 0x0000\
 	, 0x0001, 0x0000, 0x0000, 0x0001, 0x0001
 #if 0
+Installation:
+http://www.3kranger.com/HP3000/mpeix/en-mpe70/32650-90892/32650-90892.pdf
+
 https://support.hpe.com/hpesc/public/docDisplay?docId=c01097674&docLocale=en_US
     Hardware Model:  5D6H, Revision: 0
     Software Model:    4H, Revision: 0

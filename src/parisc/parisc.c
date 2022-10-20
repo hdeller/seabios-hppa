@@ -1078,10 +1078,10 @@ static int pdc_cache(ARG_LIST)
             machine_cache_info->dc_conf.cc_block = 11;
             machine_cache_info->ic_conf.cc_block = 11;
 
-            machine_cache_info->ic_size = 0; /* no instruction cache */
+            machine_cache_info->ic_size =    /* no instruction cache */
+            machine_cache_info->dc_size = (opsys_id = OS_ID_MPEXL) ? 1:0; /* no data cache */
             machine_cache_info->ic_count = 0;
             machine_cache_info->ic_loop = 0;
-            machine_cache_info->dc_size = 0; /* no data cache */
             machine_cache_info->dc_count = 0;
             machine_cache_info->dc_loop = 0;
 #endif
