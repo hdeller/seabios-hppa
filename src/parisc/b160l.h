@@ -1,13 +1,11 @@
 /* AUTO-GENERATED FILE FOR QEMU */
-#if 1
 #define PARISC_MODEL "9000/778/B160L"
-#define PARISC_PDC_MODEL 0x5020, 0x481, 0x0,\
-0x2020202, 0x7794d7fe, 0x10000000, 0x4, 0xba, 0xba
-#else
-#define PARISC_MODEL "928LX 3kRanger Fox"
-#define PARISC_PDC_MODEL 0x4800, 0x481, 0x0,\
-0x2020202, 0x7794d7fe, 0x10000001, 0x0 /*BOOT_ID:PA1.1->4*/, 0,0  /*0xba, 0xba*/
-#endif
+#define PARISC_PDC_MODEL 0x5020, 0x481, 0x0, 0x2020202, 0x7794d7fe, 0x10000001, 0x4, 0xba, 0xba
+// #define MPE_PARISC_MODEL "928LX 3kRanger Fox"
+#define MPE_PARISC_MODEL         "e3000/A400-100-11#N"
+// #define MPE_PARISC_MODEL      "e3000/A500-200-20#A"
+#define MPE_PARISC_PDC_MODEL  0x4800, 0x481, 0x0, 0x44143A73, 0x10000001, 0x0, 0, 0
+
 #define PARISC_PDC_VERSION 0x0008
 #define PARISC_PDC_CPUID 0x01e8
 #define PARISC_PDC_CAPABILITIES 0x0002
@@ -27,28 +25,6 @@ https://support.hpe.com/hpesc/public/docDisplay?docId=c01097674&docLocale=en_US
     HP-UX Model String: 9000/800/A400-44
     MPE/XL Model String: e3000/A400-100-11#N
 
-https://support.hpe.com/hpesc/public/docDisplay?docId=pdb_na-PHSS_28611
-Please note that the following configuration settings are
-	  maintained in Stable Storage, not NVRAM, and thus are not
-	  modified during the update to PDC version 43.24:
-	
-	    - Primary boot path
-	    - Console/Display path
-	    - Alternate boot path
-	    - Keyboard path
-	    - Hversion
-	    - Sversion
-	    - SWID
-	    - SW Cap
-	    - CPU Boot IDs
-	    - Calib Values
-	    - HPUX model
-	    - MPE XL model
-	    - NT Model
-	    - MFG console path
-	    - Original product number
-	    - Current product number
-	    - System Serial Number string
 #endif
 
 #define HPA_ffc00000_DESCRIPTION "Phantom PseudoBC GSC+ Port"

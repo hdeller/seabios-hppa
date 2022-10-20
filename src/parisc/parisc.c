@@ -118,6 +118,8 @@ int pdc_console;
 #define CONSOLE_SERIAL    0x0001
 #define CONSOLE_GRAPHICS  0x0002
 
+int opsys_id = OS_ID_MPEXL;     // default OS: OS_ID_HPUX or OS_ID_MPEXL
+
 int sti_font;
 
 /* Want PDC boot menu? Enable via qemu "-boot menu=on" option. */
@@ -834,8 +836,30 @@ static void init_stable_storage(void)
     stable_storage[0x67] = 0xff;
     stable_storage[0x87] = 0xff;
     stable_storage[0xa7] = 0xff;
-    // 0x0e/0x0f => fastsize = all, needed for HPUX
-    stable_storage[0x5f] = 0x0f;
+    stable_storage[0x41] = opsys_id;
+    *(unsigned int *) &stable_storage[0x58] = 0x7B3A; // diag
+    stable_storage[0x5e] = 0x01;        // osdep2
+    stable_storage[0x5f] = 0x0f;        // 0x0e/0x0f => fastsize = all, needed for HPUX
+}
+
+static const char *model_string(int op_id)
+{
+    if (op_id == OS_ID_MPEXL)
+        return MPE_PARISC_MODEL;
+    else
+        return PARISC_MODEL;
+}
+
+static struct pdc_model model = { PARISC_PDC_MODEL };
+
+static void init_nvolatile_storage(void)
+{
+    const char *model_str;
+
+    memset(nvolatile_storage, 0, sizeof(nvolatile_storage));
+    memcpy(&nvolatile_storage[0], &model, sizeof(model));
+    model_str = model_string(opsys_id);
+    strtcpy((char *)&nvolatile_storage[80], model_str, 32);
 }
 
 static unsigned long lasi_rtc_read(void)
@@ -981,8 +1005,6 @@ static int pdc_pim(ARG_LIST)
     return PDC_BAD_OPTION;
 }
 
-static struct pdc_model model = { PARISC_PDC_MODEL };
-
 static int pdc_model(ARG_LIST)
 {
     unsigned long option = ARG1;
@@ -1004,16 +1026,9 @@ static int pdc_model(ARG_LIST)
             }
             return -4; // invalid c_index
         case PDC_MODEL_SYSMODEL:
-            switch (ARG3) {
-            case OS_ID_MPEXL:   model_str = "928LX 3kRanger Fox";
-                                model_str = "e3000/A400-100-11#N";
-                                break;
-            case OS_ID_HPUX:
-            default:            model_str = PARISC_MODEL;
-                                break;
-            }
+            model_str = model_string(ARG3);
             result[0] = strlen(model_str);
-            strtcpy((char *)ARG4, model_str, 80);
+            strtcpy((char *)ARG4, model_str, 32);
             return PDC_OK;
         case PDC_MODEL_ENSPEC:
         case PDC_MODEL_DISPEC:
@@ -1103,19 +1118,14 @@ static int pdc_coproc(ARG_LIST)
 {
     unsigned long option = ARG1;
     unsigned long *result = (unsigned long *)ARG2;
-    unsigned long mask;
     switch (option) {
         case PDC_COPROC_CFG:
             memset(result, 0, 32 * sizeof(unsigned long));
-            /* Set one bit per cpu in ccr_functional and ccr_present.
-               Ignore that specification only mentions 8 bits for cr10
-               and set all FPUs functional */
-            mask = -1UL;
-            mtctl(mask, 10); /* initialize cr10 */
-            result[0] = mask;
-            result[1] = mask;
-            result[17] = 1; // Revision
-            result[18] = 19; // Model
+            mtctl(-1UL, 10);    /* initialize cr10 */
+            result[0] = 0xc0;
+            result[1] = 0xc0;
+            result[17] = 0x01; // Revision        /* 1 auf c3k */
+            result[18] = 0x13; // Model           /* 0x13 auf c3k */
             return PDC_OK;
     }
     return PDC_BAD_OPTION;
@@ -1235,7 +1245,7 @@ static int pdc_stable(ARG_LIST)
         case PDC_STABLE_VERIFY_CONTENTS:
             return PDC_OK;
         case PDC_STABLE_INITIALIZE:
-            init_stable_storage();
+            // init_stable_storage();
             return PDC_OK;
     }
     return PDC_BAD_OPTION;
@@ -1263,7 +1273,7 @@ static int pdc_nvolatile(ARG_LIST)
         case PDC_NVOLATILE_VERIFY_CONTENTS:
             return PDC_OK;
         case PDC_NVOLATILE_INITIALIZE:
-            memset(nvolatile_storage, 0, sizeof(nvolatile_storage));
+            init_nvolatile_storage();
             return PDC_OK;
     }
     return PDC_BAD_OPTION;
@@ -2231,6 +2241,14 @@ void __VISIBLE start_parisc_firmware(void)
     /* 0,1 = default 8x16 font, 2 = 16x32 font */
     sti_font = romfile_loadstring_to_int("opt/font", 0);
 
+    /* 0: HP-UX/Linux, 2: MPE/XL */
+    opsys_id = romfile_loadstring_to_int("opt/os", opsys_id);
+    if (opsys_id == OS_ID_MPEXL) {
+        struct pdc_model mpe_model = { MPE_PARISC_PDC_MODEL };
+        model = mpe_model;
+    } else
+        opsys_id = OS_ID_HPUX;  /* else default to HP-UX */
+
     model.sw_id = romfile_loadstring_to_int("opt/hostid", model.sw_id);
     dprintf(0, "fw_cfg: machine hostid %lu\n", model.sw_id);
 
@@ -2277,6 +2295,9 @@ void __VISIBLE start_parisc_firmware(void)
         // remove_from_keep_list(LASI_PS2MOU_HPA);
     }
 
+    // Initialize stable storage
+    init_stable_storage();
+
     // Initialize boot paths (graphics & keyboard)
     if (pdc_console == CONSOLE_DEFAULT) {
 	if (artist_present())
@@ -2299,9 +2320,6 @@ void __VISIBLE start_parisc_firmware(void)
     if (0) { for (i=0; parisc_devices[i].hpa; i++)
         printf("Kept #%d at 0x%lx\n", i, parisc_devices[i].hpa);
     }
-
-    // Initialize stable storage
-    init_stable_storage();
 
     chassis_code = 0;
 
