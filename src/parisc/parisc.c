@@ -239,15 +239,21 @@ void flush_data_cache(char *start, size_t length)
     asm ("sync");
 }
 
-void memdump(void *mem, unsigned long len)
+static void dump_mem(unsigned long addr, signed long len)
 {
-    printf("memdump @ 0x%x : ", (unsigned int) mem);
-    while (len--) {
-        printf("0x%x ", (unsigned int) *(unsigned char *)mem);
-        mem++;
+    unsigned char *p = (unsigned char *)addr;
+
+    while (len > 0) {
+        printf("%08lx: %02x %02x %02x %02x %02x %02x %02x %02x"
+                     " %02x %02x %02x %02x %02x %02x %02x %02x\n",
+            addr, p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7],
+                  p[8], p[9], p[10], p[11], p[12], p[13], p[14], p[15]);
+        addr += 16;
+        p += 16;
+        len -= 16;
     }
-    printf("\n");
 }
+
 
 /********************************************************
  * Boot drives
@@ -821,10 +827,10 @@ int __VISIBLE parisc_iodc_ENTRY_TLB(ARG_LIST)
  * FIRMWARE PDC HANDLER
  ********************************************************/
 
-#define STABLE_STORAGE_SIZE	512
+#define STABLE_STORAGE_SIZE	2048
 static unsigned char stable_storage[STABLE_STORAGE_SIZE];
 
-#define NVOLATILE_STORAGE_SIZE	512
+#define NVOLATILE_STORAGE_SIZE	2048
 static unsigned char nvolatile_storage[NVOLATILE_STORAGE_SIZE];
 
 static void init_stable_storage(void)
@@ -859,7 +865,8 @@ static void init_nvolatile_storage(void)
     memset(nvolatile_storage, 0, sizeof(nvolatile_storage));
     memcpy(&nvolatile_storage[0], &model, sizeof(model));
     model_str = model_string(opsys_id);
-    strtcpy((char *)&nvolatile_storage[80], model_str, 32);
+    strtcpy((char *)&nvolatile_storage[0x80], model_str, 32);
+    strtcpy((char *)&nvolatile_storage[0xf0], "SeaBIOS-hppa", 16);
 }
 
 static unsigned long lasi_rtc_read(void)
@@ -932,13 +939,15 @@ static int pdc_chassis(ARG_LIST)
 
     switch (option) {
         case PDC_CHASSIS_DISP:
+            if (ARG2 == 0x2dead)
+                hlt();
             ARG3 = ARG2;
             result = (unsigned long *)&ARG4; // do not write to ARG2, use &ARG4 instead
             // fall through
         case PDC_CHASSIS_DISPWARN:
             ARG4 = (ARG3 >> 17) & 7;
             chassis_code = ARG3 & 0xffff;
-            if (0) printf("\nPDC_CHASSIS: %s (%d), %sCHASSIS  %0x\n",
+            if (1) printf("\nPDC_CHASSIS: %s (%d), %sCHASSIS  %0x\n",
                     systat[ARG4], ARG4, (ARG3>>16)&1 ? "blank display, ":"", chassis_code);
             // fall through
         case PDC_CHASSIS_WARN:
@@ -1233,10 +1242,12 @@ static int pdc_stable(ARG_LIST)
             if ((ARG2 + ARG4) > STABLE_STORAGE_SIZE)
                 return PDC_INVALID_ARG;
             memcpy((unsigned char *) ARG3, &stable_storage[ARG2], ARG4);
+            dump_mem(ARG3, ARG4);
             return PDC_OK;
         case PDC_STABLE_WRITE:
             if ((ARG2 + ARG4) > STABLE_STORAGE_SIZE)
                 return PDC_INVALID_ARG;
+            dump_mem(ARG3, ARG4);
             memcpy(&stable_storage[ARG2], (unsigned char *) ARG3, ARG4);
             return PDC_OK;
         case PDC_STABLE_RETURN_SIZE:
@@ -1261,10 +1272,12 @@ static int pdc_nvolatile(ARG_LIST)
             if ((ARG2 + ARG4) > NVOLATILE_STORAGE_SIZE)
                 return PDC_INVALID_ARG;
             memcpy((unsigned char *) ARG3, &nvolatile_storage[ARG2], ARG4);
+            dump_mem(ARG3, ARG4);
             return PDC_OK;
         case PDC_NVOLATILE_WRITE:
             if ((ARG2 + ARG4) > NVOLATILE_STORAGE_SIZE)
                 return PDC_INVALID_ARG;
+            dump_mem(ARG3, ARG4);
             memcpy(&nvolatile_storage[ARG2], (unsigned char *) ARG3, ARG4);
             return PDC_OK;
         case PDC_NVOLATILE_RETURN_SIZE:
@@ -2411,6 +2424,8 @@ void __VISIBLE start_parisc_firmware(void)
         PAGE0->mem_boot.dp.layers[0] = boot_drive->target;
         PAGE0->mem_boot.dp.layers[1] = boot_drive->lun;
     }
+
+    init_nvolatile_storage();
 
     /* directly start Linux kernel if it was given on qemu command line. */
     if (linux_kernel_entry > 1) {
