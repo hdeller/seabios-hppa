@@ -951,7 +951,7 @@ static int pdc_chassis(ARG_LIST)
             if (1) printf("PDC_CHASSIS: %s (%d), %sCHASSIS  %0x\n",
                     systat[ARG4], ARG4, (ARG3>>16)&1 ? "blank display, ":"", chassis_code);
 
-dump_mem(0x3a0, 32*4);
+// dump_mem(0x3a0, 32*4);
 #if 0
 IN:
 0x00000000000e4008:  ldi 3c8,r21
