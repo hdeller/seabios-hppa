@@ -118,7 +118,8 @@ int pdc_console;
 #define CONSOLE_SERIAL    0x0001
 #define CONSOLE_GRAPHICS  0x0002
 
-int opsys_id = OS_ID_MPEXL;     // default OS: OS_ID_HPUX or OS_ID_MPEXL
+unsigned int opsys_id = OS_ID_MPEXL;     // default OS: OS_ID_HPUX or OS_ID_MPEXL
+unsigned int parisc_cpuid = PARISC_PDC_CPUID;
 
 int sti_font;
 
@@ -947,8 +948,21 @@ static int pdc_chassis(ARG_LIST)
         case PDC_CHASSIS_DISPWARN:
             ARG4 = (ARG3 >> 17) & 7;
             chassis_code = ARG3 & 0xffff;
-            if (1) printf("\nPDC_CHASSIS: %s (%d), %sCHASSIS  %0x\n",
+            if (1) printf("PDC_CHASSIS: %s (%d), %sCHASSIS  %0x\n",
                     systat[ARG4], ARG4, (ARG3>>16)&1 ? "blank display, ":"", chassis_code);
+
+dump_mem(0x3a0, 32*4);
+#if 0
+IN:
+0x00000000000e4008:  ldi 3c8,r21
+0x00000000000e400c:  ldwa 0(r21),r21
+0x00000000000e4010:  cmpb,=,n r0,r21,0xe41ec
+
+0x00000000000e4014:  ldb -31(sp),r22
+0x00000000000e4018:  depw r22,15,16,r26
+0x00000000000e401c:  break 4,80
+#endif
+
             // fall through
         case PDC_CHASSIS_WARN:
             // return warnings regarding fans, batteries and temperature: None!
@@ -1045,7 +1059,7 @@ static int pdc_model(ARG_LIST)
                 return -20;
             return PDC_OK;
         case PDC_MODEL_CPU_ID:
-            result[0] = PARISC_PDC_CPUID;
+            result[0] = parisc_cpuid;
             return PDC_OK;
         case PDC_MODEL_CAPABILITIES:
             result[0] = PARISC_PDC_CAPABILITIES;
@@ -1133,8 +1147,9 @@ static int pdc_coproc(ARG_LIST)
             mtctl(-1UL, 10);    /* initialize cr10 */
             result[0] = 0xc0;
             result[1] = 0xc0;
-            result[17] = 0x01; // Revision        /* 1 auf c3k */
-            result[18] = 0x13; // Model           /* 0x13 auf c3k */
+            result[17] = 1; // Revision
+            // use same model for FPU as for CPU
+            result[18] = parisc_cpuid >> 5; // Model
             return PDC_OK;
     }
     return PDC_BAD_OPTION;
@@ -2155,6 +2170,7 @@ static void prepare_boot_path(volatile struct pz_device *dest,
 
     /* copy device path to entry in PAGE0 */
     memcpy((void*)dest, source, sizeof(*source));
+    // dest->iodc_io = 0;  // delete predefined iodc_io
     memcpy((void*)&dest->dp, mod_path, sizeof(struct device_path));
 
     /* copy device path to stable storage */
@@ -2261,6 +2277,10 @@ void __VISIBLE start_parisc_firmware(void)
         model = mpe_model;
     } else
         opsys_id = OS_ID_HPUX;  /* else default to HP-UX */
+
+    /* CPUID 0x01e8 PCX-L2 (B160) = 0x01e8 = vers 15 rev 8 */
+    parisc_cpuid = romfile_loadstring_to_int("opt/cpuid", parisc_cpuid);
+    dprintf(0, "fw_cfg: CPU ID %x\n", parisc_cpuid);
 
     model.sw_id = romfile_loadstring_to_int("opt/hostid", model.sw_id);
     dprintf(0, "fw_cfg: machine hostid %lu\n", model.sw_id);
