@@ -578,9 +578,15 @@ static hppa_device_t *find_hppa_device_by_path(struct pdc_module_path *search,
 #define SERIAL_TIMEOUT 20
 static unsigned long parisc_serial_in(char *c, unsigned long maxchars)
 {
-    portaddr_t addr = PAGE0->mem_kbd.hpa + 0x800; /* PARISC_SERIAL_CONSOLE */
+    portaddr_t addr;
     unsigned long end = timer_calc(SERIAL_TIMEOUT);
     unsigned long count = 0;
+
+    if (opsys_id == OS_ID_MPEXL)
+        addr = PARISC_SERIAL_CONSOLE; /* XXX: workaround that MPE uses different serial port hpa */
+    else
+        addr = PAGE0->mem_kbd.hpa + 0x800;
+
     while (count < maxchars) {
         u8 lsr = inb(addr+SEROFF_LSR);
         if (lsr & 0x01) {
@@ -660,7 +666,7 @@ int __VISIBLE parisc_iodc_ENTRY_IO(ARG_LIST)
     char *c;
     struct disk_op_s disk_op;
 
-    if (1 &&
+    if (0 &&
             (((HPA_is_serial_device(hpa) || HPA_is_graphics_device(hpa)) && option == ENTRY_IO_COUT) ||
              ((HPA_is_serial_device(hpa) || HPA_is_graphics_device(hpa)) && option == ENTRY_IO_CIN)
              // || (HPA_is_storage_device(hpa) && option == ENTRY_IO_BOOTIN)
@@ -1200,7 +1206,7 @@ static int pdc_iodc(ARG_LIST)
                 //	ARG6 = 2; // Memory modules return 2 bytes of IODC memory (result2 ret[0] = 0x6701f41 HI !!)
                 memcpy((void*) ARG5, iodc_p, ARG6);
                 c = (unsigned char *) ARG5;
-                dprintf(0, "SeaBIOS: PDC_IODC get: hpa = 0x%lx, HV: 0x%x 0x%x IODC_SPA=0x%x  type 0x%x, \n", hpa, c[0], c[1], c[2], c[3]);
+                // printf("SeaBIOS: XXXXXXXXXXXXXXX PDC_IODC get: hpa = 0x%lx, HV: 0x%x 0x%x IODC_SPA=0x%x  type 0x%x, \n", hpa, c[0], c[1], c[2], c[3]);
                 // c[0] = iodc_p->hversion_model; // FIXME. BROKEN HERE !!!
                 // c[1] = iodc_p->hversion_rev || (iodc_p->hversion << 4);
                 *result = ARG6;
@@ -1232,6 +1238,9 @@ static int pdc_iodc(ARG_LIST)
             result[2] = 0;
             result[3] = 0;
             return PDC_OK;
+        case PDC_IODC_IDENT_PRIMARY:
+            result[0] = MEMORY_HPA;
+            return PDC_OK;      /* or -19 ? */
     }
     printf("\n\nSeaBIOS: Unimplemented PDC_IODC function %ld ARG3=%x ARG4=%x ARG5=%x ARG6=%x\n", option, ARG3, ARG4, ARG5, ARG6);
     return PDC_BAD_OPTION;
@@ -1273,13 +1282,13 @@ static int pdc_stable(ARG_LIST)
             if ((ARG2 + ARG4) > STABLE_STORAGE_SIZE)
                 return PDC_INVALID_ARG;
             memcpy((unsigned char *) ARG3, &stable_storage[ARG2], ARG4);
-            dump_mem(ARG3, ARG4, ARG3);
+            dump_mem(ARG3, ARG4, ARG2);
             return PDC_OK;
         case PDC_STABLE_WRITE:
             if ((ARG2 + ARG4) > STABLE_STORAGE_SIZE)
                 return PDC_INVALID_ARG;
-            dump_mem(ARG3, ARG4, (unsigned long) &nvolatile_storage[ARG2]);
             memcpy(&stable_storage[ARG2], (unsigned char *) ARG3, ARG4);
+            dump_mem(ARG3, ARG4, ARG2);
             return PDC_OK;
         case PDC_STABLE_RETURN_SIZE:
             result[0] = STABLE_STORAGE_SIZE;
@@ -1303,12 +1312,12 @@ static int pdc_nvolatile(ARG_LIST)
             if ((ARG2 + ARG4) > NVOLATILE_STORAGE_SIZE)
                 return PDC_INVALID_ARG;
             memcpy((unsigned char *) ARG3, &nvolatile_storage[ARG2], ARG4);
-            dump_mem(ARG3, ARG4, ARG3);
+            dump_mem(ARG3, ARG4, ARG2);
             return PDC_OK;
         case PDC_NVOLATILE_WRITE:
             if ((ARG2 + ARG4) > NVOLATILE_STORAGE_SIZE)
                 return PDC_INVALID_ARG;
-            dump_mem(ARG3, ARG4, (unsigned long) &nvolatile_storage[ARG2]);
+            dump_mem(ARG3, ARG4, ARG2);
             memcpy(&nvolatile_storage[ARG2], (unsigned char *) ARG3, ARG4);
             return PDC_OK;
         case PDC_NVOLATILE_RETURN_SIZE:
@@ -2310,7 +2319,7 @@ void __VISIBLE start_parisc_firmware(void)
 
     PAGE0->memc_cont = ram_size;
     PAGE0->memc_phsize = ram_size;
-    PAGE0->memc_adsize = 0;
+    PAGE0->memc_adsize = 0x6000;
     PAGE0->mem_pdc_hi = (MEM_PDC_ENTRY + 0ULL) >> 32;
     PAGE0->mem_free = 0x6000; // min PAGE_SIZE
     PAGE0->mem_hpa = CPU_HPA; // HPA of boot-CPU

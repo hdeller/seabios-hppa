@@ -20,6 +20,19 @@
 	, 0x0001, 0x0000, 0x0000, 0x0001, 0x0001
 #if 0
 Installation:
+
+install 8/0/0:0.1.0
+                                                                            
+INSTALL [   START ] [ SINGLE-USER ] [   SYSSTART ] [ LOGON=acct ]           
+        [ NOSTART ] [ MULTI-USER  ] [ NOSYSSTART ]                          
+                                                                            
+        [ SINGLE-DISC ]                                                     
+        [ MULTI-DISC  ]                                                     
+                                                                            
+You may enter "help" for a description of the boot options.
+
+
+
 http://www.3kranger.com/HP3000/mpeix/en-mpe70/32650-90892/32650-90892.pdf
 
 https://support.hpe.com/hpesc/public/docDisplay?docId=c01097674&docLocale=en_US

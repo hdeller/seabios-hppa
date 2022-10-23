@@ -93,6 +93,8 @@
 #define PDC_IODC_NINIT		2	/* non-destructive init		*/
 #define PDC_IODC_DINIT		3	/* destructive init		*/
 #define PDC_IODC_MEMERR		4	/* check for memory errors	*/
+#define PDC_IODC_IDENT_PRIMARY	5	/* Identify primary memory mod  */
+
 #define PDC_IODC_INDEX_DATA	0	/* get first 16 bytes from mod IODC */
 #define PDC_IODC_BUS_ERROR	-4	/* bus error return value	*/
 #define PDC_IODC_INVALID_INDEX	-5	/* invalid index return value	*/

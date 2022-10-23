@@ -27,8 +27,8 @@
 #define LASI_PS2MOU_HPA 0xffd08100
 #define LASI_GFX_HPA    0xf8000000
 #define ARTIST_FB_ADDR  0xf9000000
-#define CPU_HPA         0xfffb0000
-#define MEMORY_HPA      0xfffff000
+#define MEMORY_HPA      0xfffa0000
+#define CPU_HPA         0xfffb0000      /* needs to be last for MPE */
 
 #define PCI_HPA         DINO_HPA        /* PCI bus */
 #define IDE_HPA         0xf9000000      /* Boot disc controller */
