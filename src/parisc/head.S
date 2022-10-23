@@ -138,9 +138,14 @@ name:
 	/* On HPMC, the CPUs will start here at 0xf0000000 */
 hpmc_entry:
         b,n toc_asm_entry       /* TOC and HPMC */
-
 reset_entry:
 	/* at reset, the CPU begins fetching instructions from address 0xf0000004. */
+	b,n startup
+BOOT_ADDR:
+	b,n startup
+ENTRY_ADDR:
+	break 0,0	/* TODO: should probably be: b,n iodc_entry */
+LPMC_ADDR:
 	b,n startup
 
 marker:

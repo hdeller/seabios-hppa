@@ -432,9 +432,9 @@ struct zeropage {
 	unsigned int	imm_max_mem;		/* bytes of mem in IMM */
 
 	/* [0x3A0] boot console, display device and keyboard */
-	struct pz_device mem_cons;	/* description of console device */
-	struct pz_device mem_boot;	/* description of boot device */
-	struct pz_device mem_kbd;	/* description of keyboard device */
+	struct pz_device mem_cons;	/* 0x3a0: description of console device */
+	struct pz_device mem_boot;	/* 0x3d0: description of boot device */
+	struct pz_device mem_kbd;	/* 0x400: description of keyboard device */
 
 	/* [0x430] reserved */
 	int	pad430[116];

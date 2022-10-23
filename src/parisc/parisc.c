@@ -111,6 +111,7 @@ extern unsigned long boot_args[];
 /* flags for pdc_debug */
 #define DEBUG_PDC       0x0001
 #define DEBUG_IODC      0x0002
+#define DEBUG_CHASSIS   0x0004
 
 int pdc_console;
 /* flags for pdc_console */
@@ -154,6 +155,7 @@ extern char iodc_entry_table[14*4];
 #define ARG5 arg[-5]
 #define ARG6 arg[-6]
 #define ARG7 arg[-7]
+#define ARG8 arg[-8]
 #define ARG_LIST        unsigned int *arg
 #define ARG_REFS        arg
 #endif
@@ -240,16 +242,20 @@ void flush_data_cache(char *start, size_t length)
     asm ("sync");
 }
 
-static void dump_mem(unsigned long addr, signed long len)
+static void dump_mem(unsigned long addr, signed long len, unsigned long oaddr)
 {
     unsigned char *p = (unsigned char *)addr;
+
+    if (!(pdc_debug & DEBUG_PDC))
+        return;
 
     while (len > 0) {
         printf("%08lx: %02x %02x %02x %02x %02x %02x %02x %02x"
                      " %02x %02x %02x %02x %02x %02x %02x %02x\n",
-            addr, p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7],
+           oaddr, p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7],
                   p[8], p[9], p[10], p[11], p[12], p[13], p[14], p[15]);
         addr += 16;
+        oaddr += 16;
         p += 16;
         len -= 16;
     }
@@ -379,7 +385,7 @@ static int class_of_hpa(unsigned long hpa)
 
 int HPA_is_serial_device(unsigned long hpa)
 {
-    return (hpa == DINO_UART_HPA) || (hpa == LASI_UART_HPA);
+    return (hpa == DINO_UART_HPA) || (hpa == LASI_UART_HPA) || (hpa == MPE_CONSOLE_HPA);
 }
 
 int HPA_is_storage_device(unsigned long hpa)
@@ -641,7 +647,7 @@ static void iodc_log_call(ARG_LIST, const char *func)
 {
     if (pdc_debug & DEBUG_IODC) {
         printf("\nIODC %s called: hpa=0x%x (%s) option=0x%x arg2=0x%x arg3=0x%x ", func, ARG0, hpa_name(ARG0), ARG1, ARG2, ARG3);
-        printf("result=0x%x arg5=0x%x arg6=0x%x arg7=0x%x\n", ARG4, ARG5, ARG6, ARG7);
+        printf("result=0x%x arg5=0x%x arg6=0x%x arg7=0x%x arg8=0x%x\n", ARG4, ARG5, ARG6, ARG7, ARG8);
     }
 }
 
@@ -697,12 +703,31 @@ int __VISIBLE parisc_iodc_ENTRY_IO(ARG_LIST)
     /* boot medium I/O */
     if (HPA_is_storage_device(hpa))
         switch (option) {
-            case ENTRY_IO_BOOTIN: /* boot medium IN */
-            case ENTRY_IO_BBLOCK_IN: /* boot block medium IN */
+            case ENTRY_IO_BOOTOUT:      /* boot medium OUT */
+            case ENTRY_IO_BBLOCK_OUT:   /* boot block medium OUT */
+                disk_op.command = CMD_WRITE;
+                goto process_bootio;
+
+            case ENTRY_IO_BOOTIN:       /* boot medium IN */
+            case ENTRY_IO_BBLOCK_IN:    /* boot block medium IN */
+                disk_op.command = CMD_READ;
+
+                process_bootio:
+
+                if (ARG6 >= ram_size) { /* ram address outside memory range? */
+                    result[0] = ARG7;
+                    return PDC_OK;      // work around MEM size detection problem with "DUMPAREA found, save main memory to disc" should be: PDC_ERROR XXX
+                }
+                if (ARG6 < PAGE_SIZE &&
+                    (option == ENTRY_IO_BOOTIN || option == ENTRY_IO_BBLOCK_IN)) {
+                    printf("\nSeaBIOS: Will not overwrite page zero!\n");
+                    return PDC_ERROR;
+                }
+
                 disk_op.drive_fl = boot_drive;
                 disk_op.buf_fl = (void*)ARG6;
-                disk_op.command = CMD_READ;
-                if (option == ENTRY_IO_BBLOCK_IN) { /* in 2k blocks */
+                if (option == ENTRY_IO_BBLOCK_IN ||
+                    option == ENTRY_IO_BBLOCK_OUT) { /* in 2k blocks */
                     disk_op.count = (ARG7 * ((u64)FW_BLOCKSIZE / disk_op.drive_fl->blksize));
                     disk_op.lba = (ARG5 * ((u64)FW_BLOCKSIZE / disk_op.drive_fl->blksize));
                 } else {
@@ -712,6 +737,8 @@ int __VISIBLE parisc_iodc_ENTRY_IO(ARG_LIST)
                 // ARG8 = maxsize !!!
                 ret = process_op(&disk_op);
                 // dprintf(0, "\nBOOT IO res %d count = %d\n", ret, ARG7);
+                if ((pdc_debug & DEBUG_IODC) && (option == ENTRY_IO_BOOTOUT))
+                    printf("\nBOOT IO OUT ret %d count = %d\n", ret, ARG7);
                 result[0] = ARG7;
                 if (ret)
                     return PDC_ERROR;
@@ -948,21 +975,9 @@ static int pdc_chassis(ARG_LIST)
         case PDC_CHASSIS_DISPWARN:
             ARG4 = (ARG3 >> 17) & 7;
             chassis_code = ARG3 & 0xffff;
-            if (1) printf("PDC_CHASSIS: %s (%d), %sCHASSIS  %0x\n",
+            if (pdc_debug & (DEBUG_CHASSIS|DEBUG_PDC))
+                printf("PDC_CHASSIS: %s (%d), %sCHASSIS  %0x\n",
                     systat[ARG4], ARG4, (ARG3>>16)&1 ? "blank display, ":"", chassis_code);
-
-// dump_mem(0x3a0, 32*4);
-#if 0
-IN:
-0x00000000000e4008:  ldi 3c8,r21
-0x00000000000e400c:  ldwa 0(r21),r21
-0x00000000000e4010:  cmpb,=,n r0,r21,0xe41ec
-
-0x00000000000e4014:  ldb -31(sp),r22
-0x00000000000e4018:  depw r22,15,16,r26
-0x00000000000e401c:  break 4,80
-#endif
-
             // fall through
         case PDC_CHASSIS_WARN:
             // return warnings regarding fans, batteries and temperature: None!
@@ -1164,7 +1179,8 @@ static int pdc_iodc(ARG_LIST)
     int hpa_index;
     unsigned char *c;
 
-    dprintf(9, "\nSeaBIOS: Info PDC_IODC option %ld ARG3=%x ARG4=%x ARG5=%x ARG6=%x\n", option, ARG3, ARG4, ARG5, ARG6);
+    if (pdc_debug & DEBUG_IODC)
+        printf("\nSeaBIOS: Info PDC_IODC option %ld ARG2=%x ARG3=%x ARG4=%x ARG5=%x ARG6=%x\n", option, ARG2, ARG3, ARG4, ARG5, ARG6);
 
     hpa = ARG3;
     if (hpa == IDE_HPA) { // do NOT check for DINO_SCSI_HPA, breaks Linux which scans IO areas for unlisted io modules
@@ -1257,12 +1273,12 @@ static int pdc_stable(ARG_LIST)
             if ((ARG2 + ARG4) > STABLE_STORAGE_SIZE)
                 return PDC_INVALID_ARG;
             memcpy((unsigned char *) ARG3, &stable_storage[ARG2], ARG4);
-            dump_mem(ARG3, ARG4);
+            dump_mem(ARG3, ARG4, ARG3);
             return PDC_OK;
         case PDC_STABLE_WRITE:
             if ((ARG2 + ARG4) > STABLE_STORAGE_SIZE)
                 return PDC_INVALID_ARG;
-            dump_mem(ARG3, ARG4);
+            dump_mem(ARG3, ARG4, (unsigned long) &nvolatile_storage[ARG2]);
             memcpy(&stable_storage[ARG2], (unsigned char *) ARG3, ARG4);
             return PDC_OK;
         case PDC_STABLE_RETURN_SIZE:
@@ -1287,12 +1303,12 @@ static int pdc_nvolatile(ARG_LIST)
             if ((ARG2 + ARG4) > NVOLATILE_STORAGE_SIZE)
                 return PDC_INVALID_ARG;
             memcpy((unsigned char *) ARG3, &nvolatile_storage[ARG2], ARG4);
-            dump_mem(ARG3, ARG4);
+            dump_mem(ARG3, ARG4, ARG3);
             return PDC_OK;
         case PDC_NVOLATILE_WRITE:
             if ((ARG2 + ARG4) > NVOLATILE_STORAGE_SIZE)
                 return PDC_INVALID_ARG;
-            dump_mem(ARG3, ARG4);
+            dump_mem(ARG3, ARG4, (unsigned long) &nvolatile_storage[ARG2]);
             memcpy(&nvolatile_storage[ARG2], (unsigned char *) ARG3, ARG4);
             return PDC_OK;
         case PDC_NVOLATILE_RETURN_SIZE:
@@ -2294,7 +2310,7 @@ void __VISIBLE start_parisc_firmware(void)
 
     PAGE0->memc_cont = ram_size;
     PAGE0->memc_phsize = ram_size;
-    PAGE0->memc_adsize = ram_size;
+    PAGE0->memc_adsize = 0;
     PAGE0->mem_pdc_hi = (MEM_PDC_ENTRY + 0ULL) >> 32;
     PAGE0->mem_free = 0x6000; // min PAGE_SIZE
     PAGE0->mem_hpa = CPU_HPA; // HPA of boot-CPU
