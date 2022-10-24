@@ -178,6 +178,9 @@ ENTRY(startup)
 	rsm	PSW_W_SM, %r0
 	.level 1.1
 
+	/* enable PSQ Q-bit by default. HPE needs it. */
+	ssm	8, %r1		/* set Q-bit */
+
 	/* Save CPU HPA in cr7, hopefully HP-UX will not use that register. */
 	mtctl   %r5, CPU_HPA_CR_REG /* store CPU HPA */
 

@@ -575,18 +575,22 @@ static hppa_device_t *find_hppa_device_by_path(struct pdc_module_path *search,
     return NULL;
 }
 
+static portaddr_t ser_port_addr(unsigned long defport)
+{
+    if (opsys_id == OS_ID_MPEXL)
+        return PARISC_SERIAL_CONSOLE; /* XXX: workaround that MPE uses different serial port hpa */
+    else
+        return defport;
+}
+
 #define SERIAL_TIMEOUT 20
 static unsigned long parisc_serial_in(char *c, unsigned long maxchars)
 {
-    portaddr_t addr;
     unsigned long end = timer_calc(SERIAL_TIMEOUT);
     unsigned long count = 0;
+    portaddr_t addr;
 
-    if (opsys_id == OS_ID_MPEXL)
-        addr = PARISC_SERIAL_CONSOLE; /* XXX: workaround that MPE uses different serial port hpa */
-    else
-        addr = PAGE0->mem_kbd.hpa + 0x800;
-
+    addr = ser_port_addr(PAGE0->mem_kbd.hpa + 0x800);
     while (count < maxchars) {
         u8 lsr = inb(addr+SEROFF_LSR);
         if (lsr & 0x01) {
@@ -602,8 +606,9 @@ static unsigned long parisc_serial_in(char *c, unsigned long maxchars)
 
 static void parisc_serial_out(char c)
 {
-    portaddr_t addr = PAGE0->mem_cons.hpa + 0x800; /* PARISC_SERIAL_CONSOLE */
-    addr = PARISC_SERIAL_CONSOLE;
+    portaddr_t addr;
+
+    addr = ser_port_addr(PAGE0->mem_cons.hpa + 0x800);
     for (;;) {
         if (c == '\n')
             parisc_serial_out('\r');
@@ -666,7 +671,7 @@ int __VISIBLE parisc_iodc_ENTRY_IO(ARG_LIST)
     char *c;
     struct disk_op_s disk_op;
 
-    if (0 &&
+    if (1 &&
             (((HPA_is_serial_device(hpa) || HPA_is_graphics_device(hpa)) && option == ENTRY_IO_COUT) ||
              ((HPA_is_serial_device(hpa) || HPA_is_graphics_device(hpa)) && option == ENTRY_IO_CIN)
              // || (HPA_is_storage_device(hpa) && option == ENTRY_IO_BOOTIN)
@@ -720,9 +725,9 @@ int __VISIBLE parisc_iodc_ENTRY_IO(ARG_LIST)
 
                 process_bootio:
 
-                if (ARG6 >= ram_size) { /* ram address outside memory range? */
-                    result[0] = ARG7;
-                    return PDC_OK;      // work around MEM size detection problem with "DUMPAREA found, save main memory to disc" should be: PDC_ERROR XXX
+                if (ARG6 >= ram_size || (ARG6 + ARG7) >= ram_size ||
+                    (ARG6 + ARG7) < ARG6) { /* ram address outside memory range? */
+                    return PDC_ERROR;
                 }
                 if (ARG6 < PAGE_SIZE &&
                     (option == ENTRY_IO_BOOTIN || option == ENTRY_IO_BBLOCK_IN)) {
@@ -973,8 +978,10 @@ static int pdc_chassis(ARG_LIST)
 
     switch (option) {
         case PDC_CHASSIS_DISP:
-            if (ARG2 == 0x2dead)
+            if (ARG2 == 0x2dead) {
+                // dump_mem(0x3a0, 96, 0x3a0);
                 hlt();
+            }
             ARG3 = ARG2;
             result = (unsigned long *)&ARG4; // do not write to ARG2, use &ARG4 instead
             // fall through
@@ -1447,7 +1454,7 @@ static int pdc_mem(ARG_LIST)
 
 static int pdc_psw(ARG_LIST)
 {
-    static unsigned long psw_defaults = PDC_PSW_ENDIAN_BIT;
+    static unsigned long psw_defaults = 0;
     unsigned long option = ARG1;
     unsigned long *result = (unsigned long *)ARG2;
 
@@ -1460,6 +1467,7 @@ static int pdc_psw(ARG_LIST)
         *result = psw_defaults;
     if (option == PDC_PSW_SET_DEFAULTS) {
         psw_defaults = ARG2;
+        /* TODO: check if endian bit changed and set. */
     }
     return PDC_OK;
 }
