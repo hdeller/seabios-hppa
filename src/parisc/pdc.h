@@ -80,16 +80,16 @@
 
 #define PDC_IODC	8		/* talk to IODC			*/
 #define PDC_IODC_READ		0	/* read IODC entry point	*/
-/*      PDC_IODC_RI_			 * INDEX parameter of PDC_IODC_READ */
-#define PDC_IODC_RI_DATA_BYTES	0	/* IODC Data Bytes		*/
-/*				1, 2	   obsolete - HVERSION dependent*/
-#define PDC_IODC_RI_INIT	3	/* Initialize module		*/
-#define PDC_IODC_RI_IO		4	/* Module input/output		*/
-#define PDC_IODC_RI_SPA		5	/* Module input/output		*/
-#define PDC_IODC_RI_CONFIG	6	/* Module input/output		*/
-/*				7	  obsolete - HVERSION dependent */
-#define PDC_IODC_RI_TEST	8	/* Module input/output		*/
-#define PDC_IODC_RI_TLB		9	/* Module input/output		*/
+/*       PDC_IODC_RI_	        		 * INDEX parameter of PDC_IODC_READ */
+#define  PDC_IODC_RI_DATA_BYTES	        0	/* IODC Data Bytes		*/
+/*				        1, 2	   obsolete - HVERSION dependent*/
+#define  PDC_IODC_RI_INIT	        3	/* Initialize module		*/
+#define  PDC_IODC_RI_IO		        4	/* Module input/output		*/
+#define  PDC_IODC_RI_SPA		5	/* Module input/output		*/
+#define  PDC_IODC_RI_CONFIG	        6	/* Module input/output		*/
+/*				        7	  obsolete - HVERSION dependent */
+#define  PDC_IODC_RI_TEST	        8	/* Module input/output		*/
+#define  PDC_IODC_RI_TLB		9	/* Module input/output		*/
 #define PDC_IODC_NINIT		2	/* non-destructive init		*/
 #define PDC_IODC_DINIT		3	/* destructive init		*/
 #define PDC_IODC_MEMERR		4	/* check for memory errors	*/
