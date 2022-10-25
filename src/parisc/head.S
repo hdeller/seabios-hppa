@@ -436,6 +436,7 @@ ENTRY(iodc_entry_table)
 END(iodc_entry_table)
 
 ENTRY(iodc_entry)
+	/* This next instr will be replaced when copied to caller. */
 	load32 parisc_iodc_ENTRY_IO, %r1
 #if NOSAVE
 	bv %r0(%r1)

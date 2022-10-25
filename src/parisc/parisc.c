@@ -250,6 +250,7 @@ static void dump_mem(unsigned long addr, signed long len, unsigned long oaddr)
         return;
 
     while (len > 0) {
+        printf("Dump of %ld bytes from addr 0x%lx\n", len, oaddr);
         printf("%08lx: %02x %02x %02x %02x %02x %02x %02x %02x"
                      " %02x %02x %02x %02x %02x %02x %02x %02x\n",
            oaddr, p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7],
@@ -775,10 +776,15 @@ int __VISIBLE parisc_iodc_ENTRY_INIT(ARG_LIST)
 
     iodc_log_call(ARG_REFS, __FUNCTION__);
 
-    hpa = fix_hpa_hack(hpa);
-    hpa_index = find_hpa_index(hpa);
-    if (hpa_index < 0)
-        return PDC_NE_MOD;
+    if (hpa == MPE_CONSOLE_HPA) {
+    } else {
+        hpa = fix_hpa_hack(hpa);
+        hpa_index = find_hpa_index(hpa);
+        if (hpa_index < 0) {
+            printf("NOT found !!\n");
+            return PDC_NE_MOD;
+        }
+    }
 
     switch (option) {
         case ENTRY_INIT_SRCH_FRST: /* 2: Search first */
@@ -1192,22 +1198,27 @@ static int pdc_iodc(ARG_LIST)
     int hpa_index;
     unsigned char *c;
 
-    if (pdc_debug & DEBUG_IODC)
-        printf("\nSeaBIOS: Info PDC_IODC option %ld ARG2=%x ARG3=%x ARG4=%x ARG5=%x ARG6=%x\n", option, ARG2, ARG3, ARG4, ARG5, ARG6);
+    if (1 && pdc_debug & DEBUG_IODC)
+        printf("\n-> SeaBIOS: Info PDC_IODC option %ld ARG2=0x%x ARG3=0x%x ARG4=0x%x ARG5=0x%x ARG6=0x%x\n",
+            option, ARG2, ARG3, ARG4, ARG5, ARG6);
 
     hpa = ARG3;
     if (hpa == IDE_HPA) { // do NOT check for DINO_SCSI_HPA, breaks Linux which scans IO areas for unlisted io modules
         iodc_p = &iodc_data_hpa_fff8c000; // workaround for PCI ATA (use DINO_SCSI_HPA)
+    } else if (hpa == MPE_CONSOLE_HPA) {
+        iodc_p = &iodc_data_hpa_ffd05000; // workaround for MPE RS-232
     } else {
         hpa = fix_hpa_hack(hpa);
         hpa_index = find_hpa_index(hpa);
-        if (hpa_index < 0)
+        if (hpa_index < 0) {
+            // printf("DEVICE NOT FOUND \n");
             return -4; // not found
+        }
         iodc_p = parisc_devices[hpa_index].iodc;
     }
 
     switch (option) {
-        case PDC_IODC_READ:
+    case PDC_IODC_READ:
             if (ARG4 == PDC_IODC_INDEX_DATA) {
                 // if (hpa == MEMORY_HPA)
                 //	ARG6 = 2; // Memory modules return 2 bytes of IODC memory (result2 ret[0] = 0x6701f41 HI !!)
@@ -1235,17 +1246,16 @@ static int pdc_iodc(ARG_LIST)
             // dprintf(0, "\n\nSeaBIOS: Info PDC_IODC function OK\n");
             flush_data_cache((char*)ARG5, *result);
             return PDC_OK;
+    case PDC_IODC_NINIT:	/* 2: non-destructive init */
+    case PDC_IODC_DINIT:	/* 3: destructive init */
             break;
-        case PDC_IODC_NINIT:	/* non-destructive init */
-        case PDC_IODC_DINIT:	/* destructive init */
-            break;
-        case PDC_IODC_MEMERR:
+    case PDC_IODC_MEMERR:   /* 4: check for errors */
             result[0] = 0; /* IO_STATUS */
             result[1] = 0;
             result[2] = 0;
             result[3] = 0;
             return PDC_OK;
-        case PDC_IODC_IDENT_PRIMARY:
+    case PDC_IODC_IDENT_PRIMARY:
             result[0] = MEMORY_HPA;
             return PDC_OK;      /* or -19 ? */
     }
