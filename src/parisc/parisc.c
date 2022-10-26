@@ -4,6 +4,82 @@
 // Copyright (C) 2019 Sven Schnelle <svens@stackframe.org>
 //
 // This file may be distributed under the terms of the GNU LGPLv3 license.
+//
+#if 0
+
+                                                                     IODC IODC
+Path         Decimal     Type                  Location   HVER SVER  Vers Dep
+------------ ----------- --------------------- ---------- ---- ----  ---- ----
+LAN          10/0/12/0   Ethernet              built-in   0610 a200  0x02 0x00
+AUDIO        10/0/13/0   Audio                 built-in   
+IDE          10/0/14/0   IDE                   built-in   0610 a300  0x00 0x00
+SUPERIO MISC 10/0/14/1   Bridge Device         built-in   
+SERIAL_1     10/0/14/1/1 RS232 Port            built-in   0610 8c00  0x01 0x00
+SERIAL_2     10/0/14/1/2 RS232 Port            built-in   0610 8c00  0x01 0x00
+PARALLEL     10/0/14/1/3 Parallel Port         built-in   
+USB          10/0/14/2   USB                   built-in   0610 a900  0x98 0x00
+SCSI         10/0/15/0   SCSI                  built-in   0610 a300  0x00 0x00
+FWSCSI       10/0/15/1   SCSI                  built-in   0610 a300  0x00 0x00
+GRAPHICS(4)  10/1/4/0    PCI_GRAFFITIX1280     slot 4     0070 8500  0x01 0x00
+GRAPHICS(2)  10/6/2/0    A1299B                slot 2     0070 8500  0x01 0x00
+
+[    2.861517] 1. Astro BC Runway Port at 0xfffffffffed00000 [10] { 12, 0x0, 0x582, 0x0000b }
+[    2.969495] 2. Elroy PCI Bridge at 0xfffffffffed30000 [10/0] { 13, 0x0, 0x782, 0x0000a }
+[    3.077482] 3. Elroy PCI Bridge at 0xfffffffffed32000 [10/1] { 13, 0x0, 0x782, 0x0000a }
+[    3.185482] 4. Elroy PCI Bridge at 0xfffffffffed38000 [10/4] { 13, 0x0, 0x782, 0x0000a }
+[    3.289482] 5. Elroy PCI Bridge at 0xfffffffffed3c000 [10/6] { 13, 0x0, 0x782, 0x0000a }
+[    3.397482] 6. Allegro W2 at 0xfffffffffffa0000 [32] { 0, 0x0, 0x5dc, 0x00004 }
+[    3.493481] 7. Memory at 0xfffffffffed10200 [49] { 1, 0x0, 0x09c, 0x00009 }
+
+root@c3000:~# cat /proc/iomem 
+00000000-7fffffff : System RAM
+  00000000-000009ff : PDC data (Page Zero)
+  00300000-014fffff : Kernel code
+  01500000-018fffff : Kernel data
+fffffff0f05d0000-fffffff0f05d0000 : lcd_data
+fffffff0f05d0008-fffffff0f05d0008 : lcd_cmd
+fffffffff4000000-fffffffff47fffff : PCI00 LMMIO
+  fffffffff4000000-fffffffff4001fff : 0000:00:0f.1
+    fffffffff4000000-fffffffff4001fff : sym53c8xx
+  fffffffff4002000-fffffffff4003fff : 0000:00:0f.0
+    fffffffff4002000-fffffffff4003fff : sym53c8xx
+  fffffffff4004000-fffffffff40043ff : 0000:00:0f.1
+    fffffffff4004000-fffffffff40043ff : sym53c8xx
+  fffffffff4005000-fffffffff40053ff : 0000:00:0f.0
+    fffffffff4005000-fffffffff40053ff : sym53c8xx
+  fffffffff4006000-fffffffff4006fff : 0000:00:0e.2
+  fffffffff4007000-fffffffff4007fff : 0000:00:0e.2
+    fffffffff4007000-fffffffff4007fff : ohci_hcd
+  fffffffff4008000-fffffffff40083ff : 0000:00:0c.0
+    fffffffff4008000-fffffffff40083ff : tulip
+  fffffffff4009000-fffffffff400900f : 0000:00:0d.0
+  fffffffff400a000-fffffffff400a00f : 0000:00:0d.0
+  fffffffff400b000-fffffffff400b00f : 0000:00:0d.0
+  fffffffff400c000-fffffffff400c1ff : 0000:00:0d.0
+    fffffffff400c000-fffffffff400c1ff : AD1889
+  fffffffff4040000-fffffffff407ffff : 0000:00:0c.0
+fffffffff4800000-fffffffff4ffffff : PCI01 LMMIO
+  fffffffff4800000-fffffffff480ffff : 0000:01:04.0
+fffffffff6000000-fffffffff67fffff : PCI02 LMMIO
+fffffffff7000000-fffffffff77fffff : PCI03 LMMIO
+  fffffffff7000000-fffffffff71fffff : 0000:03:02.0
+fffffffff8000000-fffffffff9ffffff : PCI01 ELMMIO
+  fffffffff8000000-fffffffff9ffffff : 0000:01:04.0
+    fffffffff8100000-fffffffff84fffff : stifb mmio
+    fffffffff9000000-fffffffff91fffff : stifb fb
+fffffffffa000000-fffffffffbffffff : PCI03 ELMMIO
+  fffffffffa000000-fffffffffbffffff : 0000:03:02.0
+fffffffffed00000-fffffffffed00fff : 10
+fffffffffed30000-fffffffffed30fff : 10:0
+fffffffffed32000-fffffffffed32fff : 10:1
+fffffffffed38000-fffffffffed38fff : 10:4
+fffffffffed3c000-fffffffffed3cfff : 10:6
+fffffffffef00000-fffffffffeffffff : Astro Intr Ack
+fffffffffff80000-fffffffffffaffff : Central Bus
+  fffffffffffa0000-fffffffffffa0fff : 32
+fffffffffffb0000-fffffffffffdffff : Local Broadcast
+fffffffffffe0000-ffffffffffffffff : Global Broadcast
+#endif
 
 #include "biosvar.h" // GET_BDA
 #include "bregs.h" // struct bregs
@@ -249,8 +325,8 @@ static void dump_mem(unsigned long addr, signed long len, unsigned long oaddr)
     if (!(pdc_debug & DEBUG_PDC))
         return;
 
+    printf("Dump of %ld bytes from addr 0x%lx\n", len, oaddr);
     while (len > 0) {
-        printf("Dump of %ld bytes from addr 0x%lx\n", len, oaddr);
         printf("%08lx: %02x %02x %02x %02x %02x %02x %02x %02x"
                      " %02x %02x %02x %02x %02x %02x %02x %02x\n",
            oaddr, p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7],
@@ -268,11 +344,12 @@ static void dump_mem(unsigned long addr, signed long len, unsigned long oaddr)
  ********************************************************/
 
 static struct drive_s *boot_drive; // really currently booted drive
-static struct drive_s *parisc_boot_harddisc; // first hard disc
-static struct drive_s *parisc_boot_cdrom;    // first DVD or CD-ROM
+static struct drive_s *parisc_pri_harddisc;  // primary hard disc
+static struct drive_s *parisc_alt_harddisc;  // alternative hard disc
+static struct drive_s *parisc_cdrom;    // first DVD or CD-ROM
 
 static struct pdc_module_path mod_path_emulated_drives = {
-    .path = { .flags = 0x0, .bc = { 0xff, 0xff, 0xff, 0x8, 0x0, 0x0 }, .mod = 0x0  },
+    .path = { .flags = 0x0, .bc = { 0xff, 0xff, 0xff, 0x8, 12, 0x0 }, .mod = 0xc  },
     .layers = { 0x0, 0x0, 0x0, 0x0, 0x0, 0x0 } // first two layer entries get replaced
 };
 
@@ -295,7 +372,7 @@ static hppa_device_t parisc_devices[HPPA_MAX_CPUS+16] = { PARISC_DEVICE_LIST };
     GSC_HPA,\
     DINO_HPA,\
     DINO_UART_HPA,\
-    /* DINO_SCSI_HPA, */ \
+    DINO_SCSI_HPA, \
     LASI_HPA, \
     LASI_UART_HPA, \
     /* LASI_SCSI_HPA, */ \
@@ -312,6 +389,9 @@ static const char *hpa_name(unsigned long hpa)
 {
     struct pci_device *pci;
     int i;
+
+    if (opsys_id != OS_ID_MPEXL && hpa == MPE_CONSOLE_HPA)
+        return "NOT-MPE-CONSOLE";
 
     #define DO(x) if (hpa == x) return #x;
     DO(GSC_HPA)
@@ -330,6 +410,7 @@ static const char *hpa_name(unsigned long hpa)
     DO(LASI_PS2KBD_HPA)
     DO(LASI_PS2MOU_HPA)
     DO(LASI_GFX_HPA)
+    DO(MPE_CONSOLE_HPA)
     #undef DO
 
     /* could be one of the SMP CPUs */
@@ -406,7 +487,7 @@ int HPA_is_graphics_device(unsigned long hpa)
            (hpa == 0xf8000000)   || (hpa == 0xfa000000);
 }
 
-static const char *hpa_device_name(unsigned long hpa, int output)
+static const char *hpa_device_name(unsigned long hpa)
 {
     return HPA_is_graphics_device(hpa) ? "GRAPHICS(1)" :
             HPA_is_keyboard_device(hpa) ? "PS2" :
@@ -428,6 +509,8 @@ static void remove_from_keep_list(unsigned long hpa)
             keep_list[i] = keep_list[i+1];
             ++i;
     }
+    /* delete last entry */
+    keep_list[i-1] = 0;
 }
 
 static int keep_this_hpa(unsigned long hpa)
@@ -513,9 +596,7 @@ static void remove_parisc_devices(unsigned int num_cpus)
 
 static int fix_hpa_hack(unsigned long hpa)
 {
-    if (hpa == IDE_HPA)
-        return DINO_SCSI_HPA;
-    if (hpa == MPE_CONSOLE_HPA) // MPE sets this value as screen output, how come?
+    if (hpa == MPE_CONSOLE_HPA && opsys_id == OS_ID_MPEXL) // MPE sets this value as screen output, how come?
         return PARISC_SERIAL_CONSOLE - 0x800;
     return hpa;
 }
@@ -683,9 +764,9 @@ int __VISIBLE parisc_iodc_ENTRY_IO(ARG_LIST)
     }
 
     hpa = fix_hpa_hack(hpa);
-    if (hpa == DINO_HPA)        // MPE uses the DINO HPA as boot medium with arg3=0x3d8
-        hpa = IDE_HPA;
-    if (hpa == MPE_CONSOLE_HPA)
+    if (0 && hpa == DINO_HPA)        // MPE uses the DINO HPA as boot medium with arg3=0x3d8
+        hpa = DINO_SCSI_HPA;
+    if (hpa == MPE_CONSOLE_HPA && opsys_id == OS_ID_MPEXL)
         hpa = PARISC_SERIAL_CONSOLE - 0x800;
     if (find_hpa_index(hpa) < 0 && !HPA_is_storage_device(hpa)) {
         printf("parisc_iodc_ENTRY_IO  Did not find hpa %lx\n", hpa);
@@ -712,6 +793,7 @@ int __VISIBLE parisc_iodc_ENTRY_IO(ARG_LIST)
             return PDC_OK;
     }
 
+// CHECK ARG3
     /* boot medium I/O */
     if (HPA_is_storage_device(hpa))
         switch (option) {
@@ -724,6 +806,8 @@ int __VISIBLE parisc_iodc_ENTRY_IO(ARG_LIST)
             case ENTRY_IO_BBLOCK_IN:    /* boot block medium IN */
                 disk_op.command = CMD_READ;
 
+    printf("JJ2222222222222222JJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJ\n");
+    dump_mem(ARG3, 16, ARG3);
                 process_bootio:
 
                 if (ARG6 >= ram_size || (ARG6 + ARG7) >= ram_size ||
@@ -735,7 +819,7 @@ int __VISIBLE parisc_iodc_ENTRY_IO(ARG_LIST)
                     printf("\nSeaBIOS: Will not overwrite page zero!\n");
                     return PDC_ERROR;
                 }
-
+                boot_drive->target = *(int *)ARG3;
                 disk_op.drive_fl = boot_drive;
                 disk_op.buf_fl = (void*)ARG6;
                 if (option == ENTRY_IO_BBLOCK_IN ||
@@ -748,7 +832,7 @@ int __VISIBLE parisc_iodc_ENTRY_IO(ARG_LIST)
                 }
                 // ARG8 = maxsize !!!
                 ret = process_op(&disk_op);
-                // dprintf(0, "\nBOOT IO res %d count = %d\n", ret, ARG7);
+                printf("\nBOOT IO res %d count = %d\n", ret, ARG7);
                 if ((pdc_debug & DEBUG_IODC) && (option == ENTRY_IO_BOOTOUT))
                     printf("\nBOOT IO OUT ret %d count = %d\n", ret, ARG7);
                 result[0] = ARG7;
@@ -776,7 +860,7 @@ int __VISIBLE parisc_iodc_ENTRY_INIT(ARG_LIST)
 
     iodc_log_call(ARG_REFS, __FUNCTION__);
 
-    if (hpa == MPE_CONSOLE_HPA) {
+    if (hpa == MPE_CONSOLE_HPA && opsys_id == OS_ID_MPEXL) {
     } else {
         hpa = fix_hpa_hack(hpa);
         hpa_index = find_hpa_index(hpa);
@@ -799,6 +883,16 @@ int __VISIBLE parisc_iodc_ENTRY_INIT(ARG_LIST)
             return PDC_NE_BOOTDEV; /* No further boot devices */
         case ENTRY_INIT_MOD_DEV: /* 4: Init & test mod & dev */
         case ENTRY_INIT_DEV:     /* 5: Init & test dev */
+            if (HPA_is_storage_device(hpa)) {
+                struct disk_op_s disk_op;
+                int ret;
+                disk_op.command = CMD_RESET;
+                boot_drive->target = *(int *)ARG3;
+                disk_op.drive_fl = boot_drive;
+                disk_op.buf_fl = NULL;
+                ret = process_op(&disk_op);
+                printf("\nBOOT IO reset = %d\n", ret);
+            }
             result[0] = 0; /* module IO_STATUS */
             result[1] = class_of_hpa(hpa);
             result[2] = result[3] = 0; /* TODO?: MAC of network card. */
@@ -881,7 +975,7 @@ static unsigned char nvolatile_storage[NVOLATILE_STORAGE_SIZE];
 static void init_stable_storage(void)
 {
     /* see ENGINEERING NOTE on page 4-92 in PDC2.0 doc */
-    memset(&stable_storage, 0, STABLE_STORAGE_SIZE);
+    // memset(&stable_storage, 0, STABLE_STORAGE_SIZE);
     // no intial paths
     stable_storage[0x07] = 0xff;
     stable_storage[0x67] = 0xff;
@@ -1136,7 +1230,7 @@ static int pdc_cache(ARG_LIST)
             machine_cache_info->ic_conf.cc_block = 11;
 
             machine_cache_info->ic_size =    /* no instruction cache */
-            machine_cache_info->dc_size = (opsys_id = OS_ID_MPEXL) ? 1:0; /* no data cache */
+            machine_cache_info->dc_size = (opsys_id == OS_ID_MPEXL) ? 1:0; /* no data cache */
             machine_cache_info->ic_count = 0;
             machine_cache_info->ic_loop = 0;
             machine_cache_info->dc_count = 0;
@@ -1199,14 +1293,16 @@ static int pdc_iodc(ARG_LIST)
     unsigned char *c;
 
     if (1 && pdc_debug & DEBUG_IODC)
-        printf("\n-> SeaBIOS: Info PDC_IODC option %ld ARG2=0x%x ARG3=0x%x ARG4=0x%x ARG5=0x%x ARG6=0x%x\n",
-            option, ARG2, ARG3, ARG4, ARG5, ARG6);
+        printf("\n-> SeaBIOS: Info PDC_IODC option %ld ARG2=0x%x ARG3=0x%x (%s) ARG4=0x%x ARG5=0x%x ARG6=0x%x\n",
+            option, ARG2, ARG3, hpa_name(ARG3), ARG4, ARG5, ARG6);
 
     hpa = ARG3;
-    if (hpa == IDE_HPA) { // do NOT check for DINO_SCSI_HPA, breaks Linux which scans IO areas for unlisted io modules
+    if (0 && hpa == IDE_HPA) { // do NOT check for DINO_SCSI_HPA, breaks Linux which scans IO areas for unlisted io modules
         iodc_p = &iodc_data_hpa_fff8c000; // workaround for PCI ATA (use DINO_SCSI_HPA)
-    } else if (hpa == MPE_CONSOLE_HPA) {
+    } else if (hpa == MPE_CONSOLE_HPA && opsys_id == OS_ID_MPEXL) {
         iodc_p = &iodc_data_hpa_ffd05000; // workaround for MPE RS-232
+printf("FIXME !!!!!\n\n");
+dump_mem(ARG3,12,ARG3);
     } else {
         hpa = fix_hpa_hack(hpa);
         hpa_index = find_hpa_index(hpa);
@@ -1895,8 +1991,9 @@ unsigned long __VISIBLE toc_handler(struct pdc_toc_pim_11 *pim)
  * BOOT MENU
  ********************************************************/
 
-extern void find_initial_parisc_boot_drives(
+extern void find_initial_parisc_drives(
         struct drive_s **harddisc,
+        struct drive_s **alt_harddisc,
         struct drive_s **cdrom);
 extern struct drive_s *select_parisc_boot_drive(char bootdrive);
 extern int parisc_get_scsi_target(struct drive_s **boot_drive, int target);
@@ -2014,7 +2111,7 @@ again2:
     // preset with default boot target (this is same as "BOOT PRI"
     scsi_boot_target = boot_drive->target;
     if (c[0] == 'A' && c[1] == 'L' && c[2] == 'T')
-        scsi_boot_target = parisc_boot_cdrom->target;
+        scsi_boot_target = parisc_cdrom->target;
     while (*c) {
         if (*c >= '0' && *c <= '9') {
             scsi_boot_target = *c - '0';
@@ -2170,14 +2267,14 @@ static struct pz_device mem_kbd_boot = {
     .cl_class = CL_KEYBD,
 };
 
-static const struct pz_device mem_boot_boot = {
+static const struct pz_device mem_boot_boot = { // the currently booted device
     .dp.flags = PF_AUTOBOOT,
-    .hpa = IDE_HPA, // workaround as LASI_SCSI_HPA and DINO_SCSI_HPA may not exist in inventory!
+    .hpa = DINO_SCSI_HPA, // workaround as LASI_SCSI_HPA and DINO_SCSI_HPA may not exist in inventory!
     .iodc_io = (unsigned long) &iodc_entry,
     .cl_class = CL_RANDOM,
 };
 
-static void find_pci_slot_for_dev(unsigned int pciid, char *pci_slot)
+static void find_pci_slot_for_dev(unsigned int pciid, unsigned int *pci_slot)
 {
     struct pci_device *pci;
 
@@ -2188,10 +2285,19 @@ static void find_pci_slot_for_dev(unsigned int pciid, char *pci_slot)
         }
 }
 
+static void set_emulated_lun(struct pdc_module_path *dest,
+        struct drive_s *drive)
+{
+    if (drive) {
+        dest->layers[0] = drive->target;
+        dest->layers[1] = drive->lun;
+    }
+}
+
 /* Prepare boot paths in PAGE0 and stable memory */
 static void prepare_boot_path(volatile struct pz_device *dest,
         const struct pz_device *source,
-        unsigned int stable_offset)
+        int stable_offset)
 {
     int hpa_index;
     unsigned long hpa;
@@ -2212,12 +2318,13 @@ static void prepare_boot_path(volatile struct pz_device *dest,
     }
 
     /* copy device path to entry in PAGE0 */
-    memcpy((void*)dest, source, sizeof(*source));
-    // dest->iodc_io = 0;  // delete predefined iodc_io
+    if (dest)
+        memcpy((void*)dest, source, sizeof(*source));
     memcpy((void*)&dest->dp, mod_path, sizeof(struct device_path));
 
     /* copy device path to stable storage */
-    memcpy(&stable_storage[stable_offset], mod_path, sizeof(*mod_path));
+    if (stable_offset >= 0)
+        memcpy(&stable_storage[stable_offset], mod_path, sizeof(*mod_path));
 
     BUG_ON(sizeof(*mod_path) != 0x20);
     BUG_ON(sizeof(struct device_path) != 0x20);
@@ -2253,7 +2360,7 @@ void __VISIBLE start_parisc_firmware(void)
     unsigned long iplstart, iplend;
     char *str;
 
-    char bootdrive = (char)cmdline; // c = hdd, d = CD/DVD
+    char bootdrive = (char)cmdline; // c = hdd, d = CD/DVD, e = 2nd hdd
     show_boot_menu = (linux_kernel_entry == 1);
 
     if (smp_cpus > HPPA_MAX_CPUS)
@@ -2317,9 +2424,9 @@ void __VISIBLE start_parisc_firmware(void)
     opsys_id = romfile_loadstring_to_int("opt/os", opsys_id);
     if (opsys_id == OS_ID_MPEXL) {
         struct pdc_model mpe_model = { MPE_PARISC_PDC_MODEL };
-        model = mpe_model;
+        // model = mpe_model;
     } else
-        opsys_id = OS_ID_HPUX;  /* else default to HP-UX */
+        opsys_id = OS_ID_HPUX;  /* else default to NONE */
 
     /* CPUID 0x01e8 PCX-L2 (B160) = 0x01e8 = vers 15 rev 8 */
     parisc_cpuid = romfile_loadstring_to_int("opt/cpuid", parisc_cpuid);
@@ -2447,48 +2554,59 @@ void __VISIBLE start_parisc_firmware(void)
             "  Good memory required: %d MB\n\n",
             ram_size/1024/1024, MIN_RAM_SIZE/1024/1024);
 
-    // search boot devices
-    find_initial_parisc_boot_drives(&parisc_boot_harddisc, &parisc_boot_cdrom);
+    // search possible boot devices
+    find_initial_parisc_drives(&parisc_pri_harddisc,
+            &parisc_alt_harddisc, &parisc_cdrom);
+
+    /* choose CD-ROM as alt if no seconds hard disc was found */
+    if (parisc_alt_harddisc == NULL)
+        parisc_alt_harddisc = parisc_cdrom;
+
+    switch (bootdrive) {
+    case 'd':   boot_drive = parisc_cdrom;
+                /* fall through */
+    case 'e':   if (!boot_drive) boot_drive = parisc_alt_harddisc;
+                /* fall through */
+    default:    if (!boot_drive) boot_drive = parisc_pri_harddisc;
+    }
+
+    /* default to DINO_SCSI_HPA */
+    mod_path_emulated_drives = mod_path_hpa_fff8c000;
+
+    if (0) {
+        printf("PRI  %d\n", parisc_pri_harddisc->target);
+        printf("ALT  %d\n", parisc_alt_harddisc->target);
+        printf("CDR  %d\n", parisc_cdrom->target);
+        printf("BOO  %d\n", boot_drive->target);  // is 0, will be set later
+    }
+
+    // Find PCI bus id of LSI SCSI card
+    // NOT USED, but keep here for now.
+    find_pci_slot_for_dev(PCI_VENDOR_ID_LSI_LOGIC,
+        &mod_path_emulated_drives.layers[0]);
+
+    set_emulated_lun(&mod_path_emulated_drives, parisc_pri_harddisc);
+    prepare_boot_path(NULL, &mem_boot_boot, 0x00); // store in STABLE[0x00]
+    set_emulated_lun(&mod_path_emulated_drives, parisc_alt_harddisc);
+    prepare_boot_path(NULL, &mem_boot_boot, 0x80); // store in STABLE[0x80]
+    set_emulated_lun(&mod_path_emulated_drives, boot_drive);
+    // SCSI-ID of boot drive in PAGE0 is still 0, but will be set later in parisc_boot_menu()
+    // mod_path_emulated_drives.path.flags = PF_AUTOBOOT;
+    prepare_boot_path(&(PAGE0->mem_boot), &mem_boot_boot, -1); // do not store in STABLE
+
+    dump_mem(&(PAGE0->mem_boot), 32, 0);
+    dump_mem(&stable_storage, 0x100, 0);
+
+    init_nvolatile_storage();
 
     printf("  Primary boot path:    FWSCSI.%d.%d\n"
            "  Alternate boot path:  FWSCSI.%d.%d\n"
            "  Console path:         %s\n"
            "  Keyboard path:        %s\n\n",
-            parisc_boot_harddisc->target, parisc_boot_harddisc->lun,
-            parisc_boot_cdrom->target, parisc_boot_cdrom->lun,
-            hpa_device_name(PAGE0->mem_cons.hpa, 1),
-            hpa_device_name(PAGE0->mem_kbd.hpa, 0));
-
-    if (bootdrive == 'c')
-        boot_drive = parisc_boot_harddisc;
-    else
-        boot_drive = parisc_boot_cdrom;
-
-    // Find PCI bus id of LSI SCSI card
-    find_pci_slot_for_dev(PCI_VENDOR_ID_LSI_LOGIC,
-            &mod_path_emulated_drives.path.bc[5]);
-
-    // Store initial emulated drives path master data
-    if (parisc_boot_harddisc) {
-        mod_path_emulated_drives.layers[0] = parisc_boot_harddisc->target;
-        mod_path_emulated_drives.layers[1] = parisc_boot_harddisc->lun;
-    }
-
-    prepare_boot_path(&(PAGE0->mem_boot), &mem_boot_boot, 0x0);
-
-    // copy primary boot path to alt boot path
-    memcpy(&stable_storage[0x80], &stable_storage[0], 0x20);
-    if (parisc_boot_cdrom) {
-        stable_storage[0x80 + 11] = parisc_boot_cdrom->target;
-        stable_storage[0x80 + 12] = parisc_boot_cdrom->lun;
-    }
-    // currently booted path == CD in PAGE0->mem_boot
-    if (boot_drive) {
-        PAGE0->mem_boot.dp.layers[0] = boot_drive->target;
-        PAGE0->mem_boot.dp.layers[1] = boot_drive->lun;
-    }
-
-    init_nvolatile_storage();
+            parisc_pri_harddisc->target, parisc_pri_harddisc->lun,
+            parisc_alt_harddisc->target, parisc_alt_harddisc->lun,
+            hpa_device_name(PAGE0->mem_cons.hpa),
+            hpa_device_name(PAGE0->mem_kbd.hpa));
 
     /* directly start Linux kernel if it was given on qemu command line. */
     if (linux_kernel_entry > 1) {

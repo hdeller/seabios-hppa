@@ -806,15 +806,21 @@ int parisc_get_scsi_target(struct drive_s **boot_drive, int target)
     }
     return 0;
 }
-void find_initial_parisc_boot_drives(struct drive_s **harddisc,
-            struct drive_s **cdrom)
+void find_initial_parisc_drives(struct drive_s **harddisc,
+            struct drive_s **alt_harddisc, struct drive_s **cdrom)
 {
     struct bootentry_s *pos;
     hlist_for_each_entry(pos, &BootList, node) {
 	if ((pos->type == IPL_TYPE_CDROM) && (*cdrom == NULL))
             *cdrom = pos->drive;
-	if ((pos->type == IPL_TYPE_HARDDISK) && (*harddisc == NULL))
+	if ((pos->type == IPL_TYPE_HARDDISK) && (*harddisc == NULL)) {
             *harddisc = pos->drive;
+            continue;
+        }
+	if ((pos->type == IPL_TYPE_HARDDISK) && (*alt_harddisc == NULL)) {
+            *alt_harddisc = pos->drive;
+            continue;
+        }
     }
 }
 

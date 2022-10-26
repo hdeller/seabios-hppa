@@ -138,13 +138,23 @@ static struct pdc_module_path mod_path_hpa_fff8c000 = {
 	.path = { .flags = 0x0, .bc = { 0xff, 0xff, 0xff, 0xff, 0xff, 0x8 }, .mod = 0xc  },
 	.layers = { 0x0, 0x0, 0x0, 0x0, 0x0, 0x0 }
 };
+#if 0
+HELGE
+        unsigned short  hw_type:5;      /* HPHW_xxx */
+        unsigned short  hversion;
+        unsigned long   sversion:28;
+        unsigned short  opt;
+#endif
+// ORG: {4= HPHW_A_DMA, 0x03D, 0x00089, 0x80, "Merlin 160 Core FW-SCSI"}
+//      {10=HPHW_FIO,   0x03F, 0x000A3, 0x0, "Merlin+ 180 Core SE FWSCSI PCI Disk"},
+
 static struct pdc_iodc iodc_data_hpa_fff8c000 = {
 	.hversion_model = 0x0003,
-	.hversion = 0x00d0,
+	.hversion = 0x00f0,     // 0x00d0,
 	.spa = 0x0000,
-	.type = 0x0084,
+	.type = 0x008A,         //0x0084,
 	.sversion_rev = 0x0000,
-	.sversion_model = 0x0044,
+	.sversion_model = 0x0051,
 	.sversion_opt = 0x00c0,
 	.rev = 0x0099,
 	.dep = 0x0000,
