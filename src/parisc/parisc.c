@@ -194,6 +194,9 @@ int pdc_console;
 #define CONSOLE_DEFAULT   0x0000
 #define CONSOLE_SERIAL    0x0001
 #define CONSOLE_GRAPHICS  0x0002
+#define CONSOLE_PSEUDO    0x0003
+
+static const struct pz_device *console_display, *console_keyboard;
 
 unsigned int opsys_id = OS_ID_MPEXL;     // default OS: OS_ID_HPUX or OS_ID_MPEXL
 unsigned int parisc_cpuid = PARISC_PDC_CPUID;
@@ -253,6 +256,81 @@ static int index_of_CPU_HPA(unsigned long hpa) {
     }
     return -1;
 }
+
+#define IO_STATUS_READY         8
+
+#if 0
+    http://ftp.parisc-linux.org/docs/arch/pdc20-v1.1-Ch5-iodc.pdf
+    5.5.8 Console Pseudo-Module Specific IODC, page 5-85
+    IODC_TYPE must be implemented as already defined for other module types. The IODC_TYPE[type] field
+    must equal TP_CONSOLE, value 9.
+#endif
+
+#define PDC_CONSOLE_HPA         0xfff84000
+
+#define HPA_CONSOLE_DESCRIPTION "Merlin CONSOLE"
+static struct pdc_system_map_mod_info mod_info_hpa_CONSOLE = {
+	.mod_addr = PDC_CONSOLE_HPA,
+	.mod_pgs = 0x0,
+	.add_addrs = 0x0,
+};
+
+static struct pdc_module_path mod_path_hpa_CONSOLE = {
+	.path = { .flags = 0x0, .bc = { 0xff, 0xff, 0xff, 0xff, 0x08, 0x11 }, .mod = 0x4  },  // 0x8,0x10
+	.layers = { 0x0, 0x0, 0x0, 0x0, 0x0, 0x0 }
+};
+#if 0
+                                               Type  HW    SW    Revisions
+Path       Component Name                      ID    Mod   Mod   Hdwr  Firm
+---------- ----------------------------------- ----- ----- ----- ----- -----
+
+                                               2H    14H   60H   0     1
+8/4        Unknown Module                      9H    3DH   38H   0     0
+{HPHW_CONSOLE, 0x004, 0x0001C, 0x00, "Cheetah console"},
+struct hp_hardware {
+        unsigned short  hw_type:5;      /* HPHW_xxx */
+        unsigned short  hversion;
+        unsigned long   sversion:28;
+        unsigned short  opt;
+        const char      name[80];       /* The hardware description */
+
+       dev->id.hw_type = iodc_data[3] & 0x1f;
+        dev->id.hversion = (iodc_data[0] << 4) | ((iodc_data[1] & 0xf0) >> 4);
+        dev->id.hversion_rev = iodc_data[1] & 0x0f;
+        dev->id.sversion = ((iodc_data[4] & 0x0f) << 16) |
+                        (iodc_data[5] << 8) | iodc_data[6];
+
+struct pdc_iodc {     /* PDC_IODC */
+        unsigned char   hversion_model;
+        unsigned char   hversion;
+        unsigned char   spa;
+        unsigned char   type;
+        unsigned int    sversion_rev:4;
+        unsigned int    sversion_model:19;
+        unsigned int    sversion_opt:8;
+        unsigned char   rev;
+};
+#endif
+
+static struct pdc_iodc iodc_data_hpa_CONSOLE = {
+        // dev->id.hversion = (iodc_data[0] << 4) | ((iodc_data[1] & 0xf0) >> 4);
+        // dev->id.hversion_rev = iodc_data[1] & 0x0f;
+	.hversion_model = 0,
+	.hversion = 0x40,
+	.spa = 0x0000,
+	.type = 9,              /* TP_CONSOLE = 9 */
+        // dev->id.sversion = ((iodc_data[4] & 0x0f) << 16) | (iodc_data[5] << 8) | iodc_data[6];
+	.sversion_rev = 0,
+	.sversion_model = 0x1c >> 1,
+	.sversion_opt = 111,
+	.rev = 0x0000,
+	.dep = 0x0000,
+	.features = 0x0000,
+	.checksum = 0x6309,
+	.length = 0x0002,
+	/* pad: 0x0000, 0x0000 */
+};
+
 
 static unsigned long GoldenMemory = MIN_RAM_SIZE;
 
@@ -383,15 +461,13 @@ static hppa_device_t parisc_devices[HPPA_MAX_CPUS+16] = { PARISC_DEVICE_LIST };
     LASI_GFX_HPA,\
     LASI_PS2KBD_HPA, \
     LASI_PS2MOU_HPA, \
+    PDC_CONSOLE_HPA, \
     0
 
 static const char *hpa_name(unsigned long hpa)
 {
     struct pci_device *pci;
     int i;
-
-    if (opsys_id != OS_ID_MPEXL && hpa == MPE_CONSOLE_HPA)
-        return "NOT-MPE-CONSOLE";
 
     #define DO(x) if (hpa == x) return #x;
     DO(GSC_HPA)
@@ -410,7 +486,7 @@ static const char *hpa_name(unsigned long hpa)
     DO(LASI_PS2KBD_HPA)
     DO(LASI_PS2MOU_HPA)
     DO(LASI_GFX_HPA)
-    DO(MPE_CONSOLE_HPA)
+    DO(PDC_CONSOLE_HPA)
     #undef DO
 
     /* could be one of the SMP CPUs */
@@ -450,13 +526,13 @@ static int class_of_hpa(unsigned long hpa)
     case IDE_HPA:
     case DINO_SCSI_HPA:
     case LASI_SCSI_HPA:     return CL_RANDOM;
-    case MPE_CONSOLE_HPA:                               /* MPE hack */
     case DINO_UART_HPA:
     case LASI_UART_HPA:     return CL_DUPLEX;
     case LASI_LAN_HPA:      return CL_NULL;
     case LASI_LPT_HPA:      return CL_NULL; // ??
     case LASI_PS2KBD_HPA:   return CL_KEYBD;
     case LASI_PS2MOU_HPA:   return CL_NULL; // ??
+    case PDC_CONSOLE_HPA:
     case LASI_GFX_HPA:      return CL_DISPL;
     default:
         printf("SeaBIOS: %s: Class of hpa %lx unknown.\n", __FUNCTION__, hpa);
@@ -467,7 +543,7 @@ static int class_of_hpa(unsigned long hpa)
 
 int HPA_is_serial_device(unsigned long hpa)
 {
-    return (hpa == DINO_UART_HPA) || (hpa == LASI_UART_HPA) || (hpa == MPE_CONSOLE_HPA);
+    return (hpa == DINO_UART_HPA) || (hpa == LASI_UART_HPA) || (hpa == PDC_CONSOLE_HPA);
 }
 
 int HPA_is_storage_device(unsigned long hpa)
@@ -491,8 +567,9 @@ static const char *hpa_device_name(unsigned long hpa)
 {
     return HPA_is_graphics_device(hpa) ? "GRAPHICS(1)" :
             HPA_is_keyboard_device(hpa) ? "PS2" :
-            ((hpa + 0x800) == PORT_SERIAL1) ?
-                "SERIAL_1.9600.8.none" : "SERIAL_2.9600.8.none";
+            ((hpa + 0x800) == PORT_SERIAL1) ? "SERIAL_1.9600.8.none" :
+            ((hpa + 0x800) == PORT_SERIAL2) ? "SERIAL_2.9600.8.none" :
+            "PDC_CONSOLE";
 }
 
 static unsigned long keep_list[] = { PARISC_KEEP_LIST };
@@ -586,6 +663,21 @@ static void remove_parisc_devices(unsigned int num_cpus)
         t++;
     }
 
+    /* add PDC_CONSOLE_HPA */
+    {
+        unsigned long hpa = PDC_CONSOLE_HPA;
+
+        parisc_devices[t].hpa = hpa;
+        parisc_devices[t].iodc = &iodc_data_hpa_CONSOLE;
+        parisc_devices[t].mod_info = &mod_info_hpa_CONSOLE;
+        mod_path_hpa_CONSOLE.path.mod = (hpa - DINO_HPA) / 0x1000; // fix mod
+        parisc_devices[t].mod_path = &mod_path_hpa_CONSOLE;
+        parisc_devices[t].num_addr = 0;
+        parisc_devices[t].add_addr[0] = 0;
+
+        t++;
+    }
+
     BUG_ON(t > ARRAY_SIZE(parisc_devices));
 
     while (t < ARRAY_SIZE(parisc_devices)) {
@@ -596,8 +688,8 @@ static void remove_parisc_devices(unsigned int num_cpus)
 
 static int fix_hpa_hack(unsigned long hpa)
 {
-    if (hpa == MPE_CONSOLE_HPA && opsys_id == OS_ID_MPEXL) // MPE sets this value as screen output, how come?
-        return PARISC_SERIAL_CONSOLE - 0x800;
+    // if (hpa == MPE_CONSOLE_HPA && opsys_id == OS_ID_MPEXL) // MPE sets this value as screen output, how come?
+    //    return PARISC_SERIAL_CONSOLE - 0x800;
     return hpa;
 }
 
@@ -613,6 +705,50 @@ static int find_hpa_index(unsigned long hpa)
             return -1;
     }
     return -1;
+}
+
+static void path_to_string(char *str, volatile struct device_path *p)
+{
+    char *s = str;
+    int i;
+
+    for (i = 0; i < 6; i++)
+        if (p->bc[i] >= 64)
+            { /* ignore "null" path elements (see the i/o acd ver 0.93 pg. 12-66). */ }
+        else {
+            snprintf(s, 10, "%d/", p->bc[i]);
+            while (*s) ++s;
+        }
+
+    for (i = 0; i < 6; i++) {
+        snprintf(s, 10, "%d.", p->layers[i]);
+        while (*s) ++s;
+    }
+}
+
+static void print_path(const char *prefix, volatile struct device_path *p) {
+    static char path[40];
+    path_to_string(path, p);
+    printf(prefix);
+    printf("PATH = %s\n", path);
+}
+
+static void layer_to_string(char *str, unsigned int *layers)
+{
+    char *s = str;
+    int i;
+
+    for (i = 0; i < 6; i++) {
+        snprintf(s, 10, "%d.", layers[i]);
+        while (*s) ++s;
+    }
+}
+
+static void print_layer(const char *prefix, unsigned long addr) {
+    static char path[40];
+    layer_to_string(path, (unsigned int *)addr);
+    printf(prefix);
+    printf("PATH = %s\n", path);
 }
 
 static int compare_module_path(struct pdc_module_path *path,
@@ -657,14 +793,6 @@ static hppa_device_t *find_hppa_device_by_path(struct pdc_module_path *search,
     return NULL;
 }
 
-static portaddr_t ser_port_addr(unsigned long defport)
-{
-    if (opsys_id == OS_ID_MPEXL)
-        return PARISC_SERIAL_CONSOLE; /* XXX: workaround that MPE uses different serial port hpa */
-    else
-        return defport;
-}
-
 #define SERIAL_TIMEOUT 20
 static unsigned long parisc_serial_in(char *c, unsigned long maxchars)
 {
@@ -672,7 +800,7 @@ static unsigned long parisc_serial_in(char *c, unsigned long maxchars)
     unsigned long count = 0;
     portaddr_t addr;
 
-    addr = ser_port_addr(PAGE0->mem_kbd.hpa + 0x800);
+    addr = console_keyboard->hpa + 0x800;
     while (count < maxchars) {
         u8 lsr = inb(addr+SEROFF_LSR);
         if (lsr & 0x01) {
@@ -690,7 +818,7 @@ static void parisc_serial_out(char c)
 {
     portaddr_t addr;
 
-    addr = ser_port_addr(PAGE0->mem_cons.hpa + 0x800);
+    addr = console_display->hpa + 0x800;
     for (;;) {
         if (c == '\n')
             parisc_serial_out('\r');
@@ -766,8 +894,6 @@ int __VISIBLE parisc_iodc_ENTRY_IO(ARG_LIST)
     hpa = fix_hpa_hack(hpa);
     if (0 && hpa == DINO_HPA)        // MPE uses the DINO HPA as boot medium with arg3=0x3d8
         hpa = DINO_SCSI_HPA;
-    if (hpa == MPE_CONSOLE_HPA && opsys_id == OS_ID_MPEXL)
-        hpa = PARISC_SERIAL_CONSOLE - 0x800;
     if (find_hpa_index(hpa) < 0 && !HPA_is_storage_device(hpa)) {
         printf("parisc_iodc_ENTRY_IO  Did not find hpa %lx\n", hpa);
         // return PDC_NE_CELL_MOD; /* Nonexistent device */
@@ -778,6 +904,8 @@ int __VISIBLE parisc_iodc_ENTRY_IO(ARG_LIST)
         case ENTRY_IO_COUT: /* console output */
             c = (char*)ARG6;
             result[0] = len = ARG7;
+            /* get real output device */
+            hpa = console_display->hpa;
             if (HPA_is_serial_device(hpa) || HPA_is_graphics_device(hpa)) {
                 while (len--)
                     printf("%c", *c++);
@@ -785,6 +913,8 @@ int __VISIBLE parisc_iodc_ENTRY_IO(ARG_LIST)
             return PDC_OK;
         case ENTRY_IO_CIN: /* console input, with 5 seconds timeout */
             c = (char*)ARG6;
+            /* get real input device */
+            hpa = console_keyboard->hpa;
             /* FIXME: Add loop to wait for up to 5 seconds for input */
             if (HPA_is_serial_device(hpa))
                 result[0] = parisc_serial_in(c, ARG7);
@@ -805,9 +935,6 @@ int __VISIBLE parisc_iodc_ENTRY_IO(ARG_LIST)
             case ENTRY_IO_BOOTIN:       /* boot medium IN */
             case ENTRY_IO_BBLOCK_IN:    /* boot block medium IN */
                 disk_op.command = CMD_READ;
-
-    printf("JJ2222222222222222JJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJ\n");
-    dump_mem(ARG3, 16, ARG3);
                 process_bootio:
 
                 if (ARG6 >= ram_size || (ARG6 + ARG7) >= ram_size ||
@@ -832,8 +959,8 @@ int __VISIBLE parisc_iodc_ENTRY_IO(ARG_LIST)
                 }
                 // ARG8 = maxsize !!!
                 ret = process_op(&disk_op);
-                printf("\nBOOT IO res %d count = %d\n", ret, ARG7);
-                if ((pdc_debug & DEBUG_IODC) && (option == ENTRY_IO_BOOTOUT))
+                // printf("\nBOOT IO res %d count = %d\n", ret, ARG7);
+                if (0 && (pdc_debug & DEBUG_IODC) && (option == ENTRY_IO_BOOTOUT))
                     printf("\nBOOT IO OUT ret %d count = %d\n", ret, ARG7);
                 result[0] = ARG7;
                 if (ret)
@@ -860,8 +987,7 @@ int __VISIBLE parisc_iodc_ENTRY_INIT(ARG_LIST)
 
     iodc_log_call(ARG_REFS, __FUNCTION__);
 
-    if (hpa == MPE_CONSOLE_HPA && opsys_id == OS_ID_MPEXL) {
-    } else {
+    {
         hpa = fix_hpa_hack(hpa);
         hpa_index = find_hpa_index(hpa);
         if (hpa_index < 0) {
@@ -872,17 +998,28 @@ int __VISIBLE parisc_iodc_ENTRY_INIT(ARG_LIST)
 
     switch (option) {
         case ENTRY_INIT_SRCH_FRST: /* 2: Search first */
-            memcpy((void *)ARG3, &mod_path_emulated_drives.layers,
-                sizeof(mod_path_emulated_drives.layers)); /* fill ID_addr */
+            if (!HPA_is_serial_device(hpa) & !HPA_is_storage_device(hpa))
+                return PDC_NE_BOOTDEV; /* No further boot devices */
+            memcpy((void *)ARG3, &mod_path_hpa_CONSOLE,
+                sizeof(mod_path_hpa_CONSOLE));
             result[0] = 0;
-            result[1] = HPA_is_serial_device(hpa) ? CL_DUPLEX:
-                HPA_is_storage_device(hpa) ? CL_RANDOM : 0;
+            result[1] = class_of_hpa(hpa);
             result[2] = result[3] = 0; /* No network card, so no MAC. */
             return PDC_OK;
 	case ENTRY_INIT_SRCH_NEXT: /* 3: Search next */
-            return PDC_NE_BOOTDEV; /* No further boot devices */
+            if (!HPA_is_serial_device(hpa) & !HPA_is_storage_device(hpa))
+                return PDC_NE_BOOTDEV; /* No further boot devices */
+            ARG4 = (unsigned long) (char *) &(PAGE0->mem_boot.dp.layers);
+            memcpy((void *)ARG3, (void *) ARG4,
+                sizeof(mod_path_emulated_drives.layers)); /* fill ID_addr */
+            result[0] = 0;
+            result[1] = CL_SEQU;  /* TAPE HPA_is_storage_device(hpa) ? CL_RANDOM : 0; */
+            result[2] = result[3] = 0; /* No network card, so no MAC. */
+            return PDC_OK;
         case ENTRY_INIT_MOD_DEV: /* 4: Init & test mod & dev */
         case ENTRY_INIT_DEV:     /* 5: Init & test dev */
+printf("ENTRY_INIT_DEV called for ");
+    print_layer("   ", ARG3);
             if (HPA_is_storage_device(hpa)) {
                 struct disk_op_s disk_op;
                 int ret;
@@ -893,12 +1030,14 @@ int __VISIBLE parisc_iodc_ENTRY_INIT(ARG_LIST)
                 ret = process_op(&disk_op);
                 printf("\nBOOT IO reset = %d\n", ret);
             }
-            result[0] = 0; /* module IO_STATUS */
+            result[0] = IO_STATUS_READY;
             result[1] = class_of_hpa(hpa);
+printf("ENTRY_INIT_DEV class %ld\n", result[1]);
+            asm("copy %r31,%r31");
             result[2] = result[3] = 0; /* TODO?: MAC of network card. */
             return PDC_OK;
         case ENTRY_INIT_MOD:    /* 6: INIT */
-            result[0] = 0; /* module IO_STATUS */
+            result[0] = IO_STATUS_READY;
             return PDC_OK;
     }
     return PDC_BAD_OPTION;
@@ -967,10 +1106,10 @@ int __VISIBLE parisc_iodc_ENTRY_TLB(ARG_LIST)
  ********************************************************/
 
 #define STABLE_STORAGE_SIZE	2048
-static unsigned char stable_storage[STABLE_STORAGE_SIZE];
+static unsigned char stable_storage[STABLE_STORAGE_SIZE] __attribute__((aligned(256)));
 
 #define NVOLATILE_STORAGE_SIZE	2048
-static unsigned char nvolatile_storage[NVOLATILE_STORAGE_SIZE];
+static unsigned char nvolatile_storage[NVOLATILE_STORAGE_SIZE] __attribute__((aligned(256)));
 
 static void init_stable_storage(void)
 {
@@ -1299,15 +1438,11 @@ static int pdc_iodc(ARG_LIST)
     hpa = ARG3;
     if (0 && hpa == IDE_HPA) { // do NOT check for DINO_SCSI_HPA, breaks Linux which scans IO areas for unlisted io modules
         iodc_p = &iodc_data_hpa_fff8c000; // workaround for PCI ATA (use DINO_SCSI_HPA)
-    } else if (hpa == MPE_CONSOLE_HPA && opsys_id == OS_ID_MPEXL) {
-        iodc_p = &iodc_data_hpa_ffd05000; // workaround for MPE RS-232
-printf("FIXME !!!!!\n\n");
-dump_mem(ARG3,12,ARG3);
     } else {
         hpa = fix_hpa_hack(hpa);
         hpa_index = find_hpa_index(hpa);
         if (hpa_index < 0) {
-            // printf("DEVICE NOT FOUND \n");
+            printf("DEVICE NOT FOUND \n");
             return -4; // not found
         }
         iodc_p = parisc_devices[hpa_index].iodc;
@@ -1346,7 +1481,7 @@ dump_mem(ARG3,12,ARG3);
     case PDC_IODC_DINIT:	/* 3: destructive init */
             break;
     case PDC_IODC_MEMERR:   /* 4: check for errors */
-            result[0] = 0; /* IO_STATUS */
+            result[0] = IO_STATUS_READY;
             result[1] = 0;
             result[2] = 0;
             result[3] = 0;
@@ -2243,6 +2378,18 @@ static int parisc_boot_menu(unsigned long *iplstart, unsigned long *iplend,
  * FIRMWARE MAIN ENTRY POINT
  ********************************************************/
 
+static const struct pz_device mem_display_pseudo = {
+    .hpa = PDC_CONSOLE_HPA,
+    .iodc_io = (unsigned long)&iodc_entry,
+    .cl_class = CL_DISPL,  // TP_CONSOLE = 9 ??
+};
+
+static const struct pz_device mem_kbd_pseudo = {
+    .hpa = PDC_CONSOLE_HPA,
+    .iodc_io = (unsigned long)&iodc_entry,
+    .cl_class = CL_KEYBD,
+};
+
 static const struct pz_device mem_cons_sti_boot = {
     .hpa = LASI_GFX_HPA,
     .iodc_io = (unsigned long)&iodc_entry,
@@ -2267,7 +2414,7 @@ static struct pz_device mem_kbd_boot = {
     .cl_class = CL_KEYBD,
 };
 
-static const struct pz_device mem_boot_boot = { // the currently booted device
+static struct pz_device mem_boot_boot = { // the currently booted device
     .dp.flags = PF_AUTOBOOT,
     .hpa = DINO_SCSI_HPA, // workaround as LASI_SCSI_HPA and DINO_SCSI_HPA may not exist in inventory!
     .iodc_io = (unsigned long) &iodc_entry,
@@ -2415,6 +2562,8 @@ void __VISIBLE start_parisc_firmware(void)
 		pdc_console = CONSOLE_SERIAL;
 	if (strcmp(str, "graphics") == 0)
 		pdc_console = CONSOLE_GRAPHICS;
+	if (strcmp(str, "console") == 0)
+		pdc_console = CONSOLE_PSEUDO;
     }
 
     /* 0,1 = default 8x16 font, 2 = 16x32 font */
@@ -2423,7 +2572,7 @@ void __VISIBLE start_parisc_firmware(void)
     /* 0: HP-UX/Linux, 2: MPE/XL */
     opsys_id = romfile_loadstring_to_int("opt/os", opsys_id);
     if (opsys_id == OS_ID_MPEXL) {
-        struct pdc_model mpe_model = { MPE_PARISC_PDC_MODEL };
+        // struct pdc_model mpe_model = { MPE_PARISC_PDC_MODEL };
         // model = mpe_model;
     } else
         opsys_id = OS_ID_HPUX;  /* else default to NONE */
@@ -2481,21 +2630,6 @@ void __VISIBLE start_parisc_firmware(void)
     // Initialize stable storage
     init_stable_storage();
 
-    // Initialize boot paths (graphics & keyboard)
-    if (pdc_console == CONSOLE_DEFAULT) {
-	if (artist_present())
-            pdc_console = CONSOLE_GRAPHICS;
-	else
-            pdc_console = CONSOLE_SERIAL;
-    }
-    if (pdc_console == CONSOLE_GRAPHICS) {
-        prepare_boot_path(&(PAGE0->mem_cons), &mem_cons_sti_boot, 0x60);
-        prepare_boot_path(&(PAGE0->mem_kbd),  &mem_kbd_sti_boot, 0xa0);
-    } else {
-        prepare_boot_path(&(PAGE0->mem_cons), &mem_cons_boot, 0x60);
-        prepare_boot_path(&(PAGE0->mem_kbd),  &mem_kbd_boot, 0xa0);
-    }
-
     /* Initialize device list */
     remove_parisc_devices(smp_cpus);
 
@@ -2503,6 +2637,25 @@ void __VISIBLE start_parisc_firmware(void)
     if (0) { for (i=0; parisc_devices[i].hpa; i++)
         printf("Kept #%d at 0x%lx\n", i, parisc_devices[i].hpa);
     }
+
+    // Initialize boot paths (graphics & keyboard)
+    if (pdc_console == CONSOLE_DEFAULT) {
+	if (artist_present())
+            pdc_console = CONSOLE_GRAPHICS;
+	else
+            pdc_console = CONSOLE_SERIAL;
+    }
+
+    if (pdc_console == CONSOLE_GRAPHICS) {
+        console_display  = &mem_cons_sti_boot;
+        console_keyboard = &mem_kbd_sti_boot;
+    } else {
+        console_display  = &mem_cons_boot;
+        console_keyboard = &mem_kbd_boot;
+    }
+    /* Install PSEUDO console */
+    prepare_boot_path(&(PAGE0->mem_cons), &mem_display_pseudo, 0x60);
+    prepare_boot_path(&(PAGE0->mem_kbd),  &mem_kbd_pseudo, 0xa0);
 
     chassis_code = 0;
 
@@ -2570,6 +2723,9 @@ void __VISIBLE start_parisc_firmware(void)
     default:    if (!boot_drive) boot_drive = parisc_pri_harddisc;
     }
 
+    // HACK: Set bootdrive to alt_harddisc
+    boot_drive = parisc_alt_harddisc;
+
     /* default to DINO_SCSI_HPA */
     mod_path_emulated_drives = mod_path_hpa_fff8c000;
 
@@ -2587,15 +2743,21 @@ void __VISIBLE start_parisc_firmware(void)
 
     set_emulated_lun(&mod_path_emulated_drives, parisc_pri_harddisc);
     prepare_boot_path(NULL, &mem_boot_boot, 0x00); // store in STABLE[0x00]
-    set_emulated_lun(&mod_path_emulated_drives, parisc_alt_harddisc);
+    // -> HACK !!!
+    mem_boot_boot.cl_class = CL_SEQU; // and make it TAPE
+    set_emulated_lun(&mod_path_emulated_drives, boot_drive); // parisc_alt_harddisc);
     prepare_boot_path(NULL, &mem_boot_boot, 0x80); // store in STABLE[0x80]
     set_emulated_lun(&mod_path_emulated_drives, boot_drive);
     // SCSI-ID of boot drive in PAGE0 is still 0, but will be set later in parisc_boot_menu()
     // mod_path_emulated_drives.path.flags = PF_AUTOBOOT;
     prepare_boot_path(&(PAGE0->mem_boot), &mem_boot_boot, -1); // do not store in STABLE
 
-    dump_mem(&(PAGE0->mem_boot), 32, 0);
-    dump_mem(&stable_storage, 0x100, 0);
+    dump_mem((unsigned long)&(PAGE0->mem_boot), 48, (unsigned long)&(PAGE0->mem_boot));
+    dump_mem((unsigned long)&stable_storage, 0x100, (unsigned long)&stable_storage);
+
+    print_path("BOOT PATH PAGE0 ", &PAGE0->mem_boot.dp);
+    print_path("BOOT PATH STABLE", (volatile struct device_path *)&stable_storage);
+    print_path("BOOT CONSOLE    ", &PAGE0->mem_cons.dp);
 
     init_nvolatile_storage();
 
