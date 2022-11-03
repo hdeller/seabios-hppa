@@ -102,13 +102,13 @@ static struct pdc_iodc iodc_data_hpa_fff80000 = {
 
 #define HPA_fff83000_DESCRIPTION "Merlin+ 132 Dino RS-232"
 static struct pdc_system_map_mod_info mod_info_hpa_fff83000 = {
-	.mod_addr = 0xfff83000,
+	.mod_addr = DINO_UART_HPA,
 	.mod_pgs = 0x1,
 	.add_addrs = 0x0,
 };
 static struct pdc_module_path mod_path_hpa_fff83000 = {
 	.path = { .flags = 0x0, .bc = { 0xff, 0xff, 0xff, 0xff, 0x8, 0x0 }, .mod = 0x3f  },
-	.layers = { 0x0, 0x0, 0x0, 0x0, 0x0, 0x0 }
+	.layers = { 40, 0x0, 0x0, 0x0, 0x0, 0x0 }
 };
 static struct pdc_iodc iodc_data_hpa_fff83000 = {
 	.hversion_model = 0x0002,
@@ -196,13 +196,13 @@ static struct pdc_iodc iodc_data_hpa_ffd00000 = {
 
 #define HPA_ffd05000_DESCRIPTION "Merlin 160 Core RS-232"
 static struct pdc_system_map_mod_info mod_info_hpa_ffd05000 = {
-	.mod_addr = 0xffd05000,
+	.mod_addr = LASI_UART_HPA,
 	.mod_pgs = 0x1,
 	.add_addrs = 0x0,
 };
 static struct pdc_module_path mod_path_hpa_ffd05000 = {
 	.path = { .flags = 0x0, .bc = { 0xff, 0xff, 0xff, 0xff, 0x8, 0x10 }, .mod = 0x4  },
-	.layers = { 0x0, 0x0, 0x0, 0x0, 0x0, 0x0 }
+	.layers = { 30, 0x0, 0x0, 0x0, 0x0, 0x0 }
 };
 static struct pdc_iodc iodc_data_hpa_ffd05000 = {
 	.hversion_model = 0x0003,
@@ -571,7 +571,7 @@ static struct pdc_iodc iodc_data_hpa_fff81000 = {
 		.mod_path = &mod_path_hpa_fff80000,\
 		.num_addr = HPA_fff80000_num_addr,\
 		.add_addr = { HPA_fff80000_add_addr } },\
-	{	.hpa = 0xfff83000,\
+	{	.hpa = DINO_UART_HPA,\
 		.iodc = &iodc_data_hpa_fff83000,\
 		.mod_info = &mod_info_hpa_fff83000,\
 		.mod_path = &mod_path_hpa_fff83000,\
@@ -589,7 +589,7 @@ static struct pdc_iodc iodc_data_hpa_fff81000 = {
 		.mod_path = &mod_path_hpa_ffd00000,\
 		.num_addr = HPA_ffd00000_num_addr,\
 		.add_addr = { HPA_ffd00000_add_addr } },\
-	{	.hpa = 0xffd05000,\
+	{	.hpa = LASI_UART_HPA,\
 		.iodc = &iodc_data_hpa_ffd05000,\
 		.mod_info = &mod_info_hpa_ffd05000,\
 		.mod_path = &mod_path_hpa_ffd05000,\

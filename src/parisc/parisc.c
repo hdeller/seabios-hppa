@@ -31,54 +31,6 @@ GRAPHICS(2)  10/6/2/0    A1299B                slot 2     0070 8500  0x01 0x00
 [    3.397482] 6. Allegro W2 at 0xfffffffffffa0000 [32] { 0, 0x0, 0x5dc, 0x00004 }
 [    3.493481] 7. Memory at 0xfffffffffed10200 [49] { 1, 0x0, 0x09c, 0x00009 }
 
-root@c3000:~# cat /proc/iomem 
-00000000-7fffffff : System RAM
-  00000000-000009ff : PDC data (Page Zero)
-  00300000-014fffff : Kernel code
-  01500000-018fffff : Kernel data
-fffffff0f05d0000-fffffff0f05d0000 : lcd_data
-fffffff0f05d0008-fffffff0f05d0008 : lcd_cmd
-fffffffff4000000-fffffffff47fffff : PCI00 LMMIO
-  fffffffff4000000-fffffffff4001fff : 0000:00:0f.1
-    fffffffff4000000-fffffffff4001fff : sym53c8xx
-  fffffffff4002000-fffffffff4003fff : 0000:00:0f.0
-    fffffffff4002000-fffffffff4003fff : sym53c8xx
-  fffffffff4004000-fffffffff40043ff : 0000:00:0f.1
-    fffffffff4004000-fffffffff40043ff : sym53c8xx
-  fffffffff4005000-fffffffff40053ff : 0000:00:0f.0
-    fffffffff4005000-fffffffff40053ff : sym53c8xx
-  fffffffff4006000-fffffffff4006fff : 0000:00:0e.2
-  fffffffff4007000-fffffffff4007fff : 0000:00:0e.2
-    fffffffff4007000-fffffffff4007fff : ohci_hcd
-  fffffffff4008000-fffffffff40083ff : 0000:00:0c.0
-    fffffffff4008000-fffffffff40083ff : tulip
-  fffffffff4009000-fffffffff400900f : 0000:00:0d.0
-  fffffffff400a000-fffffffff400a00f : 0000:00:0d.0
-  fffffffff400b000-fffffffff400b00f : 0000:00:0d.0
-  fffffffff400c000-fffffffff400c1ff : 0000:00:0d.0
-    fffffffff400c000-fffffffff400c1ff : AD1889
-  fffffffff4040000-fffffffff407ffff : 0000:00:0c.0
-fffffffff4800000-fffffffff4ffffff : PCI01 LMMIO
-  fffffffff4800000-fffffffff480ffff : 0000:01:04.0
-fffffffff6000000-fffffffff67fffff : PCI02 LMMIO
-fffffffff7000000-fffffffff77fffff : PCI03 LMMIO
-  fffffffff7000000-fffffffff71fffff : 0000:03:02.0
-fffffffff8000000-fffffffff9ffffff : PCI01 ELMMIO
-  fffffffff8000000-fffffffff9ffffff : 0000:01:04.0
-    fffffffff8100000-fffffffff84fffff : stifb mmio
-    fffffffff9000000-fffffffff91fffff : stifb fb
-fffffffffa000000-fffffffffbffffff : PCI03 ELMMIO
-  fffffffffa000000-fffffffffbffffff : 0000:03:02.0
-fffffffffed00000-fffffffffed00fff : 10
-fffffffffed30000-fffffffffed30fff : 10:0
-fffffffffed32000-fffffffffed32fff : 10:1
-fffffffffed38000-fffffffffed38fff : 10:4
-fffffffffed3c000-fffffffffed3cfff : 10:6
-fffffffffef00000-fffffffffeffffff : Astro Intr Ack
-fffffffffff80000-fffffffffffaffff : Central Bus
-  fffffffffffa0000-fffffffffffa0fff : 32
-fffffffffffb0000-fffffffffffdffff : Local Broadcast
-fffffffffffe0000-ffffffffffffffff : Global Broadcast
 #endif
 
 #include "biosvar.h" // GET_BDA
@@ -257,7 +209,7 @@ static int index_of_CPU_HPA(unsigned long hpa) {
     return -1;
 }
 
-#define IO_STATUS_READY         8
+#define IO_STATUS_READY         0x40
 
 #if 0
     http://ftp.parisc-linux.org/docs/arch/pdc20-v1.1-Ch5-iodc.pdf
@@ -267,6 +219,7 @@ static int index_of_CPU_HPA(unsigned long hpa) {
 #endif
 
 #define PDC_CONSOLE_HPA         0xfff84000
+#define ENABLE_PDC_CONSOLE      (0)
 
 #define HPA_CONSOLE_DESCRIPTION "Merlin CONSOLE"
 static struct pdc_system_map_mod_info mod_info_hpa_CONSOLE = {
@@ -277,7 +230,7 @@ static struct pdc_system_map_mod_info mod_info_hpa_CONSOLE = {
 
 static struct pdc_module_path mod_path_hpa_CONSOLE = {
 	.path = { .flags = 0x0, .bc = { 0xff, 0xff, 0xff, 0xff, 0x08, 0x11 }, .mod = 0x4  },  // 0x8,0x10
-	.layers = { 0x0, 0x0, 0x0, 0x0, 0x0, 0x0 }
+	.layers = { 20, 0x0, 0x0, 0x0, 0x0, 0x0 }
 };
 #if 0
                                                Type  HW    SW    Revisions
@@ -318,7 +271,7 @@ static struct pdc_iodc iodc_data_hpa_CONSOLE = {
 	.hversion_model = 0,
 	.hversion = 0x40,
 	.spa = 0x0000,
-	.type = 9,              /* TP_CONSOLE = 9 */
+	.type = TP_CONSOLE,     /* TP_CONSOLE = 9 */
         // dev->id.sversion = ((iodc_data[4] & 0x0f) << 16) | (iodc_data[5] << 8) | iodc_data[6];
 	.sversion_rev = 0,
 	.sversion_model = 0x1c >> 1,
@@ -428,7 +381,7 @@ static struct drive_s *parisc_cdrom;    // first DVD or CD-ROM
 
 static struct pdc_module_path mod_path_emulated_drives = {
     .path = { .flags = 0x0, .bc = { 0xff, 0xff, 0xff, 0x8, 12, 0x0 }, .mod = 0xc  },
-    .layers = { 0x0, 0x0, 0x0, 0x0, 0x0, 0x0 } // first two layer entries get replaced
+    .layers = { 0x0, 0x0, 0x0, 0x0, 0x0, 0x0 } // first: PCI card #, SCSI ID#, LUN
 };
 
 /********************************************************
@@ -514,9 +467,13 @@ static const char *hpa_name(unsigned long hpa)
     return "UNKNOWN_HPA";
 }
 
-static int class_of_hpa(unsigned long hpa)
+static int class_of_hpa_path(unsigned long hpa, unsigned long layer_addr)
 {
+    unsigned int *layers = (unsigned int *) layer_addr;
+
     switch (hpa) {
+    case DINO_SCSI_HPA:
+    case LASI_SCSI_HPA:     break;      // need to check for CL_RANDOM or CL_SEQU
     case CPU_HPA:
     case MEMORY_HPA:
     case LASI_AUDIO_HPA:
@@ -524,8 +481,6 @@ static int class_of_hpa(unsigned long hpa)
     case GSC_HPA:
     case DINO_HPA:          return CL_NULL;
     case IDE_HPA:
-    case DINO_SCSI_HPA:
-    case LASI_SCSI_HPA:     return CL_RANDOM;
     case DINO_UART_HPA:
     case LASI_UART_HPA:     return CL_DUPLEX;
     case LASI_LAN_HPA:      return CL_NULL;
@@ -538,6 +493,11 @@ static int class_of_hpa(unsigned long hpa)
         printf("SeaBIOS: %s: Class of hpa %lx unknown.\n", __FUNCTION__, hpa);
         return CL_NULL;
     }
+
+    if (layers[1] == 1)
+        return CL_SEQU;
+    else
+        return CL_RANDOM;
 }
 
 
@@ -868,8 +828,23 @@ static void iodc_log_call(ARG_LIST, const char *func)
 {
     if (pdc_debug & DEBUG_IODC) {
         printf("\nIODC %s called: hpa=0x%x (%s) option=0x%x arg2=0x%x arg3=0x%x ", func, ARG0, hpa_name(ARG0), ARG1, ARG2, ARG3);
-        printf("result=0x%x arg5=0x%x arg6=0x%x arg7=0x%x arg8=0x%x\n", ARG4, ARG5, ARG6, ARG7, ARG8);
+        printf("result=0x%x arg5=0x%x arg6=0x%x arg7=0x%x\n", ARG4, ARG5, ARG6, ARG7);
     }
+}
+
+static struct drive_s *get_drive_for_path(const int *path)
+{
+    int target_id;
+
+    target_id = path[1];        // SCSI ID is stored in layers[1]
+
+    if (parisc_pri_harddisc && parisc_pri_harddisc->target == target_id)
+        return parisc_pri_harddisc;
+    if (parisc_alt_harddisc && parisc_alt_harddisc->target == target_id)
+        return parisc_alt_harddisc;
+    if (parisc_cdrom && parisc_cdrom->target == target_id)
+        return parisc_cdrom;
+    return NULL;
 }
 
 int __VISIBLE parisc_iodc_ENTRY_IO(ARG_LIST)
@@ -925,7 +900,9 @@ int __VISIBLE parisc_iodc_ENTRY_IO(ARG_LIST)
 
 // CHECK ARG3
     /* boot medium I/O */
-    if (HPA_is_storage_device(hpa))
+    if (HPA_is_storage_device(hpa)) {
+        // HELGE 
+        print_layer("PATH for ENTRY_IO   ", ARG3);
         switch (option) {
             case ENTRY_IO_BOOTOUT:      /* boot medium OUT */
             case ENTRY_IO_BBLOCK_OUT:   /* boot block medium OUT */
@@ -946,8 +923,7 @@ int __VISIBLE parisc_iodc_ENTRY_IO(ARG_LIST)
                     printf("\nSeaBIOS: Will not overwrite page zero!\n");
                     return PDC_ERROR;
                 }
-                boot_drive->target = *(int *)ARG3;
-                disk_op.drive_fl = boot_drive;
+                disk_op.drive_fl = get_drive_for_path((int *)ARG3);
                 disk_op.buf_fl = (void*)ARG6;
                 if (option == ENTRY_IO_BBLOCK_IN ||
                     option == ENTRY_IO_BBLOCK_OUT) { /* in 2k blocks */
@@ -967,6 +943,7 @@ int __VISIBLE parisc_iodc_ENTRY_IO(ARG_LIST)
                     return PDC_ERROR;
                 return PDC_OK;
         }
+    }
 
     if (option == ENTRY_IO_CLOSE)
         return PDC_OK;
@@ -1003,17 +980,17 @@ int __VISIBLE parisc_iodc_ENTRY_INIT(ARG_LIST)
             memcpy((void *)ARG3, &mod_path_hpa_CONSOLE,
                 sizeof(mod_path_hpa_CONSOLE));
             result[0] = 0;
-            result[1] = class_of_hpa(hpa);
+            result[1] = class_of_hpa_path(PDC_CONSOLE_HPA, (unsigned long) &mod_path_hpa_CONSOLE.layers);
             result[2] = result[3] = 0; /* No network card, so no MAC. */
             return PDC_OK;
 	case ENTRY_INIT_SRCH_NEXT: /* 3: Search next */
             if (!HPA_is_serial_device(hpa) & !HPA_is_storage_device(hpa))
                 return PDC_NE_BOOTDEV; /* No further boot devices */
             ARG4 = (unsigned long) (char *) &(PAGE0->mem_boot.dp.layers);
-            memcpy((void *)ARG3, (void *) ARG4,
+            memcpy((char *)ARG3, (char *) ARG4,
                 sizeof(mod_path_emulated_drives.layers)); /* fill ID_addr */
             result[0] = 0;
-            result[1] = CL_SEQU;  /* TAPE HPA_is_storage_device(hpa) ? CL_RANDOM : 0; */
+            result[1] = class_of_hpa_path(hpa, (unsigned long) &PAGE0->mem_boot.dp.layers);
             result[2] = result[3] = 0; /* No network card, so no MAC. */
             return PDC_OK;
         case ENTRY_INIT_MOD_DEV: /* 4: Init & test mod & dev */
@@ -1024,14 +1001,13 @@ printf("ENTRY_INIT_DEV called for ");
                 struct disk_op_s disk_op;
                 int ret;
                 disk_op.command = CMD_RESET;
-                boot_drive->target = *(int *)ARG3;
-                disk_op.drive_fl = boot_drive;
+                disk_op.drive_fl = get_drive_for_path((int *)ARG3);
                 disk_op.buf_fl = NULL;
                 ret = process_op(&disk_op);
                 printf("\nBOOT IO reset = %d\n", ret);
             }
             result[0] = IO_STATUS_READY;
-            result[1] = class_of_hpa(hpa);
+            result[1] = parisc_devices[hpa_index].iodc->type & 0x0f; // class_of_hpa_path(hpa, ARG3);
 printf("ENTRY_INIT_DEV class %ld\n", result[1]);
             asm("copy %r31,%r31");
             result[2] = result[3] = 0; /* TODO?: MAC of network card. */
@@ -1436,9 +1412,7 @@ static int pdc_iodc(ARG_LIST)
             option, ARG2, ARG3, hpa_name(ARG3), ARG4, ARG5, ARG6);
 
     hpa = ARG3;
-    if (0 && hpa == IDE_HPA) { // do NOT check for DINO_SCSI_HPA, breaks Linux which scans IO areas for unlisted io modules
-        iodc_p = &iodc_data_hpa_fff8c000; // workaround for PCI ATA (use DINO_SCSI_HPA)
-    } else {
+    {
         hpa = fix_hpa_hack(hpa);
         hpa_index = find_hpa_index(hpa);
         if (hpa_index < 0) {
@@ -1450,16 +1424,20 @@ static int pdc_iodc(ARG_LIST)
 
     switch (option) {
     case PDC_IODC_READ:
+
+
             if (ARG4 == PDC_IODC_INDEX_DATA) {
                 // if (hpa == MEMORY_HPA)
                 //	ARG6 = 2; // Memory modules return 2 bytes of IODC memory (result2 ret[0] = 0x6701f41 HI !!)
+                if (ARG6 > sizeof(struct pdc_iodc))
+                    ARG6 = sizeof(struct pdc_iodc);
                 memcpy((void*) ARG5, iodc_p, ARG6);
                 c = (unsigned char *) ARG5;
                 // printf("SeaBIOS: XXXXXXXXXXXXXXX PDC_IODC get: hpa = 0x%lx, HV: 0x%x 0x%x IODC_SPA=0x%x  type 0x%x, \n", hpa, c[0], c[1], c[2], c[3]);
                 // c[0] = iodc_p->hversion_model; // FIXME. BROKEN HERE !!!
                 // c[1] = iodc_p->hversion_rev || (iodc_p->hversion << 4);
                 *result = ARG6;
-                return PDC_OK;
+                return 0; // PDC_OK;
             }
 
             // ARG4 is IODC function to copy.
@@ -1479,12 +1457,20 @@ static int pdc_iodc(ARG_LIST)
             return PDC_OK;
     case PDC_IODC_NINIT:	/* 2: non-destructive init */
     case PDC_IODC_DINIT:	/* 3: destructive init */
-            break;
-    case PDC_IODC_MEMERR:   /* 4: check for errors */
-            result[0] = IO_STATUS_READY;
-            result[1] = 0;
-            result[2] = 0;
+            if (option == PDC_IODC_NINIT)
+                printf("DESTUCTIVE INIT ***************\n");
+            else
+                printf("NON-DESTUCTIVE INIT ***************\n");
+            result[0] = IO_STATUS_READY;        // stat
+            result[1] = 0;                      // max_spa
+            result[2] = ram_size;               // max_memory
             result[3] = 0;
+            return PDC_OK;
+    case PDC_IODC_MEMERR:   /* 4: check for errors */
+            result[0] = IO_STATUS_READY;        // stat
+            result[1] = 0;                      // resp
+            result[2] = 0;                      // info
+            result[3] = 0;                      // req
             return PDC_OK;
     case PDC_IODC_IDENT_PRIMARY:
             result[0] = MEMORY_HPA;
@@ -1531,6 +1517,9 @@ static int pdc_stable(ARG_LIST)
                 return PDC_INVALID_ARG;
             memcpy((unsigned char *) ARG3, &stable_storage[ARG2], ARG4);
             dump_mem(ARG3, ARG4, ARG2);
+            // PDC_STABLE(10) option 0 result=0x0 ARG3=0x8b2780  ARG4=0x20 ARG5=0x0 ARG6=0x0 ARG7=0x0
+            if (ARG2 == 0 && ARG4 == 0x20 && ARG5 ==0)
+                asm("copy 30,30");
             return PDC_OK;
         case PDC_STABLE_WRITE:
             if ((ARG2 + ARG4) > STABLE_STORAGE_SIZE)
@@ -1671,7 +1660,7 @@ static int pdc_mem(ARG_LIST)
     unsigned long *result = (unsigned long *)ARG2;
 
     // only implemented on 64bit PDC!
-    if (sizeof(unsigned long) == sizeof(unsigned int))
+    if (0 && sizeof(unsigned long) == sizeof(unsigned int))
         return PDC_BAD_PROC;
 
     switch (option) {
@@ -1687,6 +1676,8 @@ static int pdc_mem(ARG_LIST)
             return PDC_OK;
         case PDC_MEM_GOODMEM:
             GoldenMemory = ARG3;
+dump_mem(0x400-4,4,0x400-4);
+            asm("copy 5,5");
             return PDC_OK;
     }
     dprintf(0, "\n\nSeaBIOS: Check PDC_MEM option %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
@@ -2381,7 +2372,7 @@ static int parisc_boot_menu(unsigned long *iplstart, unsigned long *iplend,
 static const struct pz_device mem_display_pseudo = {
     .hpa = PDC_CONSOLE_HPA,
     .iodc_io = (unsigned long)&iodc_entry,
-    .cl_class = CL_DISPL,  // TP_CONSOLE = 9 ??
+    .cl_class = CL_DISPL,
 };
 
 static const struct pz_device mem_kbd_pseudo = {
@@ -2436,8 +2427,8 @@ static void set_emulated_lun(struct pdc_module_path *dest,
         struct drive_s *drive)
 {
     if (drive) {
-        dest->layers[0] = drive->target;
-        dest->layers[1] = drive->lun;
+        dest->layers[1] = drive->target;
+        dest->layers[2] = drive->lun;
     }
 }
 
@@ -2455,10 +2446,6 @@ static void prepare_boot_path(volatile struct pz_device *dest,
 
     if (HPA_is_storage_device(hpa))
         mod_path = &mod_path_emulated_drives;
-    else if (hpa == LASI_UART_HPA) // HPA_is_serial_device(hpa))
-        mod_path = &mod_path_hpa_ffd05000;
-    else if (hpa == DINO_UART_HPA) // HPA_is_serial_device(hpa))
-        mod_path = &mod_path_hpa_fff83000;
     else {
         BUG_ON(hpa_index < 0);
         mod_path = parisc_devices[hpa_index].mod_path;
@@ -2653,9 +2640,17 @@ void __VISIBLE start_parisc_firmware(void)
         console_display  = &mem_cons_boot;
         console_keyboard = &mem_kbd_boot;
     }
-    /* Install PSEUDO console */
-    prepare_boot_path(&(PAGE0->mem_cons), &mem_display_pseudo, 0x60);
-    prepare_boot_path(&(PAGE0->mem_kbd),  &mem_kbd_pseudo, 0xa0);
+
+    if (ENABLE_PDC_CONSOLE) {
+        /* Install PSEUDO console */
+        prepare_boot_path(&(PAGE0->mem_cons), &mem_display_pseudo, 0x60);
+        prepare_boot_path(&(PAGE0->mem_kbd),  &mem_kbd_pseudo, 0xa0);
+    } else {
+        prepare_boot_path(&(PAGE0->mem_cons), console_display, 0x60);
+        prepare_boot_path(&(PAGE0->mem_kbd),  console_keyboard, 0xa0);
+    }
+    PAGE0->mem_kbd.dp.layers[0] = 21; // KEYBOARD
+
 
     chassis_code = 0;
 
@@ -2736,8 +2731,7 @@ void __VISIBLE start_parisc_firmware(void)
         printf("BOO  %d\n", boot_drive->target);  // is 0, will be set later
     }
 
-    // Find PCI bus id of LSI SCSI card
-    // NOT USED, but keep here for now.
+    // Find PCI bus id of LSI SCSI card and put in layers[0]
     find_pci_slot_for_dev(PCI_VENDOR_ID_LSI_LOGIC,
         &mod_path_emulated_drives.layers[0]);
 
@@ -2745,7 +2739,7 @@ void __VISIBLE start_parisc_firmware(void)
     prepare_boot_path(NULL, &mem_boot_boot, 0x00); // store in STABLE[0x00]
     // -> HACK !!!
     mem_boot_boot.cl_class = CL_SEQU; // and make it TAPE
-    set_emulated_lun(&mod_path_emulated_drives, boot_drive); // parisc_alt_harddisc);
+    set_emulated_lun(&mod_path_emulated_drives, boot_drive);
     prepare_boot_path(NULL, &mem_boot_boot, 0x80); // store in STABLE[0x80]
     set_emulated_lun(&mod_path_emulated_drives, boot_drive);
     // SCSI-ID of boot drive in PAGE0 is still 0, but will be set later in parisc_boot_menu()
@@ -2755,8 +2749,8 @@ void __VISIBLE start_parisc_firmware(void)
     dump_mem((unsigned long)&(PAGE0->mem_boot), 48, (unsigned long)&(PAGE0->mem_boot));
     dump_mem((unsigned long)&stable_storage, 0x100, (unsigned long)&stable_storage);
 
-    print_path("BOOT PATH PAGE0 ", &PAGE0->mem_boot.dp);
-    print_path("BOOT PATH STABLE", (volatile struct device_path *)&stable_storage);
+    print_path("BOOT BOOT PAGE0 ", &PAGE0->mem_boot.dp);
+    print_path("BOOT BOOT STABLE", (volatile struct device_path *)&stable_storage);
     print_path("BOOT CONSOLE    ", &PAGE0->mem_cons.dp);
 
     init_nvolatile_storage();
@@ -2785,8 +2779,8 @@ void __VISIBLE start_parisc_firmware(void)
     if (parisc_boot_menu(&iplstart, &iplend, bootdrive)) {
         void (*start_ipl)(long interactive, long iplend);
 
-        PAGE0->mem_boot.dp.layers[0] = boot_drive->target;
-        PAGE0->mem_boot.dp.layers[1] = boot_drive->lun;
+        PAGE0->mem_boot.dp.layers[1] = boot_drive->target;
+        PAGE0->mem_boot.dp.layers[2] = boot_drive->lun;
 
         printf("\nBooting...\n"
                 "Boot IO Dependent Code (IODC) revision 153\n\n"
@@ -2797,3 +2791,258 @@ void __VISIBLE start_parisc_firmware(void)
 
     hlt(); /* this ends the emulator */
 }
+
+
+#if 0
+
+relied upton translation ??  
+0x00000000000e5a28:  ssm 2,r0
+
+IA_F 0000000a000e5a28 IA_B 0000000a000e5a2c IIR 00180004
+PSW  0000bf08 CB   10111111 --------------Q---
+GR00 00000000 GR01 00a00000 GR02 000e5a1c GR03 00360092
+GR04 89cc00d5 GR05 000d68e0 GR06 000bf000 GR07 c0000000
+GR08 40231a88 GR09 0000000b GR10 00000010 GR11 40231000
+GR12 0056b3fc GR13 0000000d GR14 40231000 GR15 0042bcb8
+GR16 00080000 GR17 00000000 GR18 0000002d GR19 0000000a
+GR20 000bf180 GR21 00000000 GR22 0000bf08 GR23 00000000
+GR24 00000200 GR25 f000095c GR26 00006000 GR27 c0202008
+GR28 00000000 GR29 000c5000 GR30 000bf180 GR31 f0000c08
+SR00 0000000a SR01 0000000b SR02 00000000 SR03 00000000
+SR04 0000000a SR05 0000000b SR06 0000000b SR07 0000000a
+
+----------------
+IN:  
+0x00000000000e5a2c:  Address 0xe5a2c is out of bounds.
+
+IA_F 0000000a000e5a2c IA_B 0000000a000e5a30 IIR 00180004
+PSW  0000bf0a CB   10111111 --------------Q-D-
+GR00 00000000 GR01 00a00000 GR02 000e5a1c GR03 00360092
+GR04 89cc00d5 GR05 000d68e0 GR06 000bf000 GR07 c0000000
+GR08 40231a88 GR09 0000000b GR10 00000010 GR11 40231000
+GR12 0056b3fc GR13 0000000d GR14 40231000 GR15 0042bcb8
+GR16 00080000 GR17 00000000 GR18 0000002d GR19 0000000a
+GR20 000bf180 GR21 00000000 GR22 0000bf08 GR23 00000000
+GR24 00000200 GR25 f000095c GR26 00006000 GR27 c0202008
+GR28 00000000 GR29 000c5000 GR30 000bf180 GR31 f0000c08
+SR00 0000000a SR01 0000000b SR02 00000000 SR03 00000000
+SR04 0000000a SR05 0000000b SR06 0000000b SR07 0000000a
+
+
+
+// e44a8 -> read index pdc_iodc()
+//
+Prüfe auf keyboard (8) ?
+0x00000000000e44dc:  ldb 3(r19),r19
+0x00000000000e44e0:  nop
+0x00000000000e44e4:  extrw,u r19,31,5,r19
+0x00000000000e44e8:  cmpib,<>,n 8,r19,0xe4504
+
+nach TP_CONSOLE auf 8 weiter:
+
+0x00000000000e44ec:  ldw 384(r0),r1
+0x00000000000e44f0:  ldw 3c0(r0),r20
+0x00000000000e44f4:  addi 30,r1,r1
+0x00000000000e44f8:  stw r1,5c(r20)
+0x00000000000e44fc:  ldi 5,r1
+0x00000000000e4500:  stw r1,60(r20)
+0x00000000000e4504:  ldil L%4000,r5
+0x00000000000e4508:  ldo 800(r5),r5
+0x00000000000e450c:  ldi 8,r26
+0x00000000000e4510:  ldi 0,r25
+0x00000000000e4514:  ldo 0(r4),r24
+0x00000000000e4518:  ldw 3c0(r0),r23
+0x00000000000e451c:  ldi 4,r1
+0x00000000000e4520:  stw r1,-34(sp)
+0x00000000000e4524:  ldw 380(r0),r1
+0x00000000000e4528:  stw r1,-38(sp)
+0x00000000000e452c:  stw r1,3c8(r0)
+0x00000000000e4530:  b,l 0xe4e58,rp
+0x00000000000e4534:  stw r5,-3c(sp)
+
+
+SeaBIOS: Start PDC proc PDC_IODC(8) option 0 result=0xe4640 ARG3=0xfff84000 PDC_CONSOLE_HPA ARG4=0x4 ARG5=0x6000 ARG6=0x4800 ARG7=0x0
+-> 00000000000e44ec
+
+> SeaBIOS: Info PDC_IODC option 0 ARG2=0xe4640 ARG3=0xfff84000 (PDC_CONSOLE_HPA) ARG4=0x4 ARG5=0x6000 ARG6=0x4800
+BSYSTEM ABORT 54 FROM SUBSYSTEM 146@
+
+
+
+maintenance packet qqemu.PhyMemMode
+    This will return either 0 or 1, 1 indicates you are currently in the physical memory mode.
+maintenance packet Qqemu.PhyMemMode:1
+    This will change the memory mode to physical memory.
+maintenance packet Qqemu.PhyMemMode:0
+    This will change it back to normal memory mode.
+
+
+
+addresssen:
+    0x380       = 0x6000        // start wo geladen wird
+    0x384       = 0xfffb0000
+    0x3c0       = 0xfff84000
+#define BOOT_CONSOLE_HPA_OFFSET  0x3c0
+#define BOOT_CONSOLE_SPA_OFFSET  0x3c4  
+#define BOOT_CONSOLE_PATH_OFFSET 0x3a8  
+
+auf paq:
+gdb
+file hppa-firmware.img
+set disassemble-next-line on
+target remote 192.168.20.51:1234
+target remote localhost:1234
+
+break *0x000e44ac       # vor IODC#0 call
+break *0x000e44d4
+disassemble $pc,+48
+
+HIER:
+b *0x000e4530   -> IODC 8/0/0xe4640/0xfff84000/4/
+b 0x000e4538    -> nach diesem IODC
+dann in prot mode
+-> sprung nach 0x000e5a1c
+b *0xe5a1c      -> 
+b *0x000e5a50
+
+NEUER ANLAUF: *****************************
+SeaBIOS: Start PDC proc PDC_STABLE(10) option 0 result=0x0 ARG3=0x8b2780  ARG4=0x20 ARG5=0x0 ARG6=0x0 ARG7=0x0
+Dump of 32 bytes from addr 0x0
+00000000: 00 ff ff ff ff ff 08 0c 00 00 00 00 00 00 00 00
+00000010: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+
+https://ccrma.stanford.edu/~jos/stkintro/Useful_commands_gdb.html
+
+P100:
+-----
+/home/cvs/binutils-gdb/build/gdb/gdb
+file /tmp/hppa-firmware.img
+set disassemble-next-line on
+target remote localhost:1234
+disassemble $pc-32,+64
+
+b *0x000c78c0   -> HIER STOPPEN!! vor PDC_MODEL
+     0xc7658 subroutine PDC ausführen
+b *0x000c78d4   ->   PDC_CHASSIS: Initialize (3), CHASSIS  cf0
+
+0x000c78e8:  b,l 0xe4000,rp  -> gibt "MPE/iX launch facility" aus.
+-> 0x000c7914
+-> b *0x000c7944
+=> 0x000c793c:  b,l 0xe4ac0,rp  -> macht inventory nach "MPE iX launch facility"
+
+HELGE:  b *f0016320  # copy r5,r5
+b *0x2ea560             # nach PDC_MEM ******************************************************************************
+0x002e987c
+
+
+das gibt den Text aus:
+   0x000e4114:  ldw 3c0(r0),r26
+   0x000e4118:  ldw 3c4(r0),r24
+   0x000e411c:  ldi 3a8,r23
+   0x000e4120:  blr r0,rp
+   0x000e4124:  bv,n r0(r21)
+   0x000e4128:  cmpb,>=,n ret0,r0,0xe4138
+   0x000e412c:  ldil L%2b000,r26              -> ?????
+   0x000e4130:  b,l 0xe55f0,r0
+=> 0x000e4134:  addi 70,ret0,r25
+   0x000e4138:  addi -48,sp,sp
+
+
+-> 0x000c7974:  b,l 0xc7660,rp
+  0x000c7978:  stw r25,1bc(r10)
+-> 0x000c7994:  cmpib,<>,n 1,ret0,0xc7a3c
+-> b *0x000c7a64
+=> 0x000c7c50:  b,l 0xc7658,rp -> "PDC_CHASSIS: Initialize (3), CHASSIS  cf02"
+   0x000c7c58:  b,l 0xe1808,rp
+
+   0x000c7c78:  b,l 0xc7658,rp
+   0x000c7c7c:  ldo 704(r24),r24    PDC_CHASSIS: Initialize (3), CHASSIS  cf04
+
+=> 0x000c7d8c:  cmpb,<,n r25,r26,0xc7da0
+
+=> 0x000c7d94:  b,l 0xed478,rp
+   0x000c7d98:  ldw 1b4(r10),r25
+        -> grosse routine: ************************************
+            INSTALL C.45.05 COPYRIGHT (C) HEWLETT-PACKARD 1987,1992. ALL RIGHTS RESERVED.
+            INSTALL -- MPE/iX disk image builder.
+
+hier startet inner loop:
+=> 0x000ed478:  stw rp,-14(sp)
+
+=> 0x000ebda8:  cmpib,<> 0,r24,0xebdb8
+
+
+   0x000e4110:  ldw 3c8(r0),r21
+   0x000e4114:  ldw 3c0(r0),r26
+   0x000e4118:  ldw 3c4(r0),r24
+   0x000e411c:  ldi 3a8,r23
+   0x000e4120:  blr r0,rp
+=> 0x000e4124:  bv,n r0(r21)
+
+
+STOP:
+SeaBIOS: Start PDC proc PDC_MEM(20) option 5 result=0xe94000 ARG3=0xf99000  ARG4=0x0 ARG5=0x0 ARG6=0x0 ARG7=0x0
+f0016320:       08 05 02 45     copy r5,r5
+
+
+
+----------------------------------------------------------
+
+###  b *0xf00160e4  PDC-stable
+b *0x000e4f18           # vor PDC-stable ?
+b *0x000e4f1c
+b *0x000e4f2c           -> das ist rückkehr con PDC-stable !!!!!!!!!!!!!!!!!!
+
+b *0x000e4e58   -> EINSPRUNGPUNKT !!!   (kommt von 0x120e18)
+b *0x00120dd8 -> noch vorher...
+
+   0x000c78a8:  ldi 1,r26
+   0x000c78ac:  ldi 3,r25
+
+   0x000c78c0:  ldi 1,r26
+   0x000c78c4:  ldi 0,r25
+   0x000c78c8:  ldil L%6c800,r24
+   0x000c78cc:  b,l 0xc7658,rp
+
+   0x000c78d4:  ldi 1,r26
+
+    b,l 0xc7658,rp   -> PDC call ?
+
+   0x000c78c0:  ldi 1,r26
+
+
+b *0x000e4eb0   ->
+
+
+b *0x261b34             # Rückkehr
+addresse 0x000c5000 = FAULT HANDLER 
+b *0x000c50c0           #      ITLB miss handler !!
+    => 0x000c50c0:  ldil L%da800,r1
+   0x000c50c4:  be 394(sr0,r1)
+   0x000c50c8:  mfctl pcoq,r9
+
+
+
+
+ab hier: dBSYSTEM ABORT %1 FROM SUBSYSTEM %3\033&d@\n\033&dBSECONDARY STATUS
+0x000e5a8c
+
+aktuelles discompilieren
+disassemble $pcoqh,+32
+
+disassemble 0x000e44ac,+64
+# nach pdc_iodc:
+disassemble 0x000e44d4,+32      
+
+set $ret0 = 0
+
+break *0x000e44d4
+break *0x000e44dc
+0x000e44dc:  ldb 3(r19),r19 # lädt das type field vom IODC block
+
+
+disassemble 0x000e5a28,+256     # ssm 2,r0
+
+
+#endif
+

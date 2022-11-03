@@ -309,6 +309,22 @@
 #define	CL_DISPL	9	/* half-duplex console (display) */
 #define	CL_FC		10	/* FiberChannel access media */
 
+/* type field in IODC byte #3 */
+#define TP_NPROC        0       /* Native Processor */
+#define TP_MEMORY       1       /* Memory */
+#define TP_B_DMA        2       /* Type-B DMA I/O */
+#define TP_A_DMA        4       /* Type-A DMA I/O - foreign I/O adapter */
+#define TP_A_DIRECT     5       /* Type-A Direct I/O - multiplexer adapter */
+#define TP_BCPORT       7       /* Bus Converter Port */
+#define TP_CIO          8       /* HP-CIO Adapter */
+#define TP_CONSOLE      9       /* Console */
+#define TP_FIO          10      /* Foreign I/O Module - direct I/O adapter */
+#define TP_BA           11      /* Bus Adapter */
+#define TP_IOA          12
+#define TP_BRIDGE       13      /* Bus Bridge to Foreign Bus */
+#define TP_FABRIC       14      /* Fabric Component */
+#define TP_FAULT        31      /* Faulty Module */
+
 /* IODC ENTRY_INIT() */
 #define ENTRY_INIT_SRCH_FRST	2
 #define ENTRY_INIT_SRCH_NEXT	3

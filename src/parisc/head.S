@@ -136,16 +136,16 @@ name:
 	 .level 1.1
 
 	/* On HPMC, the CPUs will start here at 0xf0000000 */
-hpmc_entry:
+hpmc_entry:			/* PDC_base + 0 */
         b,n toc_asm_entry       /* TOC and HPMC */
-reset_entry:
+reset_entry:			/* PDC_base + 4 */
 	/* at reset, the CPU begins fetching instructions from address 0xf0000004. */
 	b,n startup
-BOOT_ADDR:
+BOOT_ADDR:			/* PDC_base + 8 */
 	b,n startup
-ENTRY_ADDR:
-	break 0,0	/* TODO: should probably be: b,n iodc_entry */
-LPMC_ADDR:
+ENTRY_ADDR:			/* PDC_base + 12 */
+	b,n pdc_entry
+LPMC_ADDR:			/* PDC_base + 16 */
 	b,n startup
 
 marker:
@@ -161,6 +161,25 @@ marker:
         .align 0x80
 ENTRY(startup)
 	/* Make sure space registers are set to zero */
+
+#if 1
+  load32 .L3, %r1
+  b,n .L5
+
+.L3:
+	bv,n 0(%rp)
+
+.L5:
+  blr %r0,%rp
+  bv,n %r0(%r1)
+  rsm 1,%r0
+  cmpb,= %r1,%r1,.L4
+  ldi 1,%r1
+  nop
+.L4:
+#endif
+
+
 	mtsp    %r0,%sr0
 	mtsp    %r0,%sr1
 	mtsp    %r0,%sr2
