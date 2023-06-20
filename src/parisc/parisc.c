@@ -31,7 +31,7 @@
 
 #include "vgabios.h"
 
-#define SEABIOS_HPPA_VERSION 6
+#define SEABIOS_HPPA_VERSION 7
 
 /*
  * Various variables which are needed by x86 code.
@@ -111,6 +111,7 @@ extern unsigned long boot_args[];
 /* flags for pdc_debug */
 #define DEBUG_PDC       0x0001
 #define DEBUG_IODC      0x0002
+#define DEBUG_BOOT_IO   0x0004
 
 int pdc_console;
 /* flags for pdc_console */
@@ -601,7 +602,7 @@ int __VISIBLE parisc_iodc_ENTRY_IO(unsigned int *arg FUNC_MANY_ARGS)
     if (1 &&
             (((HPA_is_serial_device(hpa) || HPA_is_graphics_device(hpa)) && option == ENTRY_IO_COUT) ||
              ((HPA_is_serial_device(hpa) || HPA_is_graphics_device(hpa)) && option == ENTRY_IO_CIN) ||
-             (HPA_is_storage_device(hpa) && option == ENTRY_IO_BOOTIN))) {
+             ((HPA_is_storage_device(hpa) && option == ENTRY_IO_BOOTIN && !(pdc_debug & DEBUG_BOOT_IO)))) ) {
         /* avoid debug messages */
     } else {
         iodc_log_call(arg, __FUNCTION__);
@@ -636,16 +637,36 @@ int __VISIBLE parisc_iodc_ENTRY_IO(unsigned int *arg FUNC_MANY_ARGS)
                 disk_op.buf_fl = (void*)ARG6;
                 disk_op.command = CMD_READ;
                 if (option == ENTRY_IO_BBLOCK_IN) { /* in 2k blocks */
+                    /* reqsize must not be bigger than maxsize */
+                    // if (ARG7 > ARG8) return PDC_INVALID_ARG;
                     disk_op.count = (ARG7 * ((u64)FW_BLOCKSIZE / disk_op.drive_fl->blksize));
                     disk_op.lba = (ARG5 * ((u64)FW_BLOCKSIZE / disk_op.drive_fl->blksize));
                 } else {
+                    // read one block at least.
+                    if (ARG7 && (ARG7 < disk_op.drive_fl->blksize))
+                        ARG7 = disk_op.drive_fl->blksize;
+                    /* reqsize must be multiple of 2K */
+                    if (ARG7 & (FW_BLOCKSIZE-1))
+                        return PDC_INVALID_ARG;
+                    /* reqsize must not be bigger than maxsize */
+                    // if (ARG7 > ARG8) return PDC_INVALID_ARG;
+                    /* medium start must be 2K aligned */
+                    if (ARG5 & (FW_BLOCKSIZE-1))
+                        return PDC_INVALID_ARG;
                     disk_op.count = (ARG7 / disk_op.drive_fl->blksize);
                     disk_op.lba = (ARG5 / disk_op.drive_fl->blksize);
                 }
-                // ARG8 = maxsize !!!
+                // NOTE: LSI SCSI can not read more than 8191 blocks, so limit blocks to read
+                if (disk_op.count >= 8192)
+                    disk_op.count = 8192-16;
+
+                // dprintf(0, "LBA %d  COUNT  %d\n", (u32) disk_op.lba, (u32)disk_op.count);
                 ret = process_op(&disk_op);
-                // dprintf(0, "\nBOOT IO res %d count = %d\n", ret, ARG7);
-                result[0] = ARG7;
+                if (option == ENTRY_IO_BOOTIN)
+                    result[0] = disk_op.count * disk_op.drive_fl->blksize; /* return bytes */
+                else
+                    result[0] = (disk_op.count * (u64)disk_op.drive_fl->blksize) / FW_BLOCKSIZE; /* return blocks */
+                // printf("\nBOOT IO result %d, requested %d, read %ld\n", ret, ARG7, result[0]);
                 if (ret)
                     return PDC_ERROR;
                 return PDC_OK;
@@ -2265,7 +2286,7 @@ void __VISIBLE start_parisc_firmware(void)
             "Duplex Console IO Dependent Code (IODC) revision 1\n"
             "\n", SEABIOS_HPPA_VERSION);
     printf("------------------------------------------------------------------------------\n"
-            "  (c) Copyright 2017-2022 Helge Deller <deller@gmx.de> and SeaBIOS developers.\n"
+            "  (c) Copyright 2017-2023 Helge Deller <deller@gmx.de> and SeaBIOS developers.\n"
             "------------------------------------------------------------------------------\n\n");
     printf( "  Processor   Speed            State           Coprocessor State  Cache Size\n"
             "  ---------  --------   ---------------------  -----------------  ----------\n");
