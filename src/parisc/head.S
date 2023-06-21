@@ -1,17 +1,16 @@
 /*
  * Startup glue code for parisc firmware
  *
- *   (C) 2017-2021 Helge Deller <deller@gmx.de>
+ *   (C) 2017-2023 Helge Deller <deller@gmx.de>
  */
 
+#include "parisc/hppa.h"
 #include "parisc/hppa_hardware.h"
 #include "autoconf.h"
 #include "autoversion.h"
 
 	/* load 32-bit 'value' into 'reg' compensating for the ldil
-	 * sign-extension when running in wide mode.
-	 * WARNING!! neither 'value' nor 'reg' can be expressions
-	 * containing '.'!!!! */
+	 * sign-extension when running in wide mode. */
 	.macro	load32 value, reg
 	ldil	L%\value, \reg
 	ldo	R%\value(\reg), \reg
@@ -81,8 +80,8 @@ reset_entry:
 	b,n startup
 
 marker:
-	/* file identification */
-	.stringz "PA-RISC/HPPA PDC Firmware (SeaBIOS fork)"
+	/* file identification, useful for strings command on binary file to see version. */
+	.stringz "PA-RISC/HPPA PDC Firmware " SEABIOS_HPPA_VERSION_STR " (SeaBIOS fork)"
 	.stringz "https://github.com/hdeller/seabios-hppa"
 	.stringz BUILD_VERSION
 

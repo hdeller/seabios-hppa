@@ -1,6 +1,6 @@
 // Glue code for parisc architecture
 //
-// Copyright (C) 2017-2022  Helge Deller <deller@gmx.de>
+// Copyright (C) 2017-2023  Helge Deller <deller@gmx.de>
 // Copyright (C) 2019 Sven Schnelle <svens@stackframe.org>
 //
 // This file may be distributed under the terms of the GNU LGPLv3 license.
@@ -30,8 +30,6 @@
 #include "parisc/lasips2.h"
 
 #include "vgabios.h"
-
-#define SEABIOS_HPPA_VERSION 7
 
 /*
  * Various variables which are needed by x86 code.
