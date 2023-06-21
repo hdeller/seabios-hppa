@@ -92,24 +92,21 @@ void wrmsr_smp(u32 index, u64 val) { }
  * PA-RISC specific constants and functions.
  ********************************************************/
 
-/* Pointer to zero-page of PA-RISC */
-#define PAGE0 ((volatile struct zeropage *) 0UL)
-
-/* variables provided by qemu */
-extern unsigned long boot_args[];
-#define ram_size		(boot_args[0])
-#define linux_kernel_entry	(boot_args[1])
-#define cmdline			(boot_args[2])
-#define initrd_start		(boot_args[3])
-#define initrd_end		(boot_args[4])
-#define smp_cpus		(boot_args[5])
-#define pdc_debug               (boot_args[6])
-#define fw_cfg_port		(boot_args[7])
+/* variables provided by qemu - boot_args starting at pad0[10] */
+#define ram_size		PAGE0->pad0[10]
+#define linux_kernel_entry	PAGE0->pad0[11]
+#define cmdline			PAGE0->pad0[12]
+#define initrd_start		PAGE0->pad0[13]
+#define initrd_end		PAGE0->pad0[14]
+#define smp_cpus		PAGE0->pad0[15]
+#define pdc_debug		PAGE0->pad0[16]
+#define fw_cfg_port		PAGE0->pad0[17]
 
 /* flags for pdc_debug */
-#define DEBUG_PDC       0x0001
-#define DEBUG_IODC      0x0002
-#define DEBUG_BOOT_IO   0x0004
+#define DEBUG_PDC       0x01
+#define DEBUG_IODC      0x02
+#define DEBUG_BOOT_IO   0x04
+#define DEBUG_CHASSIS   0x08
 
 int pdc_console;
 /* flags for pdc_console */
@@ -1720,13 +1717,14 @@ unsigned long __VISIBLE toc_handler(struct pdc_toc_pim_11 *pim)
                 p = (unsigned long *)&pim11->sr[0];
         printf("SR0: %lx %lx %lx %lx %lx %lx %lx %lx\n", p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7]);
         if (is_64bit()) {
-                printf("IAQ: %lx.%lx %lx.%lx\n",
+                printf("IAQ: %lx.%lx %lx.%lx   PSW: %lx\n",
                         (unsigned long)pim20->cr[17], (unsigned long)pim20->cr[18],
-                        (unsigned long)pim20->iasq_back, (unsigned long)pim20->iaoq_back);
+                        (unsigned long)pim20->iasq_back, (unsigned long)pim20->iaoq_back,
+			(unsigned long)pim20->cr[22]);
                 printf("RP(r2): %lx\n", (unsigned long)pim20->gr[2]);
         } else {
-                printf("IAQ: %x.%x %x.%x\n", pim11->cr[17], pim11->cr[18],
-                        pim11->iasq_back, pim11->iaoq_back);
+                printf("IAQ: %x.%x %x.%x   PSW: %x\n", pim11->cr[17], pim11->cr[18],
+                        pim11->iasq_back, pim11->iaoq_back, pim11->cr[22]);
                 printf("RP(r2): %x\n", pim11->gr[2]);
         }
 
@@ -2178,8 +2176,8 @@ void __VISIBLE start_parisc_firmware(void)
     model.sw_id = romfile_loadstring_to_int("opt/hostid", model.sw_id);
     dprintf(0, "fw_cfg: machine hostid %lu\n", model.sw_id);
 
-    /* Initialize PAGE0 */
-    memset((void*)PAGE0, 0, sizeof(*PAGE0));
+    /* Do not initialize PAGE0. We have the boot args stored there. */
+    /* memset((void*)PAGE0, 0, sizeof(*PAGE0)); */
 
     /* copy pdc_entry entry into low memory. */
     memcpy((void*)MEM_PDC_ENTRY, &pdc_entry_table, 3*4);
@@ -2254,13 +2252,13 @@ void __VISIBLE start_parisc_firmware(void)
     // PlatformRunningOn = PF_QEMU;  // emulate runningOnQEMU()
 
     cpu_hz = 100 * PAGE0->mem_10msec; /* Hz of this PARISC */
-    dprintf(1, "\nPARISC SeaBIOS Firmware, %ld x PA7300LC (PCX-L2) at %d.%06d MHz, %lu MB RAM.\n",
+    dprintf(1, "\nPARISC SeaBIOS Firmware, %d x PA7300LC (PCX-L2) at %d.%06d MHz, %d MB RAM.\n",
             smp_cpus, cpu_hz / 1000000, cpu_hz % 1000000,
             ram_size/1024/1024);
 
     if (ram_size < MIN_RAM_SIZE) {
         printf("\nSeaBIOS: Machine configured with too little "
-                "memory (%ld MB), minimum is %d MB.\n\n",
+                "memory (%d MB), minimum is %d MB.\n\n",
                 ram_size/1024/1024, MIN_RAM_SIZE/1024/1024);
         hlt();
     }
@@ -2278,6 +2276,16 @@ void __VISIBLE start_parisc_firmware(void)
     serial_setup();
     block_setup();
 
+    PAGE0->vec_rendz = 0; /* No rendezvous yet. Add MEM_RENDEZ_HI later */
+    /* if this is a reboot, force secondary CPUs to enter smp_idle loop */
+    if (PAGE0->imm_soft_boot) {
+	for (i = 1; i < smp_cpus; i++) {
+		unsigned long hpa;
+		hpa = CPU_HPA_IDX(i);
+		*(int*)hpa = -1; /* send Wakeup IRQ to trigger QEMU to load boot address */
+	}
+    }
+
     printf("\n");
     printf("SeaBIOS PA-RISC Firmware Version %d\n"
             "\n"
@@ -2293,9 +2301,9 @@ void __VISIBLE start_parisc_firmware(void)
                 " MHz    %s                 Functional            0 KB\n",
                 i < 10 ? " ":"", i, i?"Idle  ":"Active");
     printf("\n\n");
-    printf("  Available memory:     %llu MB\n"
+    printf("  Available memory:     %u MB\n"
             "  Good memory required: %d MB\n\n",
-            (unsigned long long)ram_size/1024/1024, MIN_RAM_SIZE/1024/1024);
+            ram_size/1024/1024, MIN_RAM_SIZE/1024/1024);
 
     // search boot devices
     find_initial_parisc_boot_drives(&parisc_boot_harddisc, &parisc_boot_cdrom);
@@ -2338,6 +2346,10 @@ void __VISIBLE start_parisc_firmware(void)
         PAGE0->mem_boot.dp.layers[1] = boot_drive->lun;
     }
 
+    /* Qemu-specific: Drop *all* TLB entries for all CPUs before start. */
+    /* Necessary if machine was rebooted. */
+    asm("pdtlbe %%r0(%%sr1,%%r0)" : : : "memory");
+
     /* directly start Linux kernel if it was given on qemu command line. */
     if (linux_kernel_entry > 1) {
         void (*start_kernel)(unsigned long mem_free, unsigned long cline,
@@ -2345,6 +2357,8 @@ void __VISIBLE start_parisc_firmware(void)
 
         printf("Autobooting Linux kernel which was loaded by qemu...\n\n");
         start_kernel = (void *) linux_kernel_entry;
+	/* zero out kernel entry point in case we reset the machine: */
+        linux_kernel_entry = 0;
         start_kernel(PAGE0->mem_free, cmdline, initrd_start, initrd_end);
         hlt(); /* this ends the emulator */
     }
