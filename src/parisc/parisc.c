@@ -1779,6 +1779,7 @@ static void print_menu(void)
 #endif
             "        HElp [<menu>|<command>]         Display help for menu or command\n"
             "        RESET                           Restart the system\n"
+            "        EXIT                            Exit QEMU emulation\n"
             "-------\n");
 }
 
@@ -1866,6 +1867,10 @@ again2:
         reset();
     if (input[0] == 'H' && input[1] == 'E')     // HELP?
         goto again;
+    if (input[0] == 'L' && input[1] == 'S')     // HELP? (ls)
+        goto again;
+    if (input[0] == 'E' && input[1] == 'X')     // EXIT
+        hlt();
     if (input[0] != 'B' || input[1] != 'O') {   // BOOT?
         printf("Unknown command, please try again.\n\n");
         goto again2;
