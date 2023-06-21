@@ -871,8 +871,9 @@ static int pdc_chassis(unsigned int *arg)
         case PDC_CHASSIS_DISPWARN:
             ARG4 = (ARG3 >> 17) & 7;
             chassis_code = ARG3 & 0xffff;
-            if (0) printf("\nPDC_CHASSIS: %s (%d), %sCHASSIS  %0x\n",
-                    systat[ARG4], ARG4, (ARG3>>16)&1 ? "blank display, ":"", chassis_code);
+            if (pdc_debug & DEBUG_CHASSIS)
+                printf("\nPDC_CHASSIS: %s (%d), %sCHASSIS  0x%0x\n",
+                       systat[ARG4], ARG4, (ARG3>>16)&1 ? "blank display, ":"", chassis_code);
             // fall through
         case PDC_CHASSIS_WARN:
             // return warnings regarding fans, batteries and temperature: None!
