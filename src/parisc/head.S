@@ -101,6 +101,7 @@ marker:
         .align 0x80
 ENTRY(startup)
 	rsm	PSW_I, %r0	/* disable local irqs */
+	ssm	PSW_Q, %r0	/* enable PSW_Q flag */
 
 	/* Make sure space registers are set to zero */
 	mtsp    %r0,%sr0
@@ -152,7 +153,7 @@ ENTRY(enter_smp_idle_loop)
 	/* IDLE LOOP for SMP CPUs - wait for rendenzvous. */
 	mfctl   CPU_HPA_CR_REG, %r25 /* get CPU HPA from cr7 */
 
-	rsm	PSW_I | PSW_Q, %r0	/* disable local irqs */
+	rsm	PSW_I, %r0	/* disable local irqs */
 	mtctl	%r0, CR_EIEM	/* disable all external irqs */
 
 	/* EIRR : clear all pending external intr */
