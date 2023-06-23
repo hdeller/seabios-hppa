@@ -117,6 +117,8 @@ int pdc_console;
 
 int sti_font;
 
+char qemu_version[16] = "unknown version";
+
 /* Want PDC boot menu? Enable via qemu "-boot menu=on" option. */
 unsigned int show_boot_menu;
 unsigned int interact_ipl;
@@ -2183,6 +2185,10 @@ void __VISIBLE start_parisc_firmware(void)
     model.sw_id = romfile_loadstring_to_int("opt/hostid", model.sw_id);
     dprintf(0, "fw_cfg: machine hostid %lu\n", model.sw_id);
 
+    str = romfile_loadfile("/etc/qemu-version", NULL);
+    if (str)
+        strtcpy(qemu_version, str, sizeof(qemu_version));
+
     /* Do not initialize PAGE0. We have the boot args stored there. */
     /* memset((void*)PAGE0, 0, sizeof(*PAGE0)); */
 
@@ -2294,10 +2300,10 @@ void __VISIBLE start_parisc_firmware(void)
     }
 
     printf("\n");
-    printf("SeaBIOS PA-RISC Firmware Version %d\n"
-            "\n"
+    printf("SeaBIOS PA-RISC Firmware Version " SEABIOS_HPPA_VERSION_STR
+           " (QEMU %s)\n\n"
             "Duplex Console IO Dependent Code (IODC) revision 1\n"
-            "\n", SEABIOS_HPPA_VERSION);
+            "\n", qemu_version);
     printf("------------------------------------------------------------------------------\n"
             "  (c) Copyright 2017-2023 Helge Deller <deller@gmx.de> and SeaBIOS developers.\n"
             "------------------------------------------------------------------------------\n\n");
