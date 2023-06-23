@@ -92,15 +92,16 @@ void wrmsr_smp(u32 index, u64 val) { }
  * PA-RISC specific constants and functions.
  ********************************************************/
 
-/* variables provided by qemu - boot_args starting at pad0[10] */
-#define ram_size		PAGE0->pad0[10]
-#define linux_kernel_entry	PAGE0->pad0[11]
-#define cmdline			PAGE0->pad0[12]
-#define initrd_start		PAGE0->pad0[13]
-#define initrd_end		PAGE0->pad0[14]
-#define smp_cpus		PAGE0->pad0[15]
-#define pdc_debug		PAGE0->pad0[16]
-#define fw_cfg_port		PAGE0->pad0[17]
+/* boot_args[] variables provided by qemu */
+#define boot_args		PAGE0->pad608
+#define ram_size		boot_args[0]
+#define linux_kernel_entry	boot_args[1]
+#define cmdline			boot_args[2]
+#define initrd_start		boot_args[3]
+#define initrd_end		boot_args[4]
+#define smp_cpus		boot_args[5]
+#define pdc_debug		boot_args[6]
+#define fw_cfg_port		boot_args[7]
 
 /* flags for pdc_debug */
 #define DEBUG_PDC       0x01

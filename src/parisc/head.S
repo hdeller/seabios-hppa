@@ -190,8 +190,8 @@ $smp_exit_loop:
 	bv,n	0(%r3)
 
 $is_monarch_cpu:
-	/* Save boot_args. Only monarch CPU does this once. */
-        load32          BOOTADDR(0x040 + 10*4),%r1
+	/* Save boot_args in PAGE0->pad608[]. Only monarch CPU does this once. */
+        load32          BOOTADDR(0x608),%r1
         stw,ma          %r26,4(%r1)
         stw,ma          %r25,4(%r1)
         stw,ma          %r24,4(%r1)
