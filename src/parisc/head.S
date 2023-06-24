@@ -130,12 +130,8 @@ $startup_just_rebooted:
 
 	/* branch if this is the monarch cpu */
 	load32 CPU_HPA, %r1
-	comb,= %r5,%r1,$is_monarch_cpu_reboot
-	nop
+	comb,=,n %r5,%r1,$is_monarch_cpu_reboot
 
-	/* we assume the monarch CPU is in idle loop. wake it up. */
-	ldi	-1, %r3		/* trigger IRQ0 (Timer) */
-	stw	%r3, 0(%r1)
 	b,n	enter_smp_idle_loop
 
 $startup_fresh_booted:

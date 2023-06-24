@@ -2290,14 +2290,6 @@ void __VISIBLE start_parisc_firmware(void)
     block_setup();
 
     PAGE0->vec_rendz = 0; /* No rendezvous yet. Add MEM_RENDEZ_HI later */
-    /* if this is a reboot, force secondary CPUs to enter smp_idle loop */
-    if (PAGE0->imm_soft_boot) {
-	for (i = 1; i < smp_cpus; i++) {
-		unsigned long hpa;
-		hpa = CPU_HPA_IDX(i);
-		*(int*)hpa = -1; /* send Wakeup IRQ to trigger QEMU to load boot address */
-	}
-    }
 
     printf("\n");
     printf("SeaBIOS PA-RISC Firmware Version " SEABIOS_HPPA_VERSION_STR
