@@ -3,8 +3,8 @@
 /* this file is included by x86.h */
 
 /* version number of this SeaBIOS firmware */
-#define SEABIOS_HPPA_VERSION 8
-#define SEABIOS_HPPA_VERSION_STR  "8"
+#define SEABIOS_HPPA_VERSION 9
+#define SEABIOS_HPPA_VERSION_STR  "9"
 
 #include "parisc/hppa_hardware.h"
 
