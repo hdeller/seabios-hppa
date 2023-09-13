@@ -125,7 +125,6 @@ unsigned int interact_ipl;
 
 unsigned long PORT_QEMU_CFG_CTL;
 unsigned int tlb_entries = 256;
-unsigned int btlb_entries = 8;
 
 #define PARISC_SERIAL_CONSOLE   PORT_SERIAL1
 
@@ -1266,24 +1265,19 @@ static int pdc_proc(unsigned int *arg)
 
 static int pdc_block_tlb(unsigned int *arg)
 {
-    unsigned long option = ARG1;
-    struct pdc_btlb_info *info = (struct pdc_btlb_info *) ARG2;
+    int ret;
 
-    switch (option) {
-        case PDC_BTLB_INFO:
-            memset(info, 0, sizeof(*info));
-            if (btlb_entries) {
-                /* TODO: fill in BTLB info */
-            }
-            return PDC_OK;
-        case PDC_BTLB_INSERT:
-        case PDC_BTLB_PURGE:
-        case PDC_BTLB_PURGE_ALL:
-            /* TODO: implement above functions */
-            return PDC_BAD_OPTION;
+    asm(
+	"ldw (7-0)*%2(%1),%%r26 ! ldw (7-1)*%2(%1),%%r25 ! ldw (7-2)*%2(%1),%%r24 ! ldw (7-3)*%2(%1),%%r23\n"
+	"ldw (7-4)*%2(%1),%%r22 ! ldw (7-5)*%2(%1),%%r21 ! ldw (7-6)*%2(%1),%%r20 ! ldw (7-7)*%2(%1),%%r19\n"
+	"ldi %3,%%ret0\n"
+	"diag 0x100\n"
+	"copy %%ret0,%0\n"
+	: "=r" (ret)
+	: "r" (arg), "i" (sizeof(long)), "i" (PDC_BAD_OPTION)
+	: "r28", "r26", "r25", "r24", "r23", "r22", "r21", "r20", "r19" );
 
-    }
-    return PDC_BAD_OPTION;
+    return ret;
 }
 
 static int pdc_tlb(unsigned int *arg)
@@ -2160,9 +2154,6 @@ void __VISIBLE start_parisc_firmware(void)
 
     tlb_entries = romfile_loadint("/etc/cpu/tlb_entries", 256);
     dprintf(0, "fw_cfg: TLB entries %d\n", tlb_entries);
-
-    btlb_entries = romfile_loadint("/etc/cpu/btlb_entries", 8);
-    dprintf(0, "fw_cfg: BTLB entries %d\n", btlb_entries);
 
     powersw_ptr = (int *) (unsigned long)
         romfile_loadint("/etc/power-button-addr", (unsigned long)&powersw_nop);
