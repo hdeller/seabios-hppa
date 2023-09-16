@@ -530,10 +530,18 @@ static unsigned long parisc_serial_in(char *c, unsigned long maxchars)
 
 static void parisc_serial_out(char c)
 {
-    portaddr_t addr = PAGE0->mem_cons.hpa + 0x800; /* PARISC_SERIAL_CONSOLE */
+    portaddr_t addr = PAGE0->mem_cons.hpa;
+
+    /* might not be initialized if problems happen during early bootup */
+    if (!addr)
+        addr = PARISC_SERIAL_CONSOLE;
+    else
+        addr += 0x800;
+
+    if (c == '\n')
+        parisc_serial_out('\r');
+
     for (;;) {
-        if (c == '\n')
-            parisc_serial_out('\r');
         u8 lsr = inb(addr+SEROFF_LSR);
         if ((lsr & 0x60) == 0x60) {
             // Success - can write data
