@@ -1033,6 +1033,11 @@ static int pdc_cache(unsigned int *arg)
 
             memcpy(result, cache_info, sizeof(cache_info));
             return PDC_OK;
+        case PDC_CACHE_RET_SPID:	/* returns space-ID bits */
+            memset(result, 0, 32 * sizeof(unsigned long));
+	    /* for 32- and 64-bit CPUs, we allow only 32 useable bits for SIDs */
+            result[0] = 32;
+            return PDC_OK;
     }
     dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_CACHE function %d %x %x %x %x\n", ARG1, ARG2, ARG3, ARG4, ARG5);
     return PDC_BAD_OPTION;
