@@ -9,8 +9,6 @@
 #include "util.h" // timer_setup
 #include "parisc/pdc.h"
 
-#define PAGE0 ((volatile struct zeropage *) 0UL)
-
 // Setup internal timers.
 void
 timer_setup(void)
