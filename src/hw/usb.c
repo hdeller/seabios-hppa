@@ -227,9 +227,9 @@ get_device_info8(struct usb_pipe *pipe, struct usb_device_descriptor *dinfo)
     struct usb_ctrlrequest req;
     req.bRequestType = USB_DIR_IN | USB_TYPE_STANDARD | USB_RECIP_DEVICE;
     req.bRequest = USB_REQ_GET_DESCRIPTOR;
-    req.wValue = USB_DT_DEVICE<<8;
+    req.wValue = cpu_to_le16(USB_DT_DEVICE<<8);
     req.wIndex = 0;
-    req.wLength = 8;
+    req.wLength = cpu_to_le16(8);
     return usb_send_default_control(pipe, &req, dinfo);
 }
 
@@ -241,9 +241,9 @@ get_device_config(struct usb_pipe *pipe)
     struct usb_ctrlrequest req;
     req.bRequestType = USB_DIR_IN | USB_TYPE_STANDARD | USB_RECIP_DEVICE;
     req.bRequest = USB_REQ_GET_DESCRIPTOR;
-    req.wValue = USB_DT_CONFIG<<8;
+    req.wValue = cpu_to_le16(USB_DT_CONFIG<<8);
     req.wIndex = 0;
-    req.wLength = sizeof(cfg);
+    req.wLength = cpu_to_le16(sizeof(cfg));
     int ret = usb_send_default_control(pipe, &req, &cfg);
     if (ret)
         return NULL;
@@ -253,7 +253,7 @@ get_device_config(struct usb_pipe *pipe)
         warn_noalloc();
         return NULL;
     }
-    req.wLength = cfg.wTotalLength;
+    req.wLength = cpu_to_le16(cfg.wTotalLength);
     ret = usb_send_default_control(pipe, &req, config);
     if (ret || config->wTotalLength != cfg.wTotalLength) {
         free(config);
@@ -269,7 +269,7 @@ set_configuration(struct usb_pipe *pipe, u16 val)
     struct usb_ctrlrequest req;
     req.bRequestType = USB_DIR_OUT | USB_TYPE_STANDARD | USB_RECIP_DEVICE;
     req.bRequest = USB_REQ_SET_CONFIGURATION;
-    req.wValue = val;
+    req.wValue = cpu_to_le16(val);
     req.wIndex = 0;
     req.wLength = 0;
     return usb_send_default_control(pipe, &req, NULL);
@@ -313,7 +313,7 @@ usb_set_address(struct usbdevice_s *usbdev)
     struct usb_ctrlrequest req;
     req.bRequestType = USB_DIR_OUT | USB_TYPE_STANDARD | USB_RECIP_DEVICE;
     req.bRequest = USB_REQ_SET_ADDRESS;
-    req.wValue = cntl->maxaddr + 1;
+    req.wValue = cpu_to_le16(cntl->maxaddr + 1);
     req.wIndex = 0;
     req.wLength = 0;
     int ret = usb_send_default_control(usbdev->defpipe, &req, NULL);
