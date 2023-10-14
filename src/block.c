@@ -623,7 +623,7 @@ process_op_16(struct disk_op_s *op)
 int
 process_op(struct disk_op_s *op)
 {
-    dprintf(DEBUG_HDL_13, "disk_op d=%p lba=%d buf=%p count=%d cmd=%d\n"
+    if (0) dprintf(DEBUG_HDL_13, "disk_op d=%p lba=%d buf=%p count=%d cmd=%d\n"
             , op->drive_fl, (u32)op->lba, op->buf_fl
             , op->count, op->command);
 
