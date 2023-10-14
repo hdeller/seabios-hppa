@@ -50,7 +50,7 @@ glob_prefix(const char *glob, const char *str)
 }
 
 #if CONFIG_PARISC
-#define FW_PCI_DOMAIN "/dino-pcihost"
+#define FW_PCI_DOMAIN (has_astro ? "/elroy-pcihost" : "/dino-pcihost")
 #else
 #define FW_PCI_DOMAIN "/pci@i0cf8"
 #endif
@@ -178,7 +178,7 @@ loadBiosGeometry(void)
 static BootDeviceLCHS *
 boot_lchs_find(const char *glob)
 {
-    dprintf(1, "Searching bios-geometry for: %s\n", glob);
+    // dprintf(1, "Searching bios-geometry for: %s\n", glob);
     int i;
     for (i = 0; i < BiosGeometryCount; i++)
         if (glob_prefix(glob, BiosGeometry[i].name))
@@ -291,7 +291,7 @@ loadBootOrder(void)
 static int
 find_prio(const char *glob)
 {
-    dprintf(1, "Searching bootorder for: %s\n", glob);
+    // dprintf(1, "Searching bootorder for: %s\n", glob);
     int i;
     for (i = 0; i < BootorderCount; i++)
         if (glob_prefix(glob, Bootorder[i]))

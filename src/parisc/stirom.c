@@ -3281,7 +3281,7 @@ struct sti_rom __stiheader sti_proc_rom = {
 static void __stitext write_artist(struct sti_glob_cfg *cfg,
                                    int reg, u32 val)
 {
-    writel((void *)cfg->region_ptrs[2] + reg, val);
+    gsc_writel((void *)cfg->region_ptrs[2] + reg, val);
 }
 
 static int __stifunc("state_mgmt") sti_state_mgmt(struct sti_state_flags *flags,

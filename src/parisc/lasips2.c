@@ -14,14 +14,15 @@
 #include "string.h"
 #include "lasips2.h"
 
+
 int lasips2_kbd_in(char *c, int max)
 {
     struct bregs regs;
     volatile int count = 0;
 
     // check if PS2 reported new keys, if so queue them up.
-    while((readl(LASIPS2_KBD_STATUS) & LASIPS2_KBD_STATUS_RBNE)) {
-        process_key(readb(LASIPS2_KBD_DATA));
+    while((gsc_readl(LASIPS2_KBD_STATUS) & LASIPS2_KBD_STATUS_RBNE)) {
+        process_key(gsc_readb(LASIPS2_KBD_DATA));
     }
 
     while(count < max) {
@@ -50,13 +51,13 @@ int ps2_kbd_command(int command, u8 *param)
 
 int lasips2_command(u16 cmd)
 {
-    while(readl(LASIPS2_KBD_STATUS) & LASIPS2_KBD_STATUS_TBNE)
+    while(gsc_readl(LASIPS2_KBD_STATUS) & LASIPS2_KBD_STATUS_TBNE)
         udelay(10);
     writeb(LASIPS2_KBD_DATA, cmd & 0xff);
 
-    while(!(readl(LASIPS2_KBD_STATUS) & LASIPS2_KBD_STATUS_RBNE))
+    while(!(gsc_readl(LASIPS2_KBD_STATUS) & LASIPS2_KBD_STATUS_RBNE))
         udelay(10);
-    return readb(LASIPS2_KBD_DATA);
+    return gsc_readb(LASIPS2_KBD_DATA);
 }
 
 void ps2port_setup(void)
