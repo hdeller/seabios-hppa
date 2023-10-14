@@ -35,7 +35,7 @@ malloc_palloc(struct zone_s *zone, u32 size, u32 align)
     data = stackptr;
     stackptr += size;
 
-    dprintf(8, "size=%d align=%d ret=0x%lx\n" , size, align, data);
+    // dprintf(9, "malloc: size=%d align=%d ret=0x%lx\n" , size, align, data);
 
     return data;
 }
