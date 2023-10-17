@@ -205,7 +205,7 @@ static void check_powersw_button(void)
 {
     /* halt immediately if power button was pressed. */
     if ((*powersw_ptr & 1) == 0) {
-        printf("SeaBIOS machine power switch was pressed.\n");
+        printf("SeaBIOS: Machine powered off via power switch button.\n");
         hlt();
     }
 }
