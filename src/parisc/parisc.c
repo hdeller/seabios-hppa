@@ -2662,8 +2662,9 @@ void __VISIBLE start_parisc_firmware(void)
     // value is 63 this is a 64-bit capable CPU.
     // A 32-bit only CPU returns 31.
     mtctl(-1UL, 11);
-    cpu_bit_width = (mfctl(11) == 63) ? 64 : 32;
-    // cpu_bit_width = 64; /* XXX HACK */
+    /* this is: mfctl,w sar,r1: */
+    asm(".word 0x016048a0 + 1 ! copy %%r1,%0\n" : "=r" (i): : "r1");
+    cpu_bit_width = (i == 63) ? 64 : 32;
 
     if (smp_cpus > HPPA_MAX_CPUS)
         smp_cpus = HPPA_MAX_CPUS;
