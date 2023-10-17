@@ -133,6 +133,8 @@ unsigned long hppa_port_pci_data = (PCI_HPA + DINO_CONFIG_DATA);
 unsigned int show_boot_menu;
 unsigned int interact_ipl;
 
+static unsigned long psw_defaults;
+
 unsigned long PORT_QEMU_CFG_CTL;
 unsigned int tlb_entries = 256;
 
@@ -1739,19 +1741,27 @@ static int pdc_mem(unsigned int *arg)
 
 static int pdc_psw(unsigned int *arg)
 {
-    static unsigned long psw_defaults = PDC_PSW_ENDIAN_BIT;
     unsigned long option = ARG1;
     unsigned long *result = (unsigned long *)ARG2;
+    unsigned long mask;
+
+    if (cpu_bit_width == 64)
+        mask = PDC_PSW_WIDE_BIT | PDC_PSW_ENDIAN_BIT;
+    else
+        mask = PDC_PSW_ENDIAN_BIT;
 
     if (option > PDC_PSW_SET_DEFAULTS)
         return PDC_BAD_OPTION;
-    /* FIXME: For 64bit support enable PDC_PSW_WIDE_BIT too! */
     if (option == PDC_PSW_MASK)
-        *result = PDC_PSW_ENDIAN_BIT;
+        *result = mask;
     if (option == PDC_PSW_GET_DEFAULTS)
         *result = psw_defaults;
     if (option == PDC_PSW_SET_DEFAULTS) {
-        psw_defaults = ARG2;
+        psw_defaults = ARG2 & mask;
+        /* we do not yet support little endian mode */
+        BUG_ON((psw_defaults & PDC_PSW_ENDIAN_BIT) == 0);
+        /* tell qemu the default mask */
+        mtctl(psw_defaults, CR_PSW_DEFAULT);
     }
     return PDC_OK;
 }
@@ -2665,6 +2675,9 @@ void __VISIBLE start_parisc_firmware(void)
     /* this is: mfctl,w sar,r1: */
     asm(".word 0x016048a0 + 1 ! copy %%r1,%0\n" : "=r" (i): : "r1");
     cpu_bit_width = (i == 63) ? 64 : 32;
+
+    psw_defaults = PDC_PSW_ENDIAN_BIT;
+    mtctl(psw_defaults, CR_PSW_DEFAULT);
 
     if (smp_cpus > HPPA_MAX_CPUS)
         smp_cpus = HPPA_MAX_CPUS;
