@@ -1334,6 +1334,7 @@ static int pdc_model(unsigned int *arg)
              * with old qemu versions which will try to run 64-bit instructions
              * kernel sr_disable_hash() function
              */
+            memset(result, 0, 32 * sizeof(unsigned long));
             memcpy(result, (cpu_bit_width == 64) ?
                     &current_machine->pdc_model : &machine_B160L.pdc_model,
 			sizeof(current_machine->pdc_model));
