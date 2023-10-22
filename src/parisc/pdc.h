@@ -186,9 +186,6 @@
 #define PDC_SCSI_GET_PARMS	0	/* Get SCSI parameters for I/O device */
 #define PDC_SCSI_SET_PARMS	1	/* Set SCSI parameters for I/O device */
 
-#define PDC_PAT_CELL            64
-#define PDC_PAT_CHASSIS_LOG     65
-
 /* HVERSION dependent */
 
 /* The PDC_MEM_MAP calls */

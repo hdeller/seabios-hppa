@@ -29,6 +29,7 @@
 #include "vgahw.h"
 #include "parisc/hppa_hardware.h" // DINO_UART_BASE
 #include "parisc/pdc.h"
+#include "parisc/pdcpat.h"
 #include "parisc/sticore.h"
 #include "parisc/lasips2.h"
 
