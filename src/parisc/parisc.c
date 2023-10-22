@@ -2719,7 +2719,11 @@ void __VISIBLE start_parisc_firmware(void)
     cpu_bit_width = (i == 63) ? 64 : 32;
 
     psw_defaults = PDC_PSW_ENDIAN_BIT;
-    /*  if (cpu_bit_width == 64) psw_defaults |= PDC_PSW_WIDE_BIT; */
+    if (0 && cpu_bit_width == 64) {
+        /* enable 64-bit PSW by default */
+        psw_defaults |= PDC_PSW_WIDE_BIT;
+        current_machine->pdc_model.width = 1;
+    }
     mtctl(psw_defaults, CR_PSW_DEFAULT);
 
     if (smp_cpus > HPPA_MAX_CPUS)
