@@ -2023,6 +2023,41 @@ static int pdc_initiator(unsigned int *arg)
     return PDC_BAD_OPTION;
 }
 
+static int pdc_pat_cell(unsigned int *arg)
+{
+    unsigned long option = ARG1;
+    struct pdc_pat_cell_num *cell_info = (void *)ARG2;
+
+    switch (option) {
+        case PDC_PAT_CELL_GET_NUMBER:
+            cell_info->cell_num = 0;
+            cell_info->cell_loc = 0;
+            return PDC_OK;
+        default:
+            break;
+    }
+    dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_PAT_CELL function %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
+    return PDC_BAD_OPTION;
+}
+
+static int pdc_pat_pd(unsigned int *arg)
+{
+    unsigned long option = ARG1;
+    unsigned long *result = (unsigned long *)ARG2;
+
+    switch (option) {
+        case PDC_PAT_PD_GET_PDC_INTERF_REV:
+            result[0] = 5;  // legacy_rev
+            result[1] = 6;  // pat_rev
+            result[2] = PDC_PAT_CAPABILITY_BIT_SIMULTANEOUS_PTLB;  // pat_cap
+            return PDC_OK;
+        default:
+            break;
+    }
+    dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_PAT_PD function %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
+    return PDC_BAD_OPTION;
+}
+
 
 int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
 {
@@ -2108,11 +2143,6 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
         case 26: // PDC_SCSI_PARMS is the architected firmware interface to replace the Hversion PDC_INITIATOR procedure.
             return PDC_BAD_PROC;
 
-        case 64: // Called by HP-UX 11 bootcd during boot. Probably checks PDC_PAT_CELL (even if we are not PAT firmware)
-        case 65: // Called by HP-UX 11 bootcd during boot. Probably checks PDC_PAT_CHASSIS_LOG (even if we are not PAT firmware)
-            dprintf(0, "\n\nSeaBIOS: UNKNOWN PDC proc %lu OPTION %lu called with ARG2=%x ARG3=%x ARG4=%x\n", proc, option, ARG2, ARG3, ARG4);
-            return PDC_BAD_PROC;
-
 	case PDC_MEM_MAP:
             return pdc_mem_map(arg);
 
@@ -2146,6 +2176,17 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
 
         case PDC_INITIATOR:
             return pdc_initiator(arg);
+
+        /* PDC PAT functions */
+        case PDC_PAT_CELL:
+            return pdc_pat_cell(arg);
+
+        case PDC_PAT_CHASSIS_LOG:
+            dprintf(0, "\n\nSeaBIOS: PDC_PAT_CHASSIS_LOG OPTION %lu called with ARG2=%x ARG3=%x ARG4=%x\n", option, ARG2, ARG3, ARG4);
+            return PDC_BAD_PROC;
+
+        case PDC_PAT_PD:
+            return pdc_pat_pd(arg);
     }
 
     printf("\n** WARNING **: SeaBIOS: Unimplemented PDC proc %s(%d) option %d result=%x ARG3=%x ",
