@@ -141,7 +141,7 @@ unsigned int tlb_entries = 256;
 #define PARISC_SERIAL_CONSOLE   PORT_SERIAL1
 
 extern char pdc_entry;
-extern char pdc_entry_table[12];
+extern char pdc_entry_table[4*4];
 extern char iodc_entry[512];
 extern char iodc_entry_table[14*4];
 
@@ -1759,7 +1759,7 @@ static int pdc_psw(unsigned int *arg)
     if (option == PDC_PSW_SET_DEFAULTS) {
         psw_defaults = ARG2 & mask;
         /* we do not yet support little endian mode */
-        BUG_ON((psw_defaults & PDC_PSW_ENDIAN_BIT) == 0);
+        BUG_ON((psw_defaults & PDC_PSW_ENDIAN_BIT) == 1);
         /* tell qemu the default mask */
         mtctl(psw_defaults, CR_PSW_DEFAULT);
     }
@@ -2677,6 +2677,7 @@ void __VISIBLE start_parisc_firmware(void)
     cpu_bit_width = (i == 63) ? 64 : 32;
 
     psw_defaults = PDC_PSW_ENDIAN_BIT;
+    /*  if (cpu_bit_width == 64) psw_defaults |= PDC_PSW_WIDE_BIT; */
     mtctl(psw_defaults, CR_PSW_DEFAULT);
 
     if (smp_cpus > HPPA_MAX_CPUS)
@@ -2767,8 +2768,8 @@ void __VISIBLE start_parisc_firmware(void)
     /* memset((void*)PAGE0, 0, sizeof(*PAGE0)); */
 
     /* copy pdc_entry entry into low memory. */
-    memcpy((void*)MEM_PDC_ENTRY, &pdc_entry_table, 3*4);
-    flush_data_cache((char*)MEM_PDC_ENTRY, 3*4);
+    memcpy((void*)MEM_PDC_ENTRY, &pdc_entry_table, 4*4);
+    flush_data_cache((char*)MEM_PDC_ENTRY, 4*4);
 
     PAGE0->memc_cont = ram_size;
     PAGE0->memc_phsize = ram_size;
