@@ -403,6 +403,11 @@ ENTRY(iodc_entry)
 	stw %arg1,-40(%sp)
 	stw %arg2,-44(%sp)
 	stw %arg3,-48(%sp)
+	;! nuke the W bit
+	.level 2.0
+	rsm	PSW_W_SM, %r31
+	.level 1.1
+	stw %r31,-52(%sp)	/* store PSW_W */
 	ldo -FRAME_SIZE(%sp),%arg0
 
 	loadgp
@@ -412,8 +417,18 @@ ENTRY(iodc_entry)
 .iodc_ret:
 	ldo -FRAME_SIZE(%sp),%sp
 	ldw -20(%sp),%rp
-	bv %r0(%rp)
 	ldw -32(%sp),%dp
+
+// .word 0xfffdead0
+	ldw -52(%sp),%r31
+	load32 0x8000000,%r1	/* mask PSW_W */
+	and,= %r31,%r1,%r0
+	bv %r0(%rp)		/* return without setting PSW_W */
+	nop
+	bv %r0(%rp)		/* return with setting PSW_W */
+	.level 2.0
+	ssm PSW_W_SM,%r0
+	.level 1.1
 END(iodc_entry)
 
 /****************************************************************
