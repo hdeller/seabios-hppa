@@ -1429,10 +1429,9 @@ static int pdc_cache(unsigned int *arg)
 
             memcpy(result, machine_cache_info, sizeof(*machine_cache_info));
             return PDC_OK;
-        case PDC_CACHE_RET_SPID:	/* returns space-ID bits */
+        case PDC_CACHE_RET_SPID:	/* returns space-ID bits when sr-hasing is enabled */
             memset(result, 0, 32 * sizeof(unsigned long));
-	    /* for 32- and 64-bit CPUs, we allow only 32 useable bits for SIDs */
-            result[0] = 32;
+            result[0] = 0;
             return PDC_OK;
     }
     dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_CACHE function %d %x %x %x %x\n", ARG1, ARG2, ARG3, ARG4, ARG5);
