@@ -2045,8 +2045,24 @@ static int pdc_pat_pd(unsigned int *arg)
 {
     unsigned long option = ARG1;
     unsigned long *result = (unsigned long *)ARG2;
+    struct pdc_pat_pd_addr_map_entry *mem_table = (void *)ARG3;
+    unsigned long count = ARG4;
+    unsigned long offset = ARG5;
 
     switch (option) {
+        case PDC_PAT_PD_GET_ADDR_MAP:
+            if (count < sizeof(*mem_table) || offset != 0)
+                return PDC_INVALID_ARG;
+            memset(mem_table, 0, sizeof(*mem_table));
+            mem_table->entry_type = PAT_MEMORY_DESCRIPTOR;
+            mem_table->memory_type = PAT_MEMTYPE_MEMORY;
+            mem_table->memory_usage = PAT_MEMUSE_GENERAL; /* ?? */
+            mem_table->paddr = 0;  /* note: 64bit! */
+            mem_table->pages = ram_size / 4096; /* Length in 4K pages */
+            mem_table->cell_map = 0;
+            result[0] = sizeof(*mem_table);
+            return PDC_OK;
+
         case PDC_PAT_PD_GET_PDC_INTERF_REV:
             result[0] = 5;  // legacy_rev
             result[1] = 6;  // pat_rev

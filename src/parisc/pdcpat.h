@@ -280,10 +280,10 @@ struct pdc_pat_pd_addr_map_entry {
 	unsigned char reserve1[5];
 	unsigned char memory_type;
 	unsigned char memory_usage;
-	unsigned long paddr;
+	unsigned long long paddr;       /* note: 64bit! */
 	unsigned int  pages;            /* Length in 4K pages */
 	unsigned int  reserve2;
-	unsigned long cell_map;
+	unsigned long long cell_map;    /* note: 64bit! */
 };
 
 /********************************************************************
