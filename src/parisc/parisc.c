@@ -1365,8 +1365,8 @@ static int pdc_model(unsigned int *arg)
                 result[0] = machine_B160L.pdc_cpuid;
             return PDC_OK;
         case PDC_MODEL_CAPABILITIES:
-            result[0] = current_machine->pdc_caps;
-            result[0] |= PDC_MODEL_OS32; /* we do support 32-bit */
+            // result[0] = current_machine->pdc_caps;
+            result[0] = PDC_MODEL_OS32; /* we only support 32-bit PDC for now. */
             if (0 && cpu_bit_width == 64) /* and maybe 64-bit */
                 result[0] |= PDC_MODEL_OS64; /* this means 64-bit PDC calls are supported */
             else
