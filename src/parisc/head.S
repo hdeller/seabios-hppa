@@ -346,6 +346,10 @@ END(smp_ivt)
 	PDC and IODC entry
  *******************************************************/
 
+/* XXX: memory location in page0: vec_pad0[], temporary storage for PSW.W */
+#define PSW_OFFSET1	24
+#define PSW_OFFSET2	28
+
 ENTRY(pdc_entry)
 	stw %rp,-20(%sp)
 	stw %dp,-32(%sp)
@@ -353,7 +357,7 @@ ENTRY(pdc_entry)
 	stw %arg1,-40(%sp)
 	stw %arg2,-44(%sp)
 	stw %arg3,-48(%sp)
-	stw %r31,-52(%sp)	/* store PSW_W */
+	stw %r31,PSW_OFFSET1(%r0)	/* store PSW_W */
 	ldo -FRAME_SIZE(%sp),%arg0
 
 	loadgp
@@ -363,7 +367,7 @@ ENTRY(pdc_entry)
 	ldo -FRAME_SIZE(%sp),%sp
 	ldw -20(%sp),%rp
 	ldw -32(%sp),%dp
-	ldw -52(%sp),%r31
+	ldw PSW_OFFSET1(%r0),%r31
 	load32 0x8000000,%r1	/* mask PSW_W */
 	and,= %r31,%r1,%r0
 	bv %r0(%rp)		/* return without setting PSW_W */
@@ -407,7 +411,7 @@ ENTRY(iodc_entry)
 	.level 2.0
 	rsm	PSW_W_SM, %r31
 	.level 1.1
-	stw %r31,-52(%sp)	/* store PSW_W */
+	stw %r31,PSW_OFFSET2(%r0)	/* store PSW_W */
 	ldo -FRAME_SIZE(%sp),%arg0
 
 	loadgp
@@ -420,7 +424,7 @@ ENTRY(iodc_entry)
 	ldw -32(%sp),%dp
 
 // .word 0xfffdead0
-	ldw -52(%sp),%r31
+	ldw PSW_OFFSET2(%r0),%r31
 	load32 0x8000000,%r1	/* mask PSW_W */
 	and,= %r31,%r1,%r0
 	bv %r0(%rp)		/* return without setting PSW_W */
