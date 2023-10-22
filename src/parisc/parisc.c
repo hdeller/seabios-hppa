@@ -2800,6 +2800,8 @@ void __VISIBLE start_parisc_firmware(void)
 
     current_machine->pdc_model.sw_id = romfile_loadstring_to_int("opt/hostid",
 					current_machine->pdc_model.sw_id);
+    /* and store in 32-bit machine too */
+    machine_B160L.pdc_model.sw_id = current_machine->pdc_model.sw_id;
     dprintf(0, "fw_cfg: machine hostid %lu\n", current_machine->pdc_model.sw_id);
 
     str = romfile_loadfile("/etc/qemu-version", NULL);
