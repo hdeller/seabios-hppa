@@ -2719,7 +2719,7 @@ unsigned long romfile_loadstring_to_int(const char *name, unsigned long defval)
 void __VISIBLE start_parisc_firmware(void)
 {
     unsigned int i, cpu_hz;
-    unsigned long iplstart, iplend;
+    unsigned long iplstart, iplend, sw_id;
     char *str;
 
     char bootdrive = (char)cmdline; // c = hdd, d = CD/DVD
@@ -2818,11 +2818,14 @@ void __VISIBLE start_parisc_firmware(void)
     /* 0,1 = default 8x16 font, 2 = 16x32 font */
     sti_font = romfile_loadstring_to_int("opt/font", 0);
 
-    current_machine->pdc_model.sw_id = romfile_loadstring_to_int("opt/hostid",
-					current_machine->pdc_model.sw_id);
-    /* and store in 32-bit machine too */
-    machine_B160L.pdc_model.sw_id = current_machine->pdc_model.sw_id;
-    dprintf(0, "fw_cfg: machine hostid %lu\n", current_machine->pdc_model.sw_id);
+    sw_id = romfile_loadstring_to_int("opt/hostid",
+                        current_machine->pdc_model.sw_id);
+    if (sw_id != current_machine->pdc_model.sw_id) {
+        current_machine->pdc_model.sw_id = sw_id;
+        /* and store in 32-bit machine too */
+        machine_B160L.pdc_model.sw_id = sw_id;
+    }
+    dprintf(0, "fw_cfg: machine hostid %lu\n", sw_id);
 
     str = romfile_loadfile("/etc/qemu-version", NULL);
     if (str)
