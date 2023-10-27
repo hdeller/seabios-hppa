@@ -7,6 +7,8 @@
 #define FIRMWARE_START  0xf0000000
 #define FIRMWARE_END    0xf0800000
 
+#define MEM_PDC_ENTRY       0x4800  /* PDC entry address */
+
 #define DEVICE_HPA_LEN  0x00100000
 
 #define GSC_HPA         0xffc00000

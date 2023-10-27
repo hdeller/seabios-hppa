@@ -176,13 +176,14 @@ $smp_exit_loop:
 	rsm	PSW_I, %r0	/* disable local irqs */
 	mtctl	%r0, CR_EIEM
 
-	/* on 64bit: Address of PDCE_PROC for each non-monarch processor in GR26. */
-	load32	BOOTADDR(pdc_entry), %r26
+	/* provide PDCE_PROC entry in arg0 (required on 64-bit) */
+	load32	MEM_PDC_ENTRY, %arg0
 
 	/* jump to rendevouz */
 	ldw	0x10(%r0),%r3	/* MEM_RENDEZ */
 	/* ldw	0x28(%r0),%r0	MEM_RENDEZ_HI - assume addr < 4GB */
-	cmpb,=,n  %r0,%r3,startup	/* branch to startup if not yet initialized */
+	cmpb,=,n  %r0,%r3,enter_smp_idle_loop
+	nop			/* failed backward branch is nullified */
 	load32	startup, %rp
 	bv,n	0(%r3)
 

@@ -161,8 +161,6 @@ extern char iodc_entry_table[14*4];
 
 #define MIN_RAM_SIZE	(16*1024*1024) // 16 MB
 
-#define MEM_PDC_ENTRY	0x4800	/* as in a B160L */
-
 #define CPU_HPA_IDX(i)  (CPU_HPA + (i)*0x1000) /* CPU_HPA of CPU#i */
 
 static int index_of_CPU_HPA(unsigned long hpa) {
