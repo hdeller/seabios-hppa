@@ -478,14 +478,15 @@ static int HPA_is_keyboard_device(unsigned long hpa)
 }
 #endif
 
+static int artist_present(void)
+{
+    return !!(*(u32 *)0xf8380004 == 0x6dc20006);
+}
+
 int HPA_is_LASI_graphics(unsigned long hpa)
 {
-    hppa_device_t *dev;
-
-    dev = find_hpa_device(hpa);
-    if (!dev)
-        return 0;
-    return (dev->iodc->sversion_model == 0x003b); /* XXX */
+    /* return true if hpa is LASI graphics (artist graphics card) */
+    return (hpa == LASI_GFX_HPA) && artist_present();
 }
 #define GFX_NUM_PAGES 0x2000
 int HPA_is_graphics_device(unsigned long hpa)
@@ -2564,7 +2565,7 @@ static const struct pz_device mem_cons_sti_boot = {
     .cl_class = CL_DISPL,
 };
 
-static const struct pz_device mem_kbd_sti_boot = {
+static struct pz_device mem_kbd_sti_boot = {
     .hpa = LASI_PS2KBD_HPA,
     .iodc_io = (unsigned long)&iodc_entry,
     .cl_class = CL_KEYBD,
@@ -2630,6 +2631,7 @@ static void find_serial_pci_card(void)
     pdev->pci_addr = pmem;
     mem_cons_boot.hpa = pdev->hpa;
     mem_kbd_boot.hpa = pdev->hpa;
+    mem_kbd_sti_boot.hpa = pdev->hpa;
 }
 
 /* find SCSI PCI card (to be used as boot device) */
@@ -2688,11 +2690,6 @@ static void prepare_boot_path(volatile struct pz_device *dest,
 
     BUG_ON(sizeof(*mod_path) != 0x20);
     BUG_ON(sizeof(struct pdc_module_path) != 0x20);
-}
-
-static int artist_present(void)
-{
-    return !!(*(u32 *)0xf8380004 == 0x6dc20006);
 }
 
 unsigned long _atoul(char *str)

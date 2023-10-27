@@ -407,7 +407,7 @@ static struct pdc_iodc iodc_data_hpa_f4000000 = {
 
 #define HPA_f8000000_DESCRIPTION "Gecko GSC Core Graphics"
 static struct pdc_system_map_mod_info mod_info_hpa_f8000000 = {
-	.mod_addr = 0xf8000000,
+	.mod_addr = LASI_GFX_HPA,
 	.mod_pgs = 0x2000,
 	.add_addrs = 0x1,
 };
@@ -602,7 +602,7 @@ static struct pdc_iodc iodc_data_hpa_fff81000 = {
 		.mod_path = &mod_path_hpa_f4000000,\
 		.num_addr = HPA_f4000000_num_addr,\
 		.add_addr = { HPA_f4000000_add_addr } },\
-	{	.hpa = 0xf8000000,\
+	{	.hpa = LASI_GFX_HPA,\
 		.iodc = &iodc_data_hpa_f8000000,\
 		.mod_info = &mod_info_hpa_f8000000,\
 		.mod_path = &mod_path_hpa_f8000000,\
