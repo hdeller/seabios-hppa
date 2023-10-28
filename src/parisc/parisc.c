@@ -1290,6 +1290,10 @@ static const char *pdc_name(unsigned long num)
         DO(PDC_PCI_INDEX)
         DO(PDC_RELOCATE)
         DO(PDC_INITIATOR)
+        DO(PDC_PAT_CELL)
+        DO(PDC_PAT_CHASSIS_LOG)
+        DO(PDC_PAT_CPU)
+        DO(PDC_PAT_PD)
         DO(PDC_LINK)
 #undef DO
         return "UNKNOWN!";
@@ -2083,13 +2087,43 @@ static int pdc_pat_cell(unsigned int *arg)
 
     switch (option) {
         case PDC_PAT_CELL_GET_NUMBER:
-            cell_info->cell_num = 0;
-            cell_info->cell_loc = 0;
+            // cell_info->cell_num = cell_info->cell_loc = 0;
+            memset(cell_info, 0, 32*sizeof(long long));
             return PDC_OK;
+        case PDC_PAT_CELL_GET_INFO:
+            return PDC_BAD_OPTION; /* optional on single-cell machines */
         default:
             break;
     }
     dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_PAT_CELL function %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
+    return PDC_BAD_OPTION;
+}
+
+static int pdc_pat_cpu(unsigned int *arg)
+{
+    unsigned long option = ARG1;
+    unsigned long *result = (unsigned long *)ARG2;
+    unsigned long hpa;
+
+    switch (option) {
+        case PDC_PAT_CPU_GET_NUMBER:
+            hpa = ARG3;
+            result[0] = index_of_CPU_HPA(hpa);
+            result[1] = hpa;    /* location */
+            result[2] = 0;      /* num siblings */
+            return PDC_OK;
+        case PDC_PAT_CPU_GET_HPA:
+            if ((unsigned long)ARG3 >= smp_cpus)
+                return PDC_INVALID_ARG;
+            hpa = CPU_HPA_IDX(ARG3);
+            result[0] = hpa;
+            result[1] = hpa;    /* location */
+            result[2] = 0;      /* num siblings */
+            return PDC_OK;
+        default:
+            break;
+    }
+    dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_PAT_CPU OPTION %lu called with ARG2=%x ARG3=%x ARG4=%x\n", option, ARG2, ARG3, ARG4);
     return PDC_BAD_OPTION;
 }
 
@@ -2253,6 +2287,9 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
         case PDC_PAT_CHASSIS_LOG:
             dprintf(0, "\n\nSeaBIOS: PDC_PAT_CHASSIS_LOG OPTION %lu called with ARG2=%x ARG3=%x ARG4=%x\n", option, ARG2, ARG3, ARG4);
             return PDC_BAD_PROC;
+
+        case PDC_PAT_CPU:
+            return pdc_pat_cpu(arg);
 
         case PDC_PAT_PD:
             return pdc_pat_pd(arg);
