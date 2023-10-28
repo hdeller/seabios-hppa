@@ -283,6 +283,7 @@ typedef struct {
     int add_addr[5];
     struct pci_device *pci;
     unsigned long pci_addr;
+    int index;
 } hppa_device_t;
 
 static hppa_device_t *find_hpa_device(unsigned long hpa);
@@ -324,6 +325,7 @@ static hppa_device_t *parisc_devices = machine_B160L.device_list;
     LASI_GFX_HPA,\
     LASI_PS2KBD_HPA, \
     LASI_PS2MOU_HPA, \
+    MEMORY_HPA, \
     0
 
 static const char *hpa_name(unsigned long hpa)
@@ -627,12 +629,13 @@ static hppa_device_t *find_hpa_device(unsigned long hpa)
     int i;
 
     /* search classical HPPA devices */
-    if (hpa)
-      for (i = 0; i < (MAX_DEVICES-1); i++) {
-        if (hpa == parisc_devices[i].hpa)
-            return &parisc_devices[i];
-        if (!parisc_devices[i].hpa)
-            break;
+    if (hpa) {
+        for (i = 0; i < (MAX_DEVICES-1); i++) {
+            if (hpa == parisc_devices[i].hpa)
+                return &parisc_devices[i];
+            if (!parisc_devices[i].hpa)
+                break;
+        }
     }
 
     /* search PCI devices */
@@ -652,8 +655,8 @@ static void remove_from_keep_list(unsigned long hpa)
     while (keep_list[i] && keep_list[i] != hpa)
         i++;
     while (keep_list[i]) {
+            keep_list[i] = keep_list[i+1];
             ++i;
-            keep_list[i-1] = keep_list[i];
     }
 }
 
@@ -790,8 +793,63 @@ static int compare_module_path(struct pdc_module_path *path,
     return 1;
 }
 
-static hppa_device_t *find_hppa_device_by_path(unsigned long hpa,
-                            struct pdc_module_path *search,
+static hppa_device_t *add_index_all_devices(void)
+{
+    hppa_device_t *dev;
+    int i, index = 0;
+
+    for (i = 0; i < (MAX_DEVICES-1); i++) {
+        dev = parisc_devices + i;
+        if (dev->hpa) {
+            dev->index = index;
+            if (0)
+                dprintf(1, "device HPA %lx %s is index # %d\n", dev->hpa, hpa_name(dev->hpa), index);
+            index++;
+        }
+    }
+
+    /* search PCI devices */
+    for (i = 0; i < curr_pci_devices; i++) {
+        dev = hppa_pci_devices + i;
+        if (dev->hpa) {
+            dev->index = index;
+            if (0)
+                dprintf(1, "device HPA %lx %s is index # %d\n", dev->hpa, hpa_name(dev->hpa), index);
+            index++;
+        }
+    }
+
+    return NULL;
+}
+
+static hppa_device_t *find_hppa_device_by_hpa(unsigned long hpa)
+{
+    hppa_device_t *dev;
+    int i, nr = 0;
+
+    for (i = 0; i < (MAX_DEVICES-1); i++) {
+        dev = parisc_devices + i;
+        if (dev && dev->hpa == hpa) {
+            // found it.
+            return dev;
+        }
+        nr++;
+    }
+
+    /* search PCI devices */
+    for (i = 0; i < curr_pci_devices; i++) {
+        dev = hppa_pci_devices + i;
+        if (dev && dev->hpa == hpa) {
+            // found it.
+            return dev;
+        }
+        nr++;
+    }
+
+    return NULL;
+}
+
+static hppa_device_t *find_hppa_device_by_path(struct pdc_module_path *search,
                             unsigned long *index, int check_layers)
 {
     hppa_device_t *dev;
@@ -799,8 +857,6 @@ static hppa_device_t *find_hppa_device_by_path(unsigned long hpa,
 
     for (i = 0; i < (MAX_DEVICES-1); i++) {
         dev = parisc_devices + i;
-        if (dev->hpa != hpa)
-            continue;
 
         if (compare_module_path(dev->mod_path, search, check_layers)) {
             if (index)
@@ -833,7 +889,7 @@ static hppa_device_t *find_hppa_device_by_index(unsigned int index, int search_p
         dev = parisc_devices + i;
         if (!dev->hpa)
             continue;
-        if (index-- == 0)
+        if (dev->index == index)
             return dev;
     }
 
@@ -841,7 +897,7 @@ static hppa_device_t *find_hppa_device_by_index(unsigned int index, int search_p
     if (search_pci) {
         for (i = 0; i < curr_pci_devices; i++) {
             dev = hppa_pci_devices + i;
-            if (index-- == 0)
+            if (dev->index == index)
                 return dev;
         }
     }
@@ -891,7 +947,7 @@ static void parisc_serial_out(char c)
         dprintf(1,"  \n");
     }
     hppa_device_t *dev;
-    dev = find_hppa_device_by_path(addr, &PAGE0->mem_cons.dp, NULL, 0);
+    dev = find_hppa_device_by_path(&PAGE0->mem_cons.dp, NULL, 0);
     if (0) {
         dprintf(1,"parisc_serial_out  hpa %x\n", PAGE0->mem_cons.hpa);
         print_mod_path(dev->mod_path);
@@ -1409,9 +1465,10 @@ static int pdc_cache(unsigned int *arg)
                     machine_cache_info->dc_count, machine_cache_info->dc_loop, machine_cache_info->dc_stride);
 #endif
 #if 1
+            /* ODE has problems if we report no cache */
             machine_cache_info->ic_size = 1024; /* no instruction cache */
             machine_cache_info->dc_size = 1024; /* no data cache */
-#elif 0
+#elif 1
             machine_cache_info->dc_conf = (struct pdc_cache_cf) { 0 };  // .alias=1, .sh=3, };
             machine_cache_info->ic_conf = (struct pdc_cache_cf) { 0 };  // .alias=1, .sh=3, };
 
@@ -1502,8 +1559,6 @@ static int pdc_iodc(unsigned int *arg)
             iodc_p = dev->iodc;
 
             if (ARG4 == PDC_IODC_INDEX_DATA) {
-                if (iodc_p->type == 0x0041) // Memory ?
-                    ARG6 = 2; // Memory modules return 2 bytes of IODC memory (result2 ret[0] = 0x6701f41 HI !!)
                 memcpy((void*) ARG5, iodc_p, ARG6);
                 c = (unsigned char *) ARG5;
                 // printf("SeaBIOS: PDC_IODC get: hpa = 0x%lx, HV: 0x%x 0x%x IODC_SPA=0x%x  type 0x%x, \n", hpa, c[0], c[1], c[2], c[3]);
@@ -1822,7 +1877,7 @@ static int pdc_system_map(unsigned int *arg)
 
         case PDC_TRANSLATE_PATH:
             mod_path = (struct pdc_module_path *)ARG3;
-            hppa_device_t *dev = find_hppa_device_by_path(0, mod_path, &hpa_index, 1); // XXX
+            hppa_device_t *dev = find_hppa_device_by_path(mod_path, &hpa_index, 1); // XXX
             if (0) {
                 dprintf(1, "PDC_TRANSLATE_PATH dev=%p hpa=%lx ", dev, dev ? dev->hpa:0UL);
                 print_mod_path(mod_path);
@@ -1868,13 +1923,11 @@ static int pdc_mem_map(unsigned int *arg)
     struct pdc_memory_map *memmap = (struct pdc_memory_map *) ARG2;
     struct pdc_module_path *dp = (struct pdc_module_path *) ARG3;
     hppa_device_t *dev;
-    unsigned long index;
 
     switch (option) {
         case PDC_MEM_MAP_HPA:
-// NEEDS FIXING !!
             dprintf(0, "\nSeaBIOS: PDC_MEM_MAP_HPA  bus = %d,  mod = %d\n", dp->path.bc[4], dp->path.mod);
-            dev = find_hppa_device_by_path(memmap->hpa, (struct pdc_module_path *) dp, &index, 0); // ??
+            dev = find_hppa_device_by_hpa(memmap->hpa);
             if (!dev)
                 return PDC_NE_MOD;
             memcpy(memmap, dev->mod_info, sizeof(*memmap));
@@ -1986,7 +2039,7 @@ static int pdc_pci_index(unsigned int *arg)
             memcpy((void *)ARG4, irt_table, irt_table_entries * 16);
             return PDC_OK;
         case PDC_PCI_PCI_PATH_TO_PCI_HPA:
-            BUG_ON(1);
+            // BUG_ON(1);
             result[0] = pci_hpa;
             return PDC_OK;
         case PDC_PCI_PCI_HPA_TO_PCI_PATH:
@@ -2881,6 +2934,7 @@ void __VISIBLE start_parisc_firmware(void)
     if (0) { for (i=0; parisc_devices[i].hpa; i++)
         printf("Kept #%d at 0x%lx\n", i, parisc_devices[i].hpa);
     }
+    add_index_all_devices();
 
     // Initialize stable storage
     init_stable_storage();

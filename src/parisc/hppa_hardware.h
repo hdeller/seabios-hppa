@@ -28,7 +28,7 @@
 #define LASI_GFX_HPA    0xf8000000
 #define ARTIST_FB_ADDR  0xf9000000
 #define CPU_HPA         0xfffb0000
-#define MEMORY_HPA      0xfffff000
+#define MEMORY_HPA      0xfffff000      // 0xfffa0000
 
 #define SCSI_HPA        0xf1040000      /* emulated SCSI, needs to be in f region */
 

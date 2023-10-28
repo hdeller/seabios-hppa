@@ -129,7 +129,7 @@ static struct pdc_iodc iodc_data_hpa_fff8c000 = {
 static struct pdc_system_map_mod_info mod_info_hpa_ffd00000 = {
 	.mod_addr = 0xffd00000,
 	.mod_pgs = 0x1,
-	.add_addrs = 0x2,
+	.add_addrs = 0, // x2,
 };
 static struct pdc_module_path mod_path_hpa_ffd00000 = {
 	.path = { .flags = 0x0, .bc = { 0xff, 0xff, 0xff, 0xff, 0xff, 0x8 }, .mod = 0x10  },
@@ -150,7 +150,7 @@ static struct pdc_iodc iodc_data_hpa_ffd00000 = {
 	.length = 0x0000,
 	/* pad: 0x0000, 0x0000 */
 };
-#define HPA_ffd00000_num_addr 2
+#define HPA_ffd00000_num_addr 0 // 2
 #define HPA_ffd00000_add_addr 0xffd0c000, 0xffc00000,
 
 #define HPA_ffd05000_DESCRIPTION "Merlin 160 Core RS-232"
@@ -241,7 +241,7 @@ static struct pdc_iodc iodc_data_hpa_ffd07000 = {
 static struct pdc_system_map_mod_info mod_info_hpa_ffd02000 = {
 	.mod_addr = 0xffd02000,
 	.mod_pgs = 0x1,
-	.add_addrs = 0x2,
+	.add_addrs = 0, // 2,
 };
 static struct pdc_module_path mod_path_hpa_ffd02000 = {
 	.path = { .flags = 0x0, .bc = { 0xff, 0xff, 0xff, 0xff, 0x8, 0x10 }, .mod = 0x0  },
@@ -262,7 +262,7 @@ static struct pdc_iodc iodc_data_hpa_ffd02000 = {
 	.length = 0x0000,
 	/* pad: 0x0000, 0x0000 */
 };
-#define HPA_ffd02000_num_addr 2
+#define HPA_ffd02000_num_addr 0 // 2
 #define HPA_ffd02000_add_addr 0xffd01000, 0xffd03000,
 
 #define HPA_ffd04000_DESCRIPTION "Merlin 160 Core Audio"
@@ -409,7 +409,7 @@ static struct pdc_iodc iodc_data_hpa_f4000000 = {
 static struct pdc_system_map_mod_info mod_info_hpa_f8000000 = {
 	.mod_addr = LASI_GFX_HPA,
 	.mod_pgs = 0x2000,
-	.add_addrs = 0x1,
+	.add_addrs = 0, // 1,
 };
 static struct pdc_module_path mod_path_hpa_f8000000 = {
 	.path = { .flags = 0x0, .bc = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff }, .mod = 0x1  },
@@ -608,12 +608,6 @@ static struct pdc_iodc iodc_data_hpa_fff81000 = {
 		.mod_path = &mod_path_hpa_f8000000,\
 		.num_addr = HPA_f8000000_num_addr,\
 		.add_addr = { HPA_f8000000_add_addr } },\
-	{	.hpa = CPU_HPA,\
-		.iodc = &iodc_data_hpa_fff10000,\
-		.mod_info = &mod_info_hpa_fff10000,\
-		.mod_path = &mod_path_hpa_fff10000,\
-		.num_addr = HPA_fff10000_num_addr,\
-		.add_addr = { HPA_fff10000_add_addr } },\
 	{	.hpa = MEMORY_HPA,\
 		.iodc = &iodc_data_hpa_fffbf000,\
 		.mod_info = &mod_info_hpa_fffbf000,\
@@ -626,4 +620,10 @@ static struct pdc_iodc iodc_data_hpa_fff81000 = {
 		.mod_path = &mod_path_hpa_fff81000,\
 		.num_addr = HPA_fff81000_num_addr,\
 		.add_addr = { HPA_fff81000_add_addr } },\
+	{	.hpa = CPU_HPA,\
+		.iodc = &iodc_data_hpa_fff10000,\
+		.mod_info = &mod_info_hpa_fff10000,\
+		.mod_path = &mod_path_hpa_fff10000,\
+		.num_addr = HPA_fff10000_num_addr,\
+		.add_addr = { HPA_fff10000_add_addr } },\
 	{ 0, }
