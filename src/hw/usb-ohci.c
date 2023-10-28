@@ -269,6 +269,7 @@ static void
 ohci_controller_setup(struct pci_device *pci)
 {
     struct ohci_regs *regs = pci_enable_membar(pci, PCI_BASE_ADDRESS_0);
+    dprintf(1, "OHCI controller init on dev %pP \n", pci);
     if (!regs)
         return;
 
@@ -320,7 +321,7 @@ ohci_desc2pipe(struct ohci_pipe *pipe, struct usbdevice_s *usbdev
     usb_desc2pipe(&pipe->pipe, usbdev, epdesc);
     pipe->ed.hwINFO = cpu_to_le32(
                         (ED_SKIP | usbdev->devaddr | (pipe->pipe.ep << 7)
-                       | (epdesc->wMaxPacketSize << 16)
+                       | (le16_to_cpu(epdesc->wMaxPacketSize) << 16)
                        | (usbdev->speed ? ED_LOWSPEED : 0)));
     struct usb_ohci_s *cntl = container_of(
         usbdev->hub->cntl, struct usb_ohci_s, usb);
@@ -338,7 +339,7 @@ ohci_alloc_intr_pipe(struct usbdevice_s *usbdev
 
     if (frameexp > 5)
         frameexp = 5;
-    int maxpacket = epdesc->wMaxPacketSize;
+    int maxpacket = le16_to_cpu(epdesc->wMaxPacketSize);
     // Determine number of entries needed for 2 timer ticks.
     int ms = 1<<frameexp;
     int count = DIV_ROUND_UP(ticks_to_ms(2), ms) + 1;

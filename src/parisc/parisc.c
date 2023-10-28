@@ -22,6 +22,7 @@
 #include "hw/pci_ids.h" // PCI IDs
 #include "hw/pci_regs.h" // PCI_BASE_ADDRESS_0
 #include "hw/ata.h"
+#include "hw/usb.h"
 #include "hw/usb-ohci.h"
 #include "hw/blockcmd.h" // scsi_is_ready()
 #include "hw/rtc.h"
@@ -2917,6 +2918,7 @@ void __VISIBLE start_parisc_firmware(void)
 
     serial_setup();
     // ohci_setup();
+    usb_setup();
     block_setup();
 
     /* find SCSI PCI card when running on Astro or Dino */
