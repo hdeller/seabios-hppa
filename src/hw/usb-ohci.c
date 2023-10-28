@@ -64,13 +64,15 @@ ohci_hub_reset(struct usbhub_s *hub, u32 port)
     struct usb_ohci_s *cntl = container_of(hub->cntl, struct usb_ohci_s, usb);
     writel(&cntl->regs->roothub_portstatus[port], RH_PS_PRS);
     u32 sts;
-    u32 end = timer_calc(USB_TIME_DRSTR * 2);
+    struct wait_t end;
+
+    timer_calc2_ms(&end, USB_TIME_DRSTR * 2);
     for (;;) {
         sts = readl(&cntl->regs->roothub_portstatus[port]);
         if (!(sts & RH_PS_PRS))
             // XXX - need to ensure USB_TIME_DRSTR time in reset?
             break;
-        if (timer_check(end)) {
+        if (timer_check2(&end)) {
             // Timeout.
             warn_timeout();
             ohci_hub_disconnect(hub, port);
@@ -128,11 +130,13 @@ ohci_waittick(struct ohci_regs *regs)
     barrier();
     struct ohci_hcca *hcca = (void*)readl(&regs->hcca);
     u32 startframe = hcca->frame_no;
-    u32 end = timer_calc(1000 * 5);
+    struct wait_t end;
+
+    timer_calc2_ms(&end, 1000 * 5);
     for (;;) {
         if (hcca->frame_no != startframe)
             break;
-        if (timer_check(end)) {
+        if (timer_check2(&end)) {
             warn_timeout();
             return;
         }
@@ -442,11 +446,20 @@ ohci_realloc_pipe(struct usbdevice_s *usbdev, struct usb_pipe *upipe
 static int
 wait_ed(struct ohci_ed *ed, int timeout)
 {
-    u32 end = timer_calc(timeout);
+    struct wait_t end;
+
+    timer_calc2_ms(&end, timeout);
+#if 0
+    while (1) {
+        timer_calc2_ms(&end, 1000);
+        while (!timer_check2(&end))  { };
+        dprintf(1, "Tick\n");
+    }
+#endif
     for (;;) {
         if ((le32_to_cpu(ed->hwHeadP) & ~(ED_C|ED_H)) == le32_to_cpu(ed->hwTailP))
             return 0;
-        if (timer_check(end)) {
+        if (timer_check2(&end)) {
             warn_timeout();
             dprintf(1, "ohci ed info=%x tail=%x head=%x next=%x\n",
                     le32_to_cpu(ed->hwINFO), le32_to_cpu(ed->hwTailP),

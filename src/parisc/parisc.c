@@ -2917,8 +2917,8 @@ void __VISIBLE start_parisc_firmware(void)
     find_serial_pci_card();
 
     serial_setup();
+    // usb_setup();
     // ohci_setup();
-    usb_setup();
     block_setup();
 
     /* find SCSI PCI card when running on Astro or Dino */
