@@ -1402,10 +1402,10 @@ static int pdc_model(unsigned int *arg)
         case PDC_MODEL_VERSIONS:
             switch (ARG3) {
                 case 0: /* return CPU0 version */
-                    result[0] = 35; // TODO! ???
+                    result[0] = current_machine->pdc_version;
                     return PDC_OK;
                 case 1: /* return PDC version */
-                    result[0] = current_machine->pdc_version;
+                    result[0] = (cpu_bit_width == 64) ? 0x20 : 0x011;
                     return PDC_OK;
             }
             return -4; // invalid c_index
@@ -1555,19 +1555,21 @@ static int pdc_iodc(unsigned int *arg)
     switch (option) {
         case PDC_IODC_READ:
             hpa = ARG3;
-            dev = find_hpa_device(hpa);
-// dprintf(1, "pdc_iodc found dev %p\n", dev);
+            // dev = find_hpa_device(hpa);
+            // searches for 0xf1041000
+            dev = find_hppa_device_by_hpa(hpa);
+            // dprintf(1, "pdc_iodc found dev %p\n", dev);
             if (!dev)
                 return -4; // not found
 
             iodc_p = dev->iodc;
 
             if (ARG4 == PDC_IODC_INDEX_DATA) {
+                if (ARG6 > sizeof(*iodc_p))
+                    ARG6 = sizeof(*iodc_p);
                 memcpy((void*) ARG5, iodc_p, ARG6);
                 c = (unsigned char *) ARG5;
                 // printf("SeaBIOS: PDC_IODC get: hpa = 0x%lx, HV: 0x%x 0x%x IODC_SPA=0x%x  type 0x%x, \n", hpa, c[0], c[1], c[2], c[3]);
-                // c[0] = iodc_p->hversion_model; // FIXME. BROKEN HERE !!!
-                // c[1] = iodc_p->hversion_rev || (iodc_p->hversion << 4);
                 result[0] = ARG6;
                 return PDC_OK;
             }
@@ -2764,7 +2766,7 @@ static void prepare_boot_path(volatile struct pz_device *dest,
     dev = find_hpa_device(hpa);
     BUG_ON(!dev);
 
-    if (DEV_is_storage_device(dev))
+    if (0 && DEV_is_storage_device(dev))
         mod_path = &mod_path_emulated_drives;
     else if (dev)
         mod_path = dev->mod_path;
