@@ -1408,6 +1408,11 @@ static int pdc_model(unsigned int *arg)
                 case 1: /* return PDC version */
                     result[0] = (cpu_bit_width == 64) ? 0x20 : 0x011;
                     return PDC_OK;
+                case 2: /* return PDC PAT(?) version */
+                    if (cpu_bit_width == 32)
+                        break;
+                    result[0] = 0x20;
+                    return PDC_OK;
             }
             return -4; // invalid c_index
         case PDC_MODEL_SYSMODEL:
