@@ -1425,17 +1425,22 @@ static int pdc_model(unsigned int *arg)
                 result[0] = machine_B160L.pdc_cpuid;
             return PDC_OK;
         case PDC_MODEL_CAPABILITIES:
-            // result[0] = current_machine->pdc_caps;
-            result[0] = PDC_MODEL_OS32; /* we only support 32-bit PDC for now. */
+            result[0] = current_machine->pdc_caps;
+            result[0] |= PDC_MODEL_OS32; /* we only support 32-bit PDC for now. */
             if (0 && cpu_bit_width == 64) /* and maybe 64-bit */
                 result[0] |= PDC_MODEL_OS64; /* this means 64-bit PDC calls are supported */
             else
                 result[0] &= ~PDC_MODEL_OS64;
+            result[0] &= ~0x4; /* remove NP flag, our IO-PDIR is coherent and needs no flush */
+            result[0] &= ~0x8; /* remove SV flag, we need no virtual index in SBA */
+            result[0] &= ~0x30; /* remove NVA bits, we have no issues with non-equiv. aliasing */
             return PDC_OK;
         case PDC_MODEL_GET_INSTALL_KERNEL:
             // No need to provide a special install kernel during installation of HP-UX
             return PDC_BAD_OPTION;
         case PDC_MODEL_GET_PLATFORM_INFO:
+            if (1)      /* not supported on B160L or C3700 */
+                return PDC_BAD_OPTION;
             model_str = has_astro ? "A6057A" : "9000/778";
             strtcpy((char *)ARG2, model_str, 16);
             strtcpy((char *)ARG3, model_str, 16);
@@ -1528,15 +1533,12 @@ static int pdc_coproc(unsigned int *arg)
     switch (option) {
         case PDC_COPROC_CFG:
             memset(result, 0, 32 * sizeof(unsigned long));
-            /* Set one bit per cpu in ccr_functional and ccr_present.
-               Ignore that specification only mentions 8 bits for cr10
-               and set all FPUs functional */
-            mask = 1UL << 7;
-            mtctl(mask, 10); /* initialize cr10 */
+            mask = 1UL << 7;    /* bit for FPU available/functional */
+            mtctl(mask, 10);    /* initialize cr10 */
             result[0] = mask;
             result[1] = mask;
-            result[17] = 1; // Revision
-            result[18] = has_astro ? 0x0f : 0x13; // Model
+            result[17] = 1;     /* Revision */
+            result[18] = current_machine->pdc_cpuid >> 5; /* CPU Model */
             return PDC_OK;
     }
     return PDC_BAD_OPTION;
