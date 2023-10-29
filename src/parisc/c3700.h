@@ -25,7 +25,7 @@
 
 #define HPA_fed00000_DESCRIPTION "Astro BC Runway Port"
 static struct pdc_system_map_mod_info mod_info_hpa_fed00000 = {
-	.mod_addr = 0xfed00000,
+	.mod_addr = ASTRO_HPA,
 	.mod_pgs = 0x8,
 	.add_addrs = 0x0,
 };
@@ -54,7 +54,7 @@ static struct pdc_iodc iodc_data_hpa_fed00000 = {
 
 #define HPA_fed30000_DESCRIPTION "Elroy PCI Bridge"
 static struct pdc_system_map_mod_info mod_info_hpa_fed30000 = {
-	.mod_addr = 0xfed30000,
+	.mod_addr = ELROY0_HPA,
 	.mod_pgs = 0x2,
 	.add_addrs = 0x0,
 };
@@ -83,7 +83,7 @@ static struct pdc_iodc iodc_data_hpa_fed30000 = {
 
 #define HPA_fed32000_DESCRIPTION "Elroy PCI Bridge"
 static struct pdc_system_map_mod_info mod_info_hpa_fed32000 = {
-	.mod_addr = 0xfed32000,
+	.mod_addr = ELROY2_HPA,
 	.mod_pgs = 0x2,
 	.add_addrs = 0x0,
 };
@@ -112,7 +112,7 @@ static struct pdc_iodc iodc_data_hpa_fed32000 = {
 
 #define HPA_fed38000_DESCRIPTION "Elroy PCI Bridge"
 static struct pdc_system_map_mod_info mod_info_hpa_fed38000 = {
-	.mod_addr = 0xfed38000,
+	.mod_addr = ELROY8_HPA,
 	.mod_pgs = 0x2,
 	.add_addrs = 0x0,
 };
@@ -141,7 +141,7 @@ static struct pdc_iodc iodc_data_hpa_fed38000 = {
 
 #define HPA_fed3c000_DESCRIPTION "Elroy PCI Bridge"
 static struct pdc_system_map_mod_info mod_info_hpa_fed3c000 = {
-	.mod_addr = 0xfed3c000,
+	.mod_addr = ELROYc_HPA,
 	.mod_pgs = 0x2,
 	.add_addrs = 0x0,
 };
@@ -205,7 +205,7 @@ static struct pdc_iodc iodc_data_hpa_fffa0000 = {
 
 #define HPA_fed10200_DESCRIPTION "Memory"
 static struct pdc_system_map_mod_info mod_info_hpa_fed10200 = {
-	.mod_addr = 0xfed10200,
+	.mod_addr = ASTRO_MEMORY_HPA,
 	.mod_pgs = 0x8,
 	.add_addrs = 0x0,
 };
@@ -234,37 +234,37 @@ static struct pdc_iodc iodc_data_hpa_fed10200 = {
 
 
 #define PARISC_DEVICE_LIST \
-	{	.hpa = 0xfed00000,\
+	{	.hpa = ASTRO_HPA,\
 		.iodc = &iodc_data_hpa_fed00000,\
 		.mod_info = &mod_info_hpa_fed00000,\
 		.mod_path = &mod_path_hpa_fed00000,\
 		.num_addr = HPA_fed00000_num_addr,\
 		.add_addr = { HPA_fed00000_add_addr } },\
-	{	.hpa = 0xfed30000,\
+	{	.hpa = ELROY0_HPA,\
 		.iodc = &iodc_data_hpa_fed30000,\
 		.mod_info = &mod_info_hpa_fed30000,\
 		.mod_path = &mod_path_hpa_fed30000,\
 		.num_addr = HPA_fed30000_num_addr,\
 		.add_addr = { HPA_fed30000_add_addr } },\
-	{	.hpa = 0xfed32000,\
+	{	.hpa = ELROY2_HPA,\
 		.iodc = &iodc_data_hpa_fed32000,\
 		.mod_info = &mod_info_hpa_fed32000,\
 		.mod_path = &mod_path_hpa_fed32000,\
 		.num_addr = HPA_fed32000_num_addr,\
 		.add_addr = { HPA_fed32000_add_addr } },\
-	{	.hpa = 0xfed38000,\
+	{	.hpa = ELROY8_HPA,\
 		.iodc = &iodc_data_hpa_fed38000,\
 		.mod_info = &mod_info_hpa_fed38000,\
 		.mod_path = &mod_path_hpa_fed38000,\
 		.num_addr = HPA_fed38000_num_addr,\
 		.add_addr = { HPA_fed38000_add_addr } },\
-	{	.hpa = 0xfed3c000,\
+	{	.hpa = ELROYc_HPA,\
 		.iodc = &iodc_data_hpa_fed3c000,\
 		.mod_info = &mod_info_hpa_fed3c000,\
 		.mod_path = &mod_path_hpa_fed3c000,\
 		.num_addr = HPA_fed3c000_num_addr,\
 		.add_addr = { HPA_fed3c000_add_addr } },\
-	{	.hpa = 0xfed10200,\
+	{	.hpa = ASTRO_MEMORY_HPA,\
 		.iodc = &iodc_data_hpa_fed10200,\
 		.mod_info = &mod_info_hpa_fed10200,\
 		.mod_path = &mod_path_hpa_fed10200,\

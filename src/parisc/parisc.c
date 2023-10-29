@@ -351,6 +351,12 @@ static const char *hpa_name(unsigned long hpa)
     DO(LASI_PS2KBD_HPA)
     DO(LASI_PS2MOU_HPA)
     DO(LASI_GFX_HPA)
+    DO(ASTRO_HPA)
+    DO(ASTRO_MEMORY_HPA)
+    DO(ELROY0_HPA)
+    DO(ELROY2_HPA)
+    DO(ELROY8_HPA)
+    DO(ELROYc_HPA)
     #undef DO
 
     /* could be one of the SMP CPUs */
@@ -685,6 +691,7 @@ static int keep_add_generic_devices(void)
     while (dev->hpa) {
 	switch (dev->iodc->type) {
 	case 0x0041:	/* Memory. Save HPA in PAGE0 entry. */
+                        /* MEMORY_HPA or ASTRO_MEMORY_HPA */
                 PAGE0->imm_hpa = dev->hpa;
                 /* fallthrough */
 	case 0x0007:	/* GSC+ Port bridge */
@@ -743,7 +750,7 @@ static void remove_parisc_devices(unsigned int num_cpus)
     /* Fix monarch CPU */
     BUG_ON(!cpu_dev);
     cpu_dev->mod_info->mod_addr = CPU_HPA;
-    cpu_dev->mod_path->path.mod = (CPU_HPA - DINO_HPA) / 0x1000;
+    cpu_dev->mod_path->path.mod = (CPU_HPA - pci_hpa) / 0x1000;
 
     /* Generate other CPU devices */
     for (i = 1; i < num_cpus; i++) {
@@ -757,7 +764,7 @@ static void remove_parisc_devices(unsigned int num_cpus)
         parisc_devices[t].mod_info = &modinfo[i];
 
         modpath[i] = *cpu_dev->mod_path;
-        modpath[i].path.mod = (hpa - DINO_HPA) / 0x1000;
+        modpath[i].path.mod = (hpa - pci_hpa) / 0x1000;
         parisc_devices[t].mod_path = &modpath[i];
 
         t++;
