@@ -1,6 +1,8 @@
 #include "sticore.h"
 #include "pdc.h"
 #include "hppa.h"
+#include "../malloc.h"
+#include "../string.h"
 
 #define ARTIST_VRAM_IDX 0x4a0
 #define ARTIST_VRAM_BITMASK 0x5a0
@@ -3597,15 +3599,58 @@ void sti_rom_init(void)
     /* Swap selected font as first, then chain all. */
     if (sti_font <= 0 || sti_font > ARRAY_SIZE(fontlist))
 	sti_font = 1;
+
     /* Swap selected font in as first font */
     font_next = fontlist[0];
     fontlist[0] = fontlist[sti_font - 1];
     fontlist[sti_font - 1] = font_next;
+
+#define ENABLE_FONTCOPY
+#ifdef ENABLE_FONTCOPY
+    {
+    struct font *fontlist_temp[ARRAY_SIZE(fontlist)];
+    unsigned long font_size, font_addr;
+    /* * The trivial swapping above breaks the sti driver on older 64-bit Linux
+     * kernels which take the "next_font" pointer as unsigned int (instead of
+     * signed int) and thus calculates a wrong font start address.  Avoid the crash
+     * by sorting the fonts in memory. Maybe HP-UX has problems with that too?
+     * A Linux kernel patch to avoid that was added in kernel 6.7.
+     */
+    #define FONT_SIZE(f) (sizeof(f->hdr) + f->hdr.bytes_per_char * (unsigned int)(f->hdr.last_char - f->hdr.first_char + 1))
+    font_start = fontlist[0];   /* the lowest font ptr */
+    for (i = 0; i < ARRAY_SIZE(fontlist); i++) {
+	font_ptr = fontlist[i];
+        if (font_ptr < font_start)      /* is font ptr lower? */
+            font_start = font_ptr;
+        font_size = FONT_SIZE(font_ptr);
+        font_next = malloc_tmplow(font_size);
+        memcpy(font_next, font_ptr, font_size);
+        fontlist_temp[i] = font_next;
+    }
+    /* font_start is now starting address */
+    font_addr = (unsigned long) font_start;
+    for (i = 0; i < ARRAY_SIZE(fontlist); i++) {
+	font_ptr = fontlist_temp[i];
+        font_size = FONT_SIZE(font_ptr);
+        memcpy((void *)font_addr, font_ptr, font_size);
+        malloc_pfree((unsigned long) font_ptr);
+        fontlist[i] = (struct font *) font_addr;
+        font_addr += font_size;
+        font_addr = ALIGN(font_addr, 32);
+    }
+    }
+#endif
+
     /* Now chain all fonts */
     font_start = fontlist[0];
     sti_proc_rom.font_start = STI_OFFSET(*font_start);
     for (i = 0; i < ARRAY_SIZE(fontlist)-1; i++) {
 	font_ptr = fontlist[i];
+        if (i ==  ARRAY_SIZE(fontlist)-1) {
+            /* last entry? */
+            font_ptr->hdr.next_font = 0;
+            continue;
+        }
 	font_next = fontlist[i+1];
 	font_ptr->hdr.next_font = STI_FONT_OFFSET(font_next, font_start);
     }
