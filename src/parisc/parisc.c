@@ -135,6 +135,7 @@ unsigned long hppa_port_pci_data = (PCI_HPA + DINO_CONFIG_DATA);
 unsigned int show_boot_menu;
 unsigned int interact_ipl;
 
+static int firmware_width_locked;
 static unsigned long psw_defaults;
 
 unsigned long PORT_QEMU_CFG_CTL;
@@ -1425,6 +1426,7 @@ static int pdc_model(unsigned int *arg)
                 result[0] = machine_B160L.pdc_cpuid;
             return PDC_OK;
         case PDC_MODEL_CAPABILITIES:
+            firmware_width_locked = 0;  /* pdc unlock call */
             result[0] = current_machine->pdc_caps;
             result[0] |= PDC_MODEL_OS32; /* we only support 32-bit PDC for now. */
             if (0 && cpu_bit_width == 64) /* and maybe 64-bit */
@@ -1809,7 +1811,7 @@ static int pdc_psw(unsigned int *arg)
     unsigned long *result = (unsigned long *)ARG2;
     unsigned long mask;
 
-    if (cpu_bit_width == 64)
+    if (cpu_bit_width == 64 /* && !firmware_width_locked */)
         mask = PDC_PSW_WIDE_BIT | PDC_PSW_ENDIAN_BIT;
     else
         mask = PDC_PSW_ENDIAN_BIT;
@@ -1819,7 +1821,7 @@ static int pdc_psw(unsigned int *arg)
     if (option == PDC_PSW_MASK)
         *result = mask;
     if (option == PDC_PSW_GET_DEFAULTS)
-        *result = psw_defaults;
+        *result = psw_defaults & mask;
     if (option == PDC_PSW_SET_DEFAULTS) {
         psw_defaults = ARG2 & mask;
         /* we do not yet support little endian mode */
@@ -2286,16 +2288,24 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
 
         /* PDC PAT functions */
         case PDC_PAT_CELL:
+            if (firmware_width_locked)
+                return PDC_BAD_PROC;
             return pdc_pat_cell(arg);
 
         case PDC_PAT_CHASSIS_LOG:
+            if (firmware_width_locked)
+                return PDC_BAD_PROC;
             dprintf(0, "\n\nSeaBIOS: PDC_PAT_CHASSIS_LOG OPTION %lu called with ARG2=%x ARG3=%x ARG4=%x\n", option, ARG2, ARG3, ARG4);
             return PDC_BAD_PROC;
 
         case PDC_PAT_CPU:
+            if (firmware_width_locked)
+                return PDC_BAD_PROC;
             return pdc_pat_cpu(arg);
 
         case PDC_PAT_PD:
+            if (firmware_width_locked)
+                return PDC_BAD_PROC;
             return pdc_pat_pd(arg);
     }
 
@@ -2823,6 +2833,10 @@ void __VISIBLE start_parisc_firmware(void)
     /* this is: mfctl,w sar,r1: */
     asm(".word 0x016048a0 + 1 ! copy %%r1,%0\n" : "=r" (i): : "r1");
     cpu_bit_width = (i == 63) ? 64 : 32;
+
+    /* lock all 64-bit and PAT functions until unlocked from OS
+     * via PDC_MODEL/PDC_MODEL_CAPABILITIES call */
+    firmware_width_locked = 1;
 
     psw_defaults = PDC_PSW_ENDIAN_BIT;
     if (0 && cpu_bit_width == 64) {
