@@ -375,7 +375,7 @@ ENTRY(pdc_entry)
 	nop
 	bv %r0(%rp)		/* return with setting PSW_W */
 	.level 2.0
-	ssm PSW_W_SM,%r0
+	nop // ssm PSW_W_SM,%r0
 	.level 1.1
 END(pdc_entry)
 
@@ -432,7 +432,7 @@ ENTRY(iodc_entry)
 	nop
 	bv %r0(%rp)		/* return with setting PSW_W */
 	.level 2.0
-	ssm PSW_W_SM,%r0
+	nop // ssm PSW_W_SM,%r0
 	.level 1.1
 END(iodc_entry)
 
