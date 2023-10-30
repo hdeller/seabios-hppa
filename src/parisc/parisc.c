@@ -282,6 +282,7 @@ typedef struct {
     struct pdc_module_path *mod_path;
     int num_addr;
     int add_addr[5];
+    unsigned long hpa_parent;
     struct pci_device *pci;
     unsigned long pci_addr;
     int index;
@@ -382,6 +383,28 @@ static const char *hpa_name(unsigned long hpa)
     }
 
     return "UNKNOWN HPA";
+}
+
+/* used to generate HPA for PCI device */
+unsigned long pci_get_first_mmio_or_io(struct pci_device *pci)
+{
+    unsigned long io = 0;
+    int i;
+    for (i = PCI_BASE_ADDRESS_0; i <= PCI_BASE_ADDRESS_5; i++) {
+        unsigned long mem;
+        mem = pci_config_readl(pci->bdf, i);
+        if ((mem & ~PCI_BASE_ADDRESS_SPACE_IO) == 0)
+            continue;
+        if (mem & PCI_BASE_ADDRESS_SPACE_IO) {
+            if (!io)
+                io = mem & ~PCI_BASE_ADDRESS_SPACE_IO;
+            continue;
+        }
+        // found mem
+        return mem & ~PCI_BASE_ADDRESS_SPACE_IO;
+    }
+    // use io instead
+    return IOS_DIST_BASE_ADDR + io;
 }
 
 int HPA_is_astro_ioport(unsigned long hpa)
@@ -610,10 +633,27 @@ static void hppa_pci_build_devices_list(void)
 
         offs = elroy_offset(pci->bdf);
         BUG_ON(offs == -1UL);
+#if 0
         pfa = (unsigned long) elroy_port(0, offs);
         pfa += pci->bdf << 8;
         pfa |= SCSI_HPA;
-        dprintf(1, "PCI device #%d %pP bdf 0x%x at pfa 0x%lx\n", curr_pci_devices, pci, pci->bdf, pfa);
+#else
+        pfa = pci_get_first_mmio_or_io(pci);
+        BUG_ON(!pfa);
+#endif
+#if 0
+[    2.721607] BOOT DISK HPA f4008000
+[    2.765613] page0 00 ff ff ff 0a 00 0c 00 00 01 00 00 9a 47 10 bf
+[    2.845608] page0 48 86 a9 54 cb 07 fe 03 c0 a8 14 33 c0 a8 14 42
+[    2.925607] page0 f4 00 80 00 00 00 00 00 00 01 90 00 00 00 10 02
+[    3.005607] path
+[    3.029608] page0 00 ff ff ff 0a 00 0c 00
+[    3.085607] layers
+[    3.109608] page0 00 01 00 00 9a 47 10 bf 48 86 a9 54 cb 07 fe 03
+[    3.189607] page0 c0 a8 14 33 c0 a8 14 42
+[    3.241607] BOOT CONS HPA fee003f8
+[    3.289607] BOOT KBD HPA  fee003f8
+#endif
 
         pdev->hpa       = pfa;
         pdev->iodc      = &hppa_pci_iodc[curr_pci_devices];
@@ -621,6 +661,9 @@ static void hppa_pci_build_devices_list(void)
         pdev->mod_path  = &hppa_pci_mod_path[curr_pci_devices];
         pdev->num_addr  = 0;
         pdev->pci = pci;
+        pdev->hpa_parent = pci_hpa;
+        pdev->index     = curr_pci_devices;
+        dprintf(1, "PCI device #%d %pP bdf 0x%x at pfa 0x%lx\n", curr_pci_devices, pci, pci->bdf, pfa);
 
         make_iodc_from_pcidev(pci, pdev->iodc);
         make_modinfo_from_pcidev(pci, pdev->mod_info, pfa);
@@ -716,7 +759,7 @@ static void remove_parisc_devices(unsigned int num_cpus)
     static struct pdc_system_map_mod_info modinfo[HPPA_MAX_CPUS] = { {1,}, };
     static struct pdc_module_path modpath[HPPA_MAX_CPUS] = { {{1,}} };
     hppa_device_t *cpu_dev = NULL;
-    unsigned long hpa;
+    unsigned long hpa, cpu_offset;
     int i, p, t;
 
     /* already initialized? */
@@ -750,7 +793,11 @@ static void remove_parisc_devices(unsigned int num_cpus)
     /* Fix monarch CPU */
     BUG_ON(!cpu_dev);
     cpu_dev->mod_info->mod_addr = CPU_HPA;
-    cpu_dev->mod_path->path.mod = (CPU_HPA - pci_hpa) / 0x1000;
+    if (has_astro)
+        cpu_offset = CPU_HPA - 32*0x1000;
+    else
+        cpu_offset = pci_hpa;
+    cpu_dev->mod_path->path.mod = (CPU_HPA - cpu_offset) / 0x1000;
 
     /* Generate other CPU devices */
     for (i = 1; i < num_cpus; i++) {
@@ -764,7 +811,7 @@ static void remove_parisc_devices(unsigned int num_cpus)
         parisc_devices[t].mod_info = &modinfo[i];
 
         modpath[i] = *cpu_dev->mod_path;
-        modpath[i].path.mod = (hpa - pci_hpa) / 0x1000;
+        modpath[i].path.mod = (hpa - cpu_offset) / 0x1000;
         parisc_devices[t].mod_path = &modpath[i];
 
         t++;
@@ -801,19 +848,58 @@ static int compare_module_path(struct pdc_module_path *path,
     return 1;
 }
 
-static hppa_device_t *add_index_all_devices(void)
+/* add index number to all devices */
+static int add_index(unsigned long parent, unsigned int bc, signed char *search, int len)
 {
     hppa_device_t *dev;
     int i, index = 0;
 
     for (i = 0; i < (MAX_DEVICES-1); i++) {
         dev = parisc_devices + i;
-        if (dev->hpa) {
-            dev->index = index;
-            if (0)
-                dprintf(1, "device HPA %lx %s is index # %d\n", dev->hpa, hpa_name(dev->hpa), index);
-            index++;
-        }
+        if (!dev->hpa)
+            continue;
+        if (0)
+            dprintf(1, "%d: device HPA %lx %s   bc=%d ist %d %d\n", bc, dev->hpa,
+                    hpa_name(dev->hpa),dev->mod_path->path.bc[bc],
+                    dev->mod_path->path.bc[bc], dev->mod_path->path.bc[bc-1]);
+        if (dev->mod_path->path.bc[bc-1] != -1)
+            continue;
+        if (memcmp(&dev->mod_path->path.bc[bc], search, len) != 0)
+            continue;
+        dev->index = index;
+        if (1)
+            dprintf(1, "device HPA %lx %s is index # %d\n", dev->hpa, hpa_name(dev->hpa), index);
+        dev->hpa_parent = parent;
+        dev->num_addr = add_index(dev->hpa, bc-1, &dev->mod_path->path.bc[bc], len+1);
+        dev->mod_info->add_addrs = dev->num_addr;
+        index++;
+    }
+    return index;
+}
+
+/* add index number to all devices */
+static hppa_device_t *add_index_all_devices(void)
+{
+    hppa_device_t *dev;
+    int i, index = 0, bc = 5;
+
+    for (i = 0; i < (MAX_DEVICES-1); i++) {
+        dev = parisc_devices + i;
+
+        // keep all devices as main devices on astro...
+        if (!has_astro && dev->mod_path->path.bc[bc] != -1)
+            continue;
+        // dprintf(1, "device HPA %lx %s \n", dev->hpa, hpa_name(dev->hpa));
+        dev->index = index;
+        if (0)
+            dprintf(1, "device HPA %lx %s is index # %d\n", dev->hpa, hpa_name(dev->hpa), index);
+        dev->hpa_parent = 0;
+        if (has_astro)
+            dev->num_addr = 0;
+        else
+            dev->num_addr = add_index(dev->hpa, bc, &dev->mod_path->path.mod, 1);
+        dev->mod_info->add_addrs = dev->num_addr;
+        index++;
     }
 
     /* search PCI devices */
@@ -888,7 +974,7 @@ static hppa_device_t *find_hppa_device_by_path(struct pdc_module_path *search,
     return NULL;
 }
 
-static hppa_device_t *find_hppa_device_by_index(unsigned int index, int search_pci)
+static hppa_device_t *find_hppa_device_by_index(unsigned long hpa_parent, unsigned int index, int search_pci)
 {
     hppa_device_t *dev;
     int i;
@@ -896,6 +982,8 @@ static hppa_device_t *find_hppa_device_by_index(unsigned int index, int search_p
     for (i = 0; i < (MAX_DEVICES-1); i++) {
         dev = parisc_devices + i;
         if (!dev->hpa)
+            continue;
+        if (dev->hpa_parent != hpa_parent)
             continue;
         if (dev->index == index)
             return dev;
@@ -1039,7 +1127,8 @@ int __VISIBLE parisc_iodc_ENTRY_IO(unsigned int *arg FUNC_MANY_ARGS)
 
     dev = find_hpa_device(hpa);
     if (!dev) {
-        // BUG_ON(1);
+
+        BUG_ON(1);
         return PDC_INVALID_ARG;
     }
 
@@ -1857,7 +1946,7 @@ static int pdc_system_map(unsigned int *arg)
     switch (option) {
         case PDC_FIND_MODULE:
             hpa_index = ARG4;
-            dev = find_hppa_device_by_index(hpa_index, 0);
+            dev = find_hppa_device_by_index(0, hpa_index, 0); /* root devices */
             if (!dev)
                 return PDC_NE_MOD; // Module not found
             hpa = dev->hpa;
@@ -1880,20 +1969,33 @@ static int pdc_system_map(unsigned int *arg)
             result[0] = dev->mod_info->mod_addr; //  for PDC_IODC
             result[1] = dev->mod_info->mod_pgs;
             result[2] = dev->num_addr;           //  dev->mod_info->add_addr;
+            if (0)
+                dprintf(1, "PDC_FIND_MODULE %lx %ld %ld \n", result[0], result[1],result[2]);
+
             return PDC_OK;
 
         case PDC_FIND_ADDRESS:
             hpa_index = ARG3;
-            dev = find_hppa_device_by_index(hpa_index, 1);
+            dev = find_hppa_device_by_index(0, hpa_index, 0); /* root devices */
+            if (!dev)
+                return PDC_NE_MOD; // Module not found
+            ARG4 -= 1;
+            // if (ARG4 >= dev->num_addr) return PDC_INVALID_ARG;
+            dev = find_hppa_device_by_index(dev->hpa, ARG4, 0); /* root devices */
             if (!dev)
                 return PDC_NE_MOD; // Module not found
             hpa = dev->hpa;
 
+            if (0) {
+                dprintf(1, "PDC_FIND_ADDRESS dev=%p hpa=%lx ", dev, dev ? dev->hpa:0UL);
+                print_mod_path(dev->mod_path);
+                if (dev->pci)
+                    dprintf(1, "PCI %pP ", dev->pci);
+                dprintf(1, "\n");
+            }
+
             memset(result, 0, 32*sizeof(long));
-            ARG4 -= 1;
-            if (ARG4 >= dev->num_addr)
-                return PDC_INVALID_ARG;
-            result[0] = dev->add_addr[ARG4];
+            result[0] = dev->hpa; // dev->add_addr[ARG4];
             result[1] = HPA_is_graphics_device(hpa) ? GFX_NUM_PAGES : 1;
             return PDC_OK;
 
@@ -2901,6 +3003,8 @@ void __VISIBLE start_parisc_firmware(void)
         pci_hpa = (unsigned long) ELROY0_BASE_HPA;
         hppa_port_pci_cmd  = pci_hpa + 0x040;
         hppa_port_pci_data = pci_hpa + 0x048;
+        // but report back ASTRO_HPA
+        // pci_hpa = (unsigned long) ASTRO_HPA;
         /* no serial port for now, will find later */
         mem_cons_boot.hpa = 0;
         mem_kbd_boot.hpa = 0;
@@ -2997,11 +3101,17 @@ void __VISIBLE start_parisc_firmware(void)
     keep_add_generic_devices();
     remove_parisc_devices(smp_cpus);
 
-    /* Show list of HPA devices which are still returned by firmware. */
-    if (0) { for (i=0; parisc_devices[i].hpa; i++)
-        printf("Kept #%d at 0x%lx\n", i, parisc_devices[i].hpa);
-    }
     add_index_all_devices();
+    /* Show list of HPA devices which are still returned by firmware. */
+    if (1) {
+        hppa_device_t *dev;
+        unsigned long hpa;
+        for (i=0; parisc_devices[i].hpa; i++) {
+            dev = &parisc_devices[i];
+            hpa = dev->hpa;
+            printf("Kept #%d at 0x%lx %s  parent_hpa 0x%lx index %d\n", i, hpa, hpa_name(hpa), dev->hpa_parent, dev->index );
+        }
+    }
 
     // Initialize stable storage
     init_stable_storage();

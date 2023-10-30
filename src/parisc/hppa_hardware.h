@@ -28,7 +28,7 @@
 #define LASI_GFX_HPA    0xf8000000
 #define ARTIST_FB_ADDR  0xf9000000
 #define CPU_HPA         0xfffb0000
-#define MEMORY_HPA      0xfffff000      // 0xfffa0000
+#define MEMORY_HPA      0xfffff000
 
 #define ASTRO_HPA       0xfed00000
 #define ELROY0_HPA      0xfed30000
