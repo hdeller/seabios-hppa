@@ -26,6 +26,7 @@ int lasips2_kbd_in(char *c, int max)
     }
 
     while(count < max) {
+        extern void VISIBLE16 handle_16(struct bregs *regs);
         // check if some key is queued up already
         regs.ah = 0x11;
         regs.flags = 0;
