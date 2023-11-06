@@ -887,14 +887,14 @@ static hppa_device_t *add_index_all_devices(void)
         dev = parisc_devices + i;
 
         // keep all devices as main devices on astro...
-        if (!has_astro && dev->mod_path->path.bc[bc] != -1)
+        if (0 && !has_astro && dev->mod_path->path.bc[bc] != -1)
             continue;
         // dprintf(1, "device HPA %lx %s \n", dev->hpa, hpa_name(dev->hpa));
         dev->index = index;
         if (0)
             dprintf(1, "device HPA %lx %s is index # %d\n", dev->hpa, hpa_name(dev->hpa), index);
         dev->hpa_parent = 0;
-        if (has_astro)
+        if (1 || has_astro)
             dev->num_addr = 0;
         else
             dev->num_addr = add_index(dev->hpa, bc, &dev->mod_path->path.mod, 1);
