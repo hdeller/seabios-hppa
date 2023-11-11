@@ -362,9 +362,9 @@ static const char *hpa_name(unsigned long hpa)
 
     /* could be one of the SMP CPUs */
     for (i = 1; i < smp_cpus; i++) {
-        static char CPU_TXT[] = "CPU_HPA_x";
+        static char CPU_TXT[] = "CPU_HPA_0";
         if (hpa == CPU_HPA_IDX(i)) {
-            CPU_TXT[8] = '0'+i;
+            CPU_TXT[8] = i < 10 ? '0' + i : 'A' - 10 + i;
             return CPU_TXT;
         }
     }
