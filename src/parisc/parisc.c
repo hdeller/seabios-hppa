@@ -202,10 +202,16 @@ void __VISIBLE __noreturn hlt(void)
     while (1);
 }
 
+static int powerswitch_supported(void)
+{
+    /* can't reach powerswitch pointer on 64-bit CPU if ptr above 0xf0000000 */
+    return cpu_bit_width == 32 || (unsigned long) powersw_ptr < 0xf0000000;
+}
+
 static void check_powersw_button(void)
 {
     /* halt immediately if power button was pressed. */
-    if ((*powersw_ptr & 1) == 0) {
+    if (powerswitch_supported() && (*powersw_ptr & 1) == 0) {
         printf("SeaBIOS: Machine powered off via power switch button.\n");
         hlt();
     }
@@ -2026,6 +2032,9 @@ static int pdc_soft_power(unsigned int *arg)
     unsigned long option = ARG1;
     unsigned long *result = (unsigned long *)ARG2;
 
+    if (!powerswitch_supported())
+        return PDC_BAD_PROC;
+
     switch (option) {
         case PDC_SOFT_POWER_INFO:
             result[0] = (unsigned long) powersw_ptr;
@@ -3076,7 +3085,9 @@ void __VISIBLE start_parisc_firmware(void)
     memcpy((char*)&PAGE0->pad0, "SeaBIOS", 8);
     PAGE0->pad0[2] = ((unsigned long long)PORT_QEMU_CFG_CTL) >> 32; /* store as 64bit value */
     PAGE0->pad0[3] = PORT_QEMU_CFG_CTL;
-    *powersw_ptr = 0x01; /* button not pressed, hw controlled. */
+    PAGE0->pad0[4] = 0x01;  /* reserved for emulated power switch button */
+    if (powerswitch_supported())
+        *powersw_ptr = 0x01; /* button not pressed, hw controlled. */
 
     /* PAGE0->imm_hpa - is set later (MEMORY_HPA) */
     PAGE0->imm_spa_size = ram_size;
