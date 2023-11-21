@@ -2981,6 +2981,19 @@ void __VISIBLE start_parisc_firmware(void)
 
     // PlatformRunningOn = PF_QEMU;  // emulate runningOnQEMU()
 
+    /*
+     * Initialize main variables at reboot, e.g. initialize the HPA of the main
+     * console to "unknown" (0), which is required to get output via
+     * parisc_putchar() at bootup.  Set initial PCI bus to Dino, which will be
+     * corrected later when we get the machine model (C3000/B160L) via cfg(),
+     * but cfg() tries to initialize the PCI bus.
+     */
+    PAGE0->mem_cons.hpa = 0;
+    has_astro = 0;
+    pci_hpa = PCI_HPA;    /* HPA of Dino or Elroy0 */
+    hppa_port_pci_cmd  = (PCI_HPA + DINO_PCI_ADDR);
+    hppa_port_pci_data = (PCI_HPA + DINO_CONFIG_DATA);
+
     /* Initialize qemu fw_cfg interface */
     PORT_QEMU_CFG_CTL = fw_cfg_port;
     qemu_cfg_init();
