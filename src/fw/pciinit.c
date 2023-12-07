@@ -513,7 +513,7 @@ static void mch_mem_addr_setup(struct pci_device *dev, void *arg)
  * parisc: If mmio bar is bigger than this size, map the bar it into the
  * directed ELMMIO instead of the distributed LMMIO region.
  */
-#define PARISC_MMIO_LIMIT       0x10000
+#define PARISC_MMIO_LIMIT       0x40000
 
 #if CONFIG_PARISC
 static int dino_pci_slot_get_irq(struct pci_device *pci, int pin)
