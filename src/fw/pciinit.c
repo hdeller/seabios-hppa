@@ -1148,9 +1148,10 @@ pci_region_map_one_entry(struct pci_region_entry *entry, u64 addr)
 {
     if (entry->bar >= 0) {
         dprintf(1, "PCI: map device bdf=%pP"
-                "  bar %d, addr %08llx, size %08llx [%d: %s]\n",
+                "  bar %d, addr %08llx, size %08llx [%d: %s], 64bit:%d\n",
                 entry->dev,
-                entry->bar, addr, entry->size, entry->type, region_type_name[entry->type]);
+                entry->bar, addr, entry->size, entry->type,
+                region_type_name[entry->type], entry->is64);
 
         pci_set_io_region_addr(entry->dev, entry->bar, addr, entry->is64);
         return;
