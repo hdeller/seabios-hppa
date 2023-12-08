@@ -68,8 +68,8 @@ void pci_config_writel(u16 bdf, u32 addr, u32 val)
     if (!MODESEGMENT && mmconfig) {
         writel(mmconfig_addr(bdf, addr), val);
     } else {
-        outl(ioconfig_cmd(bdf, addr), PORT_PCI_CMD);
-        outl(cpu_to_le32(val), PORT_PCI_DATA);
+        *(u32*)PORT_PCI_CMD = ioconfig_cmd(bdf, addr);
+        *(u32*)PORT_PCI_DATA = cpu_to_le32(val);
     }
 }
 
@@ -85,8 +85,8 @@ void pci_config_writew(u16 bdf, u32 addr, u16 val)
     if (!MODESEGMENT && mmconfig) {
         writew(mmconfig_addr(bdf, addr), val);
     } else {
-        outl(ioconfig_cmd(bdf, addr), PORT_PCI_CMD);
-        outw(cpu_to_le16(val), PORT_PCI_DATA + (addr & 2));
+        *(u32*)PORT_PCI_CMD = ioconfig_cmd(bdf, addr);
+        *(u16*)(PORT_PCI_DATA + (addr & 2)) = cpu_to_le16(val);
     }
 }
 
@@ -102,8 +102,8 @@ void pci_config_writeb(u16 bdf, u32 addr, u8 val)
     if (!MODESEGMENT && mmconfig) {
         writeb(mmconfig_addr(bdf, addr), val);
     } else {
-        outl(ioconfig_cmd(bdf, addr), PORT_PCI_CMD);
-        outb(val, PORT_PCI_DATA + (addr & 3));
+        *(u32*)PORT_PCI_CMD = ioconfig_cmd(bdf, addr);
+        *(u8*)(PORT_PCI_DATA + (addr & 3)) = val;
     }
 }
 
@@ -119,8 +119,8 @@ u32 pci_config_readl(u16 bdf, u32 addr)
     if (!MODESEGMENT && mmconfig) {
         return readl(mmconfig_addr(bdf, addr));
     } else {
-        outl(ioconfig_cmd(bdf, addr), PORT_PCI_CMD);
-        return le32_to_cpu(inl(PORT_PCI_DATA));
+        *(u32*)PORT_PCI_CMD = ioconfig_cmd(bdf, addr);
+        return (le32_to_cpu(*(u32*)PORT_PCI_DATA));
     }
 }
 
@@ -136,8 +136,8 @@ u16 pci_config_readw(u16 bdf, u32 addr)
     if (!MODESEGMENT && mmconfig) {
         return readw(mmconfig_addr(bdf, addr));
     } else {
-        outl(ioconfig_cmd(bdf, addr), PORT_PCI_CMD);
-        return le16_to_cpu(inw(PORT_PCI_DATA + (addr & 2)));
+        *(u32*)PORT_PCI_CMD = ioconfig_cmd(bdf, addr);
+        return (le16_to_cpu(*(u16*)(PORT_PCI_DATA + (addr & 2))));
     }
 }
 
@@ -153,8 +153,8 @@ u8 pci_config_readb(u16 bdf, u32 addr)
     if (!MODESEGMENT && mmconfig) {
         return readb(mmconfig_addr(bdf, addr));
     } else {
-        outl(ioconfig_cmd(bdf, addr), PORT_PCI_CMD);
-        return inb(PORT_PCI_DATA + (addr & 3));
+        *(u32*)PORT_PCI_CMD = ioconfig_cmd(bdf, addr);
+        return (*(u8*)(PORT_PCI_DATA + (addr & 3)));
     }
 }
 

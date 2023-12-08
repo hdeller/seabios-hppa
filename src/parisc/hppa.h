@@ -214,9 +214,11 @@ extern unsigned long hppa_port_pci_data;
 
 #define astro_ioport_addr(port) ((void *)(portaddr_t)(IOS_DIST_BASE_ADDR + port))
 
+/*  inb()/outb() accesses little-endian memory and does byteswapping to host endianess */
+
 static inline void outl(u32 value, portaddr_t port) {
     if (is_astro_ioport(port))
-        *(volatile u32 *)(astro_ioport_addr(port)) = value;
+        *(volatile u32 *)(astro_ioport_addr(port)) = cpu_to_le32(value);
     else
     if (!pci_ioport_addr(port)) {
         *(volatile u32 *)(port) = be32_to_cpu(value);
@@ -230,7 +232,7 @@ static inline void outl(u32 value, portaddr_t port) {
 
 static inline void outw(u16 value, portaddr_t port) {
     if (is_astro_ioport(port))
-        *(volatile u16 *)(astro_ioport_addr(port)) = value;
+        *(volatile u16 *)(astro_ioport_addr(port)) = cpu_to_le16(value);
     else
     if (!pci_ioport_addr(port)) {
         *(volatile u16 *)(port) = be16_to_cpu(value);
@@ -272,7 +274,7 @@ static inline u8 inb(portaddr_t port) {
 
 static inline u16 inw(portaddr_t port) {
     if (is_astro_ioport(port))
-        return *(volatile u16 *)(astro_ioport_addr(port));
+        return le16_to_cpu(*(volatile u16 *)(astro_ioport_addr(port)));
     else
     if (!pci_ioport_addr(port)) {
         return *(volatile u16 *)(port);
@@ -285,7 +287,7 @@ static inline u16 inw(portaddr_t port) {
 }
 static inline u32 inl(portaddr_t port) {
     if (is_astro_ioport(port))
-        return *(volatile u32 *)(astro_ioport_addr(port));
+        return le32_to_cpu(*(volatile u32 *)(astro_ioport_addr(port)));
     else
     if (!pci_ioport_addr(port)) {
         return *(volatile u32 *)(port);
@@ -303,17 +305,11 @@ static inline void insb(portaddr_t port, u8 *data, u32 count) {
 }
 static inline void insw(portaddr_t port, u16 *data, u32 count) {
     while (count--)
-	if (pci_ioport_addr(port))
-		*data++ = be16_to_cpu(inw(port));
-	else
-		*data++ = inw(port);
+        *data++ = inw(port);
 }
 static inline void insl(portaddr_t port, u32 *data, u32 count) {
     while (count--)
-	if (pci_ioport_addr(port))
-		*data++ = be32_to_cpu(inl(port));
-	else
-		*data++ = inl(port);
+        *data++ = inl(port);
 }
 // XXX - outs not limited to es segment
 static inline void outsb(portaddr_t port, u8 *data, u32 count) {
@@ -322,19 +318,13 @@ static inline void outsb(portaddr_t port, u8 *data, u32 count) {
 }
 static inline void outsw(portaddr_t port, u16 *data, u32 count) {
     while (count--) {
-	if (pci_ioport_addr(port))
-		outw(cpu_to_be16(*data), port);
-	else
-		outw(*data, port);
+        outw(*data, port);
 	data++;
     }
 }
 static inline void outsl(portaddr_t port, u32 *data, u32 count) {
     while (count--) {
-	if (pci_ioport_addr(port))
-		outl(cpu_to_be32(*data), port);
-	else
-		outl(*data, port);
+        outl(*data, port);
 	data++;
     }
 }
