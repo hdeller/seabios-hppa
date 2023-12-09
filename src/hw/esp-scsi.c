@@ -180,6 +180,7 @@ esp_scsi_init_lun(struct esp_lun_s *llun, struct pci_device *pci, u32 iobase,
 {
     memset(llun, 0, sizeof(*llun));
     llun->drive.type = DTYPE_ESP_SCSI;
+    llun->drive.max_bytes_transfer = 64*1024;   /* 64kb */
     llun->drive.cntl_id = pci->bdf;
     llun->pci = pci;
     llun->target = target;
