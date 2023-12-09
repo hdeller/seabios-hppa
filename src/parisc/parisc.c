@@ -1175,15 +1175,30 @@ int __VISIBLE parisc_iodc_ENTRY_IO(unsigned int *arg FUNC_MANY_ARGS)
                 disk_op.drive_fl = boot_drive;
                 disk_op.buf_fl = (void*)ARG6;
                 disk_op.command = CMD_READ;
+
+                // Make sure we know how many bytes we can read at once!
+                // NOTE: LSI SCSI can not read more than 8191 blocks, esp only 64k
+                BUG_ON(disk_op.drive_fl->max_bytes_transfer == 0);
+
                 if (option == ENTRY_IO_BBLOCK_IN) { /* in 2k blocks */
+                    unsigned long maxcount;
+                    // one block at least
+                    // if (!ARG7) return PDC_INVALID_ARG;
                     /* reqsize must not be bigger than maxsize */
                     // if (ARG7 > ARG8) return PDC_INVALID_ARG;
                     disk_op.count = (ARG7 * ((u64)FW_BLOCKSIZE / disk_op.drive_fl->blksize));
+                    // limit transfer size (#blocks) based on scsi controller capability
+                    maxcount = disk_op.drive_fl->max_bytes_transfer / disk_op.drive_fl->blksize;
+                    if (disk_op.count > maxcount)
+                        disk_op.count = maxcount;
                     disk_op.lba = (ARG5 * ((u64)FW_BLOCKSIZE / disk_op.drive_fl->blksize));
                 } else {
                     // read one block at least.
                     if (ARG7 && (ARG7 < disk_op.drive_fl->blksize))
                         ARG7 = disk_op.drive_fl->blksize;
+                    // limit transfer size based on scsi controller capability
+                    if (ARG7 > disk_op.drive_fl->max_bytes_transfer)
+                        ARG7 = disk_op.drive_fl->max_bytes_transfer;
                     /* reqsize must be multiple of 2K */
                     if (ARG7 & (FW_BLOCKSIZE-1))
                         return PDC_INVALID_ARG;
@@ -1195,9 +1210,6 @@ int __VISIBLE parisc_iodc_ENTRY_IO(unsigned int *arg FUNC_MANY_ARGS)
                     disk_op.count = (ARG7 / disk_op.drive_fl->blksize);
                     disk_op.lba = (ARG5 / disk_op.drive_fl->blksize);
                 }
-                // NOTE: LSI SCSI can not read more than 8191 blocks, so limit blocks to read
-                if (disk_op.count >= 8192)
-                    disk_op.count = 8192-16;
 
                 // dprintf(0, "LBA %d  COUNT  %d\n", (u32) disk_op.lba, (u32)disk_op.count);
                 ret = process_op(&disk_op);
