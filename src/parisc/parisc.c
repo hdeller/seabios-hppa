@@ -855,56 +855,19 @@ static int compare_module_path(struct pdc_module_path *path,
 }
 
 /* add index number to all devices */
-static int add_index(unsigned long parent, unsigned int bc, signed char *search, int len)
+static hppa_device_t *add_index_all_devices(void)
 {
     hppa_device_t *dev;
     int i, index = 0;
 
     for (i = 0; i < (MAX_DEVICES-1); i++) {
         dev = parisc_devices + i;
-        if (!dev->hpa)
-            continue;
-        if (0)
-            dprintf(1, "%d: device HPA %lx %s   bc=%d ist %d %d\n", bc, dev->hpa,
-                    hpa_name(dev->hpa),dev->mod_path->path.bc[bc],
-                    dev->mod_path->path.bc[bc], dev->mod_path->path.bc[bc-1]);
-        if (dev->mod_path->path.bc[bc-1] != -1)
-            continue;
-        if (memcmp(&dev->mod_path->path.bc[bc], search, len) != 0)
-            continue;
-        dev->index = index;
-        if (1)
-            dprintf(1, "device HPA %lx %s is index # %d\n", dev->hpa, hpa_name(dev->hpa), index);
-        dev->hpa_parent = parent;
-        dev->num_addr = add_index(dev->hpa, bc-1, &dev->mod_path->path.bc[bc], len+1);
-        dev->mod_info->add_addrs = dev->num_addr;
-        index++;
-    }
-    return index;
-}
 
-/* add index number to all devices */
-static hppa_device_t *add_index_all_devices(void)
-{
-    hppa_device_t *dev;
-    int i, index = 0, bc = 5;
-
-    for (i = 0; i < (MAX_DEVICES-1); i++) {
-        dev = parisc_devices + i;
-
-        // keep all devices as main devices on astro...
-        if (0 && !has_astro && dev->mod_path->path.bc[bc] != -1)
-            continue;
-        // dprintf(1, "device HPA %lx %s \n", dev->hpa, hpa_name(dev->hpa));
         dev->index = index;
         if (0)
             dprintf(1, "device HPA %lx %s is index # %d\n", dev->hpa, hpa_name(dev->hpa), index);
         dev->hpa_parent = 0;
-        if (1 || has_astro)
-            dev->num_addr = 0;
-        else
-            dev->num_addr = add_index(dev->hpa, bc, &dev->mod_path->path.mod, 1);
-        dev->mod_info->add_addrs = dev->num_addr;
+        dev->num_addr = dev->mod_info->add_addrs;
         index++;
     }
 
@@ -1960,7 +1923,6 @@ static int pdc_system_map(unsigned int *arg)
     unsigned long *result = (unsigned long *)ARG2;
     struct pdc_module_path *mod_path;
     hppa_device_t *dev;
-    unsigned long hpa;
     unsigned long hpa_index;
 
     // dprintf(0, "\n\nSeaBIOS: Info: PDC_SYSTEM_MAP function %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
@@ -1970,7 +1932,6 @@ static int pdc_system_map(unsigned int *arg)
             dev = find_hppa_device_by_index(0, hpa_index, 0); /* root devices */
             if (!dev)
                 return PDC_NE_MOD; // Module not found
-            hpa = dev->hpa;
 
             if (0) {
                 dprintf(1, "PDC_FIND_MODULE dev=%p hpa=%lx ", dev, dev ? dev->hpa:0UL);
@@ -2001,23 +1962,11 @@ static int pdc_system_map(unsigned int *arg)
             if (!dev)
                 return PDC_NE_MOD; // Module not found
             ARG4 -= 1;
-            // if (ARG4 >= dev->num_addr) return PDC_INVALID_ARG;
-            dev = find_hppa_device_by_index(dev->hpa, ARG4, 0); /* root devices */
-            if (!dev)
-                return PDC_NE_MOD; // Module not found
-            hpa = dev->hpa;
-
-            if (0) {
-                dprintf(1, "PDC_FIND_ADDRESS dev=%p hpa=%lx ", dev, dev ? dev->hpa:0UL);
-                print_mod_path(dev->mod_path);
-                if (dev->pci)
-                    dprintf(1, "PCI %pP ", dev->pci);
-                dprintf(1, "\n");
-            }
-
+            if (ARG4 >= dev->num_addr)
+                return PDC_INVALID_ARG;
             memset(result, 0, 32*sizeof(long));
-            result[0] = dev->hpa; // dev->add_addr[ARG4];
-            result[1] = HPA_is_graphics_device(hpa) ? GFX_NUM_PAGES : 1;
+            result[0] = dev->add_addr[ARG4];
+            result[1] = HPA_is_graphics_device(dev->hpa) ? GFX_NUM_PAGES : 1;
             return PDC_OK;
 
         case PDC_TRANSLATE_PATH:
