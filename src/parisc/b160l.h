@@ -608,6 +608,12 @@ static struct pdc_iodc iodc_data_hpa_fff81000 = {
 		.mod_path = &mod_path_hpa_f8000000,\
 		.num_addr = HPA_f8000000_num_addr,\
 		.add_addr = { HPA_f8000000_add_addr } },\
+	{	.hpa = MEMORY_HPA,\
+		.iodc = &iodc_data_hpa_fffbf000,\
+		.mod_info = &mod_info_hpa_fffbf000,\
+		.mod_path = &mod_path_hpa_fffbf000,\
+		.num_addr = HPA_fffbf000_num_addr,\
+		.add_addr = { HPA_fffbf000_add_addr } },\
 	{	.hpa = 0xfff81000,\
 		.iodc = &iodc_data_hpa_fff81000,\
 		.mod_info = &mod_info_hpa_fff81000,\
@@ -621,13 +627,3 @@ static struct pdc_iodc iodc_data_hpa_fff81000 = {
 		.num_addr = HPA_fff10000_num_addr,\
 		.add_addr = { HPA_fff10000_add_addr } },\
 	{ 0, }
-
-#if 0
-	{	.hpa = MEMORY_HPA,\
-		.iodc = &iodc_data_hpa_fffbf000,\
-		.mod_info = &mod_info_hpa_fffbf000,\
-		.mod_path = &mod_path_hpa_fffbf000,\
-		.num_addr = HPA_fffbf000_num_addr,\
-		.add_addr = { HPA_fffbf000_add_addr } },\
-
-#endif
