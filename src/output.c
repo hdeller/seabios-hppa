@@ -482,6 +482,7 @@ hexdump(const void *d, int len)
 static void
 dump_regs(struct bregs *regs)
 {
+#if CONFIG_X86
     if (!regs) {
         dprintf(1, "  NULL\n");
         return;
@@ -492,6 +493,7 @@ dump_regs(struct bregs *regs)
     dprintf(1, "  si=%08x di=%08x bp=%08x sp=%08x cs=%04x ip=%04x  f=%04x\n"
             , regs->esi, regs->edi, regs->ebp, (u32)&regs[1]
             , regs->code.seg, regs->code.offset, regs->flags);
+#endif
 }
 
 // Report entry to an Interrupt Service Routine (ISR).
