@@ -79,6 +79,11 @@ COMMONCFLAGS += $(call cc-option,$(CC),-fno-stack-protector,)
 COMMONCFLAGS += $(call cc-option,$(CC),-fno-stack-protector-all,)
 COMMONCFLAGS += $(call cc-option,$(CC),-fstack-check=no,)
 COMMONCFLAGS += $(call cc-option,$(CC),-mfast-indirect-calls,)
+
+COMMONCFLAGS-64 = -Wno-pointer-to-int-cast -Wno-int-to-pointer-cast
+COMMONCFLAGS-32 =
+COMMONCFLAGS    += $(COMMONCFLAGS-$(BITS))
+
 COMMA := ,
 
 CFLAGS32FLAT := $(COMMONCFLAGS) -DMODE16=0 -DMODESEGMENT=0
