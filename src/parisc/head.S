@@ -14,7 +14,16 @@
 	.macro	load32 value, reg
 	ldil	L%\value, \reg
 	ldo	R%\value(\reg), \reg
+#ifdef CONFIG_64BIT
+	depdi   0, 31, 32, \reg
+#endif
 	.endm
+
+;! set the W bit
+#define set_PSW_W	.level 2.0 !	ssm PSW_W_SM, %r0 !	.level LEVEL
+
+;! nuke the W bit
+#define clear_PSW_W	.level 2.0 !	rsm PSW_W_SM, %r0 !	.level LEVEL
 
 #define ENTRY(name) \
 	.export name !\
@@ -31,11 +40,16 @@ name:
 #define BOOTADDR(x)	(x)
 
 	.macro loadgp
+#ifdef CONFIG_64BIT
+	copy		%r0, %r27
+#else
 	ldil		L%$global$, %r27
 	ldo		R%$global$(%r27), %r27
+#endif
 	.endm
 
 #ifdef CONFIG_64BIT
+#define LEVEL	2.0w
 #define LDREG	ldd
 #define STREG	std
 #define LDREGX  ldd,s
@@ -51,6 +65,7 @@ name:
 #define WORD_LEN 8
 #define INT_LEN 4
 #else	/* CONFIG_64BIT */
+#define LEVEL	1.1
 #define LDREG	ldw
 #define STREG	stw
 #define LDREGX  ldwx,s
@@ -78,7 +93,7 @@ name:
 
 	.import	$global$
 	.section ".head.text","ax"
-	 .level 1.1
+	 .level LEVEL
 
 	/* On HPMC, the CPUs will start here at 0xf0000000 */
 hpmc_entry:
@@ -103,6 +118,20 @@ ENTRY(startup)
 	rsm	PSW_I, %r0	/* disable local irqs */
 	ssm	PSW_Q, %r0	/* enable PSW_Q flag */
 
+#ifdef CONFIG_64BIT
+	/* check if we really run on 64-bit CPU */
+	ldo	-1(%r0), %r1
+	mtctl	%r1,%cr11
+	mfctl,w %cr11, %r1
+	ldo	-31(%r1),%r1
+	cmpib,<>,n 0,%r1,1f
+	.word 0xfffdead0	/* immediately halt the emulator */
+1:
+	// set_PSW_W
+#else
+	clear_PSW_W
+#endif
+
 	/* Make sure space registers are set to zero */
 	mtsp    %r0,%sr0
 	mtsp    %r0,%sr1
@@ -112,11 +141,6 @@ ENTRY(startup)
 	mtsp    %r0,%sr5
 	mtsp    %r0,%sr6
 	mtsp    %r0,%sr7
-
-	;! nuke the W bit
-	.level 2.0
-	rsm	PSW_W_SM, %r0
-	.level 1.1
 
 	/* If CPU HPA is already set in CPU_HPA_CR_REG then the
 	 * CPU is already initialized and the machine was only reset */
@@ -190,14 +214,14 @@ $smp_exit_loop:
 $is_monarch_cpu:
 	/* Save boot_args in PAGE0->pad608[]. Only monarch CPU does this once. */
         load32          BOOTADDR(0x608),%r1
-        stw,ma          %r26,4(%r1)
-        stw,ma          %r25,4(%r1)
-        stw,ma          %r24,4(%r1)
-        stw,ma          %r23,4(%r1)
-        stw,ma          %r22,4(%r1)
-        stw,ma          %r21,4(%r1)
-        stw,ma          %r20,4(%r1)
-        stw,ma          %r19,4(%r1)
+        STREGM          %r26,WORD_LEN(%r1)
+        STREGM          %r25,WORD_LEN(%r1)
+        STREGM          %r24,WORD_LEN(%r1)
+        STREGM          %r23,WORD_LEN(%r1)
+        STREGM          %r22,WORD_LEN(%r1)
+        STREGM          %r21,WORD_LEN(%r1)
+        STREGM          %r20,WORD_LEN(%r1)
+        STREGM          %r19,WORD_LEN(%r1)
 
 $is_monarch_cpu_reboot:
 	/* Initialize stack pointer */
@@ -215,7 +239,7 @@ $is_monarch_cpu_reboot:
 	load32	BOOTADDR(_ebss),%r4
 $bss_loop:
 	cmpb,<<,n %r3,%r4,$bss_loop
-	stw,ma	%r0,4(%r3)
+	STREGM	%r0,WORD_LEN(%r3)
 
 	load32	BOOTADDR(start_parisc_firmware),%r3
 	bv	0(%r3)
@@ -268,7 +292,8 @@ ENTRY(toc_asm_entry)
         /* save all general registers */
         .set loop,0
         .rept 32
-        STREGM  loop, WORD_LEN(PIM_PTR)
+        copy    loop,TEMP
+        STREGM  TEMP, WORD_LEN(PIM_PTR)
         .set loop,loop+1
         .endr
 
@@ -376,16 +401,13 @@ ENTRY(pdc_entry)
 	bv %r0(%rp)		/* return with setting PSW_W */
 	.level 2.0
 	nop // ssm PSW_W_SM,%r0
-	.level 1.1
+	.level LEVEL
 END(pdc_entry)
 
 /* pdc_entry_table will be copied into low memory. */
 ENTRY(pdc_entry_table)
 	load32 pdc_entry,%r1
-	;! nuke the W bit
-	.level 2.0
-	rsm	PSW_W_SM, %r31
-	.level 1.1
+	clear_PSW_W
 	bv,n %r0(%r1)
 END(pdc_entry_table)
 
@@ -408,10 +430,7 @@ ENTRY(iodc_entry)
 	stw %arg1,-40(%sp)
 	stw %arg2,-44(%sp)
 	stw %arg3,-48(%sp)
-	;! nuke the W bit
-	.level 2.0
-	rsm	PSW_W_SM, %r31
-	.level 1.1
+	clear_PSW_W
 	stw %r31,PSW_OFFSET2(%r0)	/* store PSW_W */
 	ldo -FRAME_SIZE(%sp),%arg0
 
@@ -433,7 +452,7 @@ ENTRY(iodc_entry)
 	bv %r0(%rp)		/* return with setting PSW_W */
 	.level 2.0
 	nop // ssm PSW_W_SM,%r0
-	.level 1.1
+	.level LEVEL
 END(iodc_entry)
 
 /****************************************************************

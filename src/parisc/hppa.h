@@ -6,6 +6,10 @@
 #define SEABIOS_HPPA_VERSION 13
 #define SEABIOS_HPPA_VERSION_STR  "13"
 
+#ifdef __LP64__
+#define CONFIG_64BIT
+#endif
+
 #include "parisc/hppa_hardware.h"
 
 #ifndef __ASSEMBLY__

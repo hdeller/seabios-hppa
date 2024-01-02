@@ -1,11 +1,20 @@
 #include "parisc/hppa_hardware.h"
 
+#if BITS == 64
+OUTPUT_FORMAT("elf64-hppa-linux")
+OUTPUT_ARCH(hppa:hppa2.0w)
+#else
 OUTPUT_FORMAT("elf32-hppa-linux")
 OUTPUT_ARCH(hppa)
+#endif
 ENTRY(startup)
 SECTIONS
 {
+#if BITS == 64
+	. = 0xfffffff000000000 + FIRMWARE_START;
+#else
 	. = FIRMWARE_START;
+#endif
 
 	/* align on next page boundary */
 	. = ALIGN(4096);

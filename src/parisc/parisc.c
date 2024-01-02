@@ -52,7 +52,13 @@ union {
 	struct pdc_toc_pim_20 pim20;
 } pim_toc_data[HPPA_MAX_CPUS] __VISIBLE __aligned(8);
 
-#define is_64bit()	0	/* we only support 32-bit PDC for now. */
+#if defined(__LP64__)
+# define is_64bit()     1      /* 64-bit PDC */
+# define cpu_bit_width  64
+#else
+# define is_64bit()     0      /* 32-bit PDC */
+char cpu_bit_width;
+#endif
 
 u8 BiosChecksum;
 
@@ -98,7 +104,7 @@ void wrmsr_smp(u32 index, u64 val) { }
  ********************************************************/
 
 /* boot_args[] variables provided by qemu */
-#define boot_args		PAGE0->pad608
+#define boot_args		((unsigned long *)(uintptr_t)&PAGE0->pad608)
 #define ram_size		boot_args[0]
 #define linux_kernel_entry	boot_args[1]
 #define cmdline			boot_args[2]
@@ -124,7 +130,6 @@ int sti_font;
 
 char qemu_version[16] = "unknown version";
 char qemu_machine[16] = "B160L";
-char cpu_bit_width;
 char has_astro;
 #define PCI_HPA         DINO_HPA        /* initial temp. PCI bus */
 unsigned long pci_hpa = PCI_HPA;    /* HPA of Dino or Elroy0 */
@@ -254,7 +259,7 @@ void flush_data_cache(char *start, size_t length)
 
 void memdump(void *mem, unsigned long len)
 {
-    printf("memdump @ 0x%x : ", (unsigned int) mem);
+    printf("memdump @ 0x%lx : ", (unsigned long) mem);
     while (len--) {
         printf("0x%x ", (unsigned int) *(unsigned char *)mem);
         mem++;
@@ -1867,8 +1872,8 @@ static int pdc_mem(unsigned int *arg)
     unsigned long option = ARG1;
     unsigned long *result = (unsigned long *)ARG2;
 
-    // only implemented on 64bit PDC!
-    if (sizeof(unsigned long) == sizeof(unsigned int))
+    // only implemented on 64bit PDC variants
+    if (!is_64bit())
         return PDC_BAD_PROC;
 
     switch (option) {
@@ -1885,6 +1890,10 @@ static int pdc_mem(unsigned int *arg)
         case PDC_MEM_GOODMEM:
             GoldenMemory = ARG3;
             return PDC_OK;
+        case PDC_MEM_GET_MEMORY_SYSTEM_TABLES_SIZE:
+        case PDC_MEM_GET_MEMORY_SYSTEM_TABLES:
+            /* not yet implemented for 64-bit */
+            return PDC_BAD_PROC;
     }
     dprintf(0, "\n\nSeaBIOS: Check PDC_MEM option %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
     return PDC_BAD_PROC;
@@ -2254,6 +2263,18 @@ static int pdc_pat_pd(unsigned int *arg)
     return PDC_BAD_OPTION;
 }
 
+static int pdc_pat_mem(unsigned int *arg)
+{
+    unsigned long option = ARG1;
+
+    switch (option) {
+        default:
+            break;
+    }
+    dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_PAT_MEM function %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
+    return PDC_BAD_OPTION;
+}
+
 
 int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
 {
@@ -2394,6 +2415,11 @@ int __VISIBLE parisc_pdc_entry(unsigned int *arg FUNC_MANY_ARGS)
             if (firmware_width_locked)
                 return PDC_BAD_PROC;
             return pdc_pat_pd(arg);
+
+        case PDC_PAT_MEM:
+            if (firmware_width_locked)
+                return PDC_BAD_PROC;
+            return pdc_pat_mem(arg);
     }
 
     printf("\n** WARNING **: SeaBIOS: Unimplemented PDC proc %s(%d) option %d result=%x ARG3=%x ",
@@ -2751,36 +2777,43 @@ static int parisc_boot_menu(unsigned long *iplstart, unsigned long *iplend,
  * FIRMWARE MAIN ENTRY POINT
  ********************************************************/
 
-static const struct pz_device mem_cons_sti_boot = {
+static struct pz_device mem_cons_sti_boot = {
     .hpa = LASI_GFX_HPA,
-    .iodc_io = (unsigned long)&iodc_entry,
     .cl_class = CL_DISPL,
 };
 
 static struct pz_device mem_kbd_sti_boot = {
     .hpa = LASI_PS2KBD_HPA,
-    .iodc_io = (unsigned long)&iodc_entry,
     .cl_class = CL_KEYBD,
 };
 
 static struct pz_device mem_cons_boot = {
     .hpa = PARISC_SERIAL_CONSOLE - 0x800,
-    .iodc_io = (unsigned long)&iodc_entry,
     .cl_class = CL_DUPLEX,
 };
 
 static struct pz_device mem_kbd_boot = {
     .hpa = PARISC_SERIAL_CONSOLE - 0x800,
-    .iodc_io = (unsigned long)&iodc_entry,
     .cl_class = CL_KEYBD,
 };
 
 static struct pz_device mem_boot_boot = {
     .dp.path.flags = PF_AUTOBOOT,
     .hpa = DINO_SCSI_HPA,  // will be overwritten
-    .iodc_io = (unsigned long) &iodc_entry,
     .cl_class = CL_RANDOM,
 };
+
+static void initialize_iodc_entry(void)
+{
+    unsigned long iodc_p = (unsigned long) &iodc_entry;
+
+    /* need to initialize at runtime, required on 64-bit firmware */
+    mem_cons_sti_boot.iodc_io = iodc_p;
+    mem_kbd_sti_boot.iodc_io = iodc_p;
+    mem_cons_boot.iodc_io = iodc_p;
+    mem_kbd_boot.iodc_io = iodc_p;
+    mem_boot_boot.iodc_io = iodc_p;
+}
 
 #if 0
 static void find_pci_slot_for_dev(unsigned int vendor, char *pci_slot)
@@ -2912,6 +2945,9 @@ void __VISIBLE start_parisc_firmware(void)
     char bootdrive = (char)cmdline; // c = hdd, d = CD/DVD
     show_boot_menu = (linux_kernel_entry == 1);
 
+    initialize_iodc_entry();
+
+#ifndef __LP64__
     // detect if we emulate a 32- or 64-bit CPU.
     // set all bits in cr11, read back, and if the return
     // value is 63 this is a 64-bit capable CPU.
@@ -2920,13 +2956,14 @@ void __VISIBLE start_parisc_firmware(void)
     /* this is: mfctl,w sar,r1: */
     asm(".word 0x016048a0 + 1 ! copy %%r1,%0\n" : "=r" (i): : "r1");
     cpu_bit_width = (i == 63) ? 64 : 32;
+#endif
 
     /* lock all 64-bit and PAT functions until unlocked from OS
      * via PDC_MODEL/PDC_MODEL_CAPABILITIES call */
     firmware_width_locked = 1;
 
     psw_defaults = PDC_PSW_ENDIAN_BIT;
-    if (0 && cpu_bit_width == 64) {
+    if (is_64bit() && cpu_bit_width == 64) {
         /* enable 64-bit PSW by default */
         psw_defaults |= PDC_PSW_WIDE_BIT;
         current_machine->pdc_model.width = 1;
@@ -3074,7 +3111,7 @@ void __VISIBLE start_parisc_firmware(void)
     if (artist_present()) {
         sti_rom_init();
         sti_console_init(&sti_proc_rom);
-        PAGE0->proc_sti = (u32)&sti_proc_rom;
+        PAGE0->proc_sti = (uintptr_t)&sti_proc_rom;
         if (has_astro)
             kbd_init();
         else
@@ -3107,13 +3144,13 @@ void __VISIBLE start_parisc_firmware(void)
     chassis_code = 0;
 
     cpu_hz = 100 * PAGE0->mem_10msec; /* Hz of this PARISC */
-    dprintf(1, "\nPARISC SeaBIOS Firmware, %d x %d-bit PA-RISC CPU at %d.%06d MHz, %d MB RAM.\n",
+    dprintf(1, "\nPARISC SeaBIOS Firmware, %ld x %d-bit PA-RISC CPU at %d.%06d MHz, %ld MB RAM.\n",
             smp_cpus, cpu_bit_width, cpu_hz / 1000000, cpu_hz % 1000000,
             ram_size/1024/1024);
 
     if (ram_size < MIN_RAM_SIZE) {
         printf("\nSeaBIOS: Machine configured with too little "
-                "memory (%d MB), minimum is %d MB.\n\n",
+                "memory (%ld MB), minimum is %d MB.\n\n",
                 ram_size/1024/1024, MIN_RAM_SIZE/1024/1024);
         hlt();
     }
@@ -3176,7 +3213,7 @@ void __VISIBLE start_parisc_firmware(void)
                 i < 10 ? " ":"", i, i?"Idle  ":"Active");
     printf("\n\n");
     printf("  Emulated machine:     HP %s (%d-bit %s)\n"
-            "  Available memory:     %u MB\n"
+            "  Available memory:     %lu MB\n"
             "  Good memory required: %d MB\n\n",
             qemu_machine, cpu_bit_width, (cpu_bit_width == 64) ? "PA2.0" : "PA1.1",
             ram_size/1024/1024, MIN_RAM_SIZE/1024/1024);
