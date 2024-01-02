@@ -477,7 +477,7 @@ fill_ata_edd(struct segoff_s edd, struct drive_s *drive_gf)
         ifpath = edd_pci_path(bdf, channel);
     }
     return fill_generic_edd(
-        edd, drive_gf, SEGOFF(SEG_LOW, (u32)&DefaultDPTE).segoff
+        edd, drive_gf, SEGOFF(SEG_LOW, (unsigned long)&DefaultDPTE).segoff
         , bustype | EDD_ATA, ifpath, slave);
 }
 
