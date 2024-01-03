@@ -209,8 +209,7 @@ void __VISIBLE __noreturn hlt(void)
 
 static int powerswitch_supported(void)
 {
-    /* can't reach powerswitch pointer on 64-bit CPU if ptr above 0xf0000000 */
-    return cpu_bit_width == 32 || (unsigned long) powersw_ptr < 0xf0000000;
+    return powersw_ptr != NULL;
 }
 
 static void check_powersw_button(void)
@@ -3040,6 +3039,12 @@ void __VISIBLE start_parisc_firmware(void)
 
     powersw_ptr = (int *) (unsigned long)
         romfile_loadint("/etc/hppa/power-button-addr", (unsigned long)&powersw_nop);
+
+    /* allow user to disable power button: "-fw_cfg opt/power-button-enable,string=0" */
+    i = romfile_loadstring_to_int("opt/power-button-enable", 1);
+    if (i == 0) {
+        powersw_ptr = NULL;
+    }
 
     /* real-time-clock addr */
     rtc_ptr = (int *) (unsigned long)
