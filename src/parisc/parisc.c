@@ -1625,12 +1625,12 @@ static int pdc_coproc(unsigned int *arg)
     switch (option) {
         case PDC_COPROC_CFG:
             memset(result, 0, 32 * sizeof(unsigned long));
-            mask = 1UL << 7;    /* bit for FPU available/functional */
+            mask = 3UL << 6;    /* bit for FPU available/functional */
             mtctl(mask, 10);    /* initialize cr10 */
-            result[0] = mask;
-            result[1] = mask;
-            result[17] = 1;     /* Revision */
-            result[18] = current_machine->pdc_cpuid >> 5; /* CPU Model */
+            result[0] = mask;   /* ccr_enable */
+            result[1] = mask;   /* ccr_present */
+            result[17] = 1;     /* FPU revision */
+            result[18] = current_machine->pdc_cpuid >> 5; /* FPU model */
             return PDC_OK;
     }
     return PDC_BAD_OPTION;
