@@ -11,7 +11,8 @@ ENTRY(startup)
 SECTIONS
 {
 #if BITS == 64
-	. = 0xfffffff000000000 + FIRMWARE_START;
+	/* limit firmware high bits to physical addresses to allow debug info */
+	. = ((FIRMWARE_HIGH & 0x3ffffff0) << 32) + FIRMWARE_START;
 #else
 	. = FIRMWARE_START;
 #endif
@@ -46,6 +47,21 @@ SECTIONS
                 . = ALIGN(4096);
                 _sti_rom_end = .;
         }
+
+#if BITS == 64
+	. = ALIGN(16);
+	.opd : {
+		__start_opd = .;
+		*(.opd)
+		__end_opd = .;
+	} PROVIDE (__gp = .);
+	.plt : {
+		*(.plt)
+	}
+	.dlt : {
+		*(.dlt)
+	}
+#endif
 
 	. = ALIGN(8);
 	.rodata : {

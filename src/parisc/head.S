@@ -19,6 +19,13 @@
 #endif
 	.endm
 
+	/* set upper 32-bits of firmware address */
+	.macro	load_fw_upper32 reg
+#ifdef CONFIG_64BIT
+	depdi   FIRMWARE_HIGH, 31, 32, \reg
+#endif
+	.endm
+
 ;! set the W bit
 #define set_PSW_W	.level 2.0 !	ssm PSW_W_SM, %r0 !	.level LEVEL
 
@@ -41,7 +48,9 @@ name:
 
 	.macro loadgp
 #ifdef CONFIG_64BIT
-	copy		%r0, %r27
+	ldil		L%__gp, %r27
+	ldo		R%__gp(%r27), %r27
+	load_fw_upper32	%r27
 #else
 	ldil		L%$global$, %r27
 	ldo		R%$global$(%r27), %r27
@@ -127,8 +136,28 @@ ENTRY(startup)
 	cmpib,<>,n 0,%r1,1f
 	.word 0xfffdead0	/* immediately halt the emulator */
 1:
-	// set_PSW_W
+	/* we now know we run on a 64-bit CPU. */
+	/* next step: turn on the PSW.W flag (enable 64-bit mode) */
+	load32		2f,%r11
+	load_fw_upper32 %r11
+
+	mtctl           %r0,%cr17       /* Clear IIASQ tail */
+	mtctl           %r0,%cr17       /* Clear IIASQ head */
+
+	/* Load RFI target into PC queue */
+	mtctl           %r11,%cr18      /* IIAOQ head */
+	ldo             4(%r11),%r11
+	mtctl           %r11,%cr18      /* IIAOQ tail */
+
+	load32          (0x08000000 | PSW_Q),%r10 /* PSW.W=1 */
+	mtctl           %r10,%ipsw
+
+	/* Jump through hyperspace to enable PSW.W */
+	rfi
+	nop
+2:
 #else
+	/* clear any PSW.W on 32-bit firmware */
 	clear_PSW_W
 #endif
 
@@ -209,6 +238,7 @@ $smp_exit_loop:
 	cmpb,=,n  %r0,%r3,enter_smp_idle_loop
 	nop			/* failed backward branch is nullified */
 	load32	startup, %rp
+	load_fw_upper32 %rp
 	bv,n	0(%r3)
 
 $is_monarch_cpu:
@@ -226,6 +256,7 @@ $is_monarch_cpu:
 $is_monarch_cpu_reboot:
 	/* Initialize stack pointer */
 	load32	BOOTADDR(parisc_stack),%r1
+	load_fw_upper32	%r1
 	ldo	FRAME_SIZE(%r1),%sp
 
 	/* Initialize the global data pointer */
@@ -242,6 +273,7 @@ $bss_loop:
 	STREGM	%r0,WORD_LEN(%r3)
 
 	load32	BOOTADDR(start_parisc_firmware),%r3
+	load_fw_upper32 %r3
 	bv	0(%r3)
 	copy	%r0,%r2
 END(startup)

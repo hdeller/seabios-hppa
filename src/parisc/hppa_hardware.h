@@ -6,6 +6,7 @@
 
 #define FIRMWARE_START  0xf0000000
 #define FIRMWARE_END    0xf0800000
+#define FIRMWARE_HIGH   0xfffffff0  /* upper 32-bits of 64-bit firmware address */
 
 #define MEM_PDC_ENTRY       0x4800  /* PDC entry address */
 
