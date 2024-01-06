@@ -3203,10 +3203,10 @@ void __VISIBLE start_parisc_firmware(void)
     PAGE0->vec_rendz = 0; /* No rendezvous yet. Add MEM_RENDEZ_HI later */
 
     printf("\n");
-    printf("SeaBIOS PA-RISC Firmware Version " SEABIOS_HPPA_VERSION_STR
+    printf("SeaBIOS PA-RISC %d-bit Firmware Version " SEABIOS_HPPA_VERSION_STR
            " (QEMU %s)\n\n"
             "Duplex Console IO Dependent Code (IODC) revision 1\n"
-            "\n", qemu_version);
+            "\n", is_64bit() ? 64 : 32, qemu_version);
     printf("------------------------------------------------------------------------------\n"
             "  (c) Copyright 2017-2023 Helge Deller <deller@gmx.de> and SeaBIOS developers.\n"
             "------------------------------------------------------------------------------\n\n");
@@ -3217,10 +3217,11 @@ void __VISIBLE start_parisc_firmware(void)
                 " MHz    %s                 Functional            0 KB\n",
                 i < 10 ? " ":"", i, i?"Idle  ":"Active");
     printf("\n\n");
-    printf("  Emulated machine:     HP %s (%d-bit %s)\n"
+    printf("  Emulated machine:     HP %s (%d-bit %s) with %d-bit PDC\n"
             "  Available memory:     %lu MB\n"
             "  Good memory required: %d MB\n\n",
             qemu_machine, cpu_bit_width, (cpu_bit_width == 64) ? "PA2.0" : "PA1.1",
+            is_64bit() ? 64 : 32,
             ram_size/1024/1024, MIN_RAM_SIZE/1024/1024);
 
     // search boot devices
