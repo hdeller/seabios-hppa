@@ -2032,7 +2032,7 @@ static int pdc_mem_map(unsigned int *arg)
     switch (option) {
         case PDC_MEM_MAP_HPA:
             dprintf(0, "\nSeaBIOS: PDC_MEM_MAP_HPA  bus = %d,  mod = %d\n", dp->path.bc[4], dp->path.mod);
-            dev = find_hppa_device_by_hpa(memmap->hpa);
+            dev = find_hppa_device_by_path(dp, NULL, 1);
             if (!dev)
                 return PDC_NE_MOD;
             memcpy(memmap, dev->mod_info, sizeof(*memmap));
