@@ -2965,6 +2965,10 @@ unsigned long romfile_loadstring_to_int(const char *name, unsigned long defval)
     return defval;
 }
 
+extern void start_kernel(unsigned long mem_free, unsigned long cline,
+                         unsigned long rdstart,  unsigned long rdend,
+                         unsigned long kernel_start_address);
+
 void __VISIBLE start_parisc_firmware(void)
 {
     unsigned int i, cpu_hz;
@@ -3301,29 +3305,26 @@ void __VISIBLE start_parisc_firmware(void)
 
     /* directly start Linux kernel if it was given on qemu command line. */
     if (linux_kernel_entry > 1) {
-        void (*start_kernel)(unsigned long mem_free, unsigned long cline,
-                unsigned long rdstart, unsigned long rdend);
+        unsigned long kernel_entry = linux_kernel_entry;
 
         printf("Autobooting Linux kernel which was loaded by qemu...\n\n");
-        start_kernel = (void *) linux_kernel_entry;
 	/* zero out kernel entry point in case we reset the machine: */
         linux_kernel_entry = 0;
-        start_kernel(PAGE0->mem_free, cmdline, initrd_start, initrd_end);
+        start_kernel(PAGE0->mem_free, cmdline, initrd_start, initrd_end,
+                kernel_entry);
         hlt(); /* this ends the emulator */
     }
 
     /* check for bootable drives, and load and start IPL bootloader if possible */
     if (parisc_boot_menu(&iplstart, &iplend, bootdrive)) {
-        void (*start_ipl)(long interactive, long iplend);
-
         PAGE0->mem_boot.dp.layers[0] = boot_drive->target;
         PAGE0->mem_boot.dp.layers[1] = boot_drive->lun;
 
         printf("\nBooting...\n"
                 "Boot IO Dependent Code (IODC) revision 153\n\n"
                 "%s Booted.\n", PAGE0->imm_soft_boot ? "SOFT":"HARD");
-        start_ipl = (void *) iplstart;
-        start_ipl(interact_ipl, iplend);
+        /* actually: start_ipl(interact_ipl, iplend); */
+        start_kernel(interact_ipl, iplend, 0, 0, iplstart);
     }
 
     hlt(); /* this ends the emulator */

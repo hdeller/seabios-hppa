@@ -278,6 +278,18 @@ $bss_loop:
 	copy	%r0,%r2
 END(startup)
 
+/*******************************************************/
+
+ENTRY(start_kernel)
+#ifdef CONFIG_64BIT
+	bv	0(%r22)
+	clear_PSW_W	/* clear PSW before we start the kernel! */
+#else
+	ldw	-0x34(%sp),%r1
+	bv,n	0(%r1)
+#endif
+END(start_kernel)
+
 /*******************************************************
   TOC handler
   Write all GRs, CRs, SRs and the iaoq_back and iasq_back registers (in
@@ -398,7 +410,6 @@ ENTRY(smp_ivt)
 	DEF_IVA_ENTRY
 	.endr
 END(smp_ivt)
-
 
 /*******************************************************
 	PDC and IODC entry
