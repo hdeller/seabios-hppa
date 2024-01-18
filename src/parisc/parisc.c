@@ -53,12 +53,23 @@ union {
 } pim_toc_data[HPPA_MAX_CPUS] __VISIBLE __aligned(8);
 
 #if defined(__LP64__)
-# define is_64bit()     1      /* 64-bit PDC */
-# define cpu_bit_width  64
+# define cpu_bit_width      64
+# define is_64bit_PDC()     1      /* 64-bit PDC */
 #else
-# define is_64bit()     0      /* 32-bit PDC */
 char cpu_bit_width;
+# define is_64bit_PDC()     0      /* 32-bit PDC */
 #endif
+
+#define is_64bit()         is_64bit_PDC()
+#define is_64bit_CPU()     (cpu_bit_width == 64)  /* 64-bit CPU? */
+
+/* running 64-bit PDC, but called from 32-bit app */
+#define is_compat_mode()  (is_64bit_PDC() && ((psw_defaults & PDC_PSW_WIDE_BIT) == 0))
+
+#define COMPAT_VAL(val)   ((long)(int)(val))    // (is_compat_mode() ? (long)(int)(val) : (val))
+
+/* Do not write back result buffer in compat mode */
+#define NO_COMPAT_RETURN_VALUE(res)     { res = 0; }
 
 u8 BiosChecksum;
 
@@ -140,8 +151,8 @@ unsigned long hppa_port_pci_data = (PCI_HPA + DINO_CONFIG_DATA);
 unsigned int show_boot_menu;
 unsigned int interact_ipl;
 
-static int firmware_width_locked;
-static unsigned long psw_defaults;
+unsigned int __VISIBLE firmware_width_locked; /* no 64-bit calls allowed */
+unsigned int __VISIBLE psw_defaults;
 
 unsigned long PORT_QEMU_CFG_CTL;
 unsigned int tlb_entries = 256;
