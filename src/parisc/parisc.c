@@ -60,7 +60,6 @@ char cpu_bit_width;
 # define is_64bit_PDC()     0      /* 32-bit PDC */
 #endif
 
-#define is_64bit()         is_64bit_PDC()
 #define is_64bit_CPU()     (cpu_bit_width == 64)  /* 64-bit CPU? */
 
 /* running 64-bit PDC, but called from 32-bit app */
@@ -655,11 +654,11 @@ static void hppa_pci_build_devices_list(void)
         offs = elroy_offset(pci->bdf);
         BUG_ON(offs == -1UL);
 #if 0
-        pfa = (unsigned long) elroy_port(0, offs);
+        pfa = F_EXTEND(elroy_port(0, offs));
         pfa += pci->bdf << 8;
         pfa |= SCSI_HPA;
 #else
-        pfa = pci_get_first_mmio_or_io(pci);
+        pfa = F_EXTEND(pci_get_first_mmio_or_io(pci));
         BUG_ON(!pfa);
 #endif
 #if 0
@@ -682,7 +681,7 @@ static void hppa_pci_build_devices_list(void)
         pdev->mod_path  = &hppa_pci_mod_path[curr_pci_devices];
         pdev->num_addr  = 0;
         pdev->pci = pci;
-        pdev->hpa_parent = pci_hpa;
+        pdev->hpa_parent = F_EXTEND(pci_hpa);
         pdev->index     = curr_pci_devices;
         dprintf(1, "PCI device #%d %pP bdf 0x%x at pfa 0x%lx\n", curr_pci_devices, pci, pci->bdf, pfa);
 
@@ -698,6 +697,8 @@ static void hppa_pci_build_devices_list(void)
 static hppa_device_t *find_hpa_device(unsigned long hpa)
 {
     int i;
+
+    hpa = COMPAT_VAL(hpa);
 
     /* search classical HPPA devices */
     if (hpa) {
@@ -813,7 +814,7 @@ static void remove_parisc_devices(unsigned int num_cpus)
 
     /* Fix monarch CPU */
     BUG_ON(!cpu_dev);
-    cpu_dev->mod_info->mod_addr = CPU_HPA;
+    cpu_dev->mod_info->mod_addr = F_EXTEND(CPU_HPA);
     if (has_astro)
         cpu_offset = CPU_HPA - 32*0x1000;
     else
@@ -877,6 +878,14 @@ static hppa_device_t *add_index_all_devices(void)
 
     for (i = 0; i < (MAX_DEVICES-1); i++) {
         dev = parisc_devices + i;
+        if (!dev->hpa)
+            continue;
+
+        /* FIX PDC up for 64-bit PDC !!!
+         * hpa and mod_addr in device tables need upper 32 bits set
+         */
+        dev->hpa = F_EXTEND(dev->hpa);
+        dev->mod_info->mod_addr = F_EXTEND(dev->mod_info->mod_addr);
 
         dev->index = index;
         if (0)
@@ -999,10 +1008,10 @@ static unsigned long parisc_serial_in(char *c, unsigned long maxchars)
     } else
         addr += 0x800;
     while (count < maxchars) {
-        u8 lsr = inb(addr+SEROFF_LSR);
+        u8 lsr = inb(F_EXTEND(addr+SEROFF_LSR));
         if (lsr & 0x01) {
             // Success - can read data
-            *c++ = inb(addr+SEROFF_DATA);
+            *c++ = inb(F_EXTEND(addr+SEROFF_DATA));
             count++;
         }
         if (timer_check(end))
@@ -1044,10 +1053,10 @@ static void parisc_serial_out(char c)
         parisc_serial_out('\r');
 
     for (;;) {
-        u8 lsr = inb(addr+SEROFF_LSR);
+        u8 lsr = inb(F_EXTEND(addr+SEROFF_LSR));
         if ((lsr & 0x60) == 0x60) {
             // Success - can write data
-            outb(c, addr+SEROFF_DATA);
+            outb(c, F_EXTEND(addr+SEROFF_DATA));
             break;
         }
     }
@@ -1436,7 +1445,7 @@ static int pdc_pim(unsigned int *arg)
     int i;
     unsigned int count, default_size;
 
-    if (is_64bit())
+    if (is_64bit_CPU())
 	default_size = sizeof(struct pdc_toc_pim_20);
     else
 	default_size = sizeof(struct pdc_toc_pim_11);
@@ -1458,8 +1467,8 @@ static int pdc_pim(unsigned int *arg)
                 *result = PDC_INVALID_ARG;
                 return PDC_OK;
             }
-            if (( is_64bit() && pim_toc_data[i].pim20.cpu_state.val == 0) ||
-                (!is_64bit() && pim_toc_data[i].pim11.cpu_state.val == 0)) {
+            if (( is_64bit_CPU() && pim_toc_data[i].pim20.cpu_state.val == 0) ||
+                (!is_64bit_CPU() && pim_toc_data[i].pim11.cpu_state.val == 0)) {
                 /* PIM contents invalid */
                 *result = PDC_NE_MOD;
                 return PDC_OK;
@@ -1468,7 +1477,7 @@ static int pdc_pim(unsigned int *arg)
             memcpy((void *)ARG3, &pim_toc_data[i], count);
             *result = count;
             /* clear PIM contents */
-            if (is_64bit())
+            if (is_64bit_CPU())
                 pim_toc_data[i].pim20.cpu_state.val = 0;
             else
                 pim_toc_data[i].pim11.cpu_state.val = 0;
@@ -1491,7 +1500,7 @@ static int pdc_model(unsigned int *arg)
              * kernel sr_disable_hash() function
              */
             memset(result, 0, 32 * sizeof(unsigned long));
-            memcpy(result, (cpu_bit_width == 64) ?
+            memcpy(result, (is_64bit_CPU()) ?
                     &current_machine->pdc_model : &machine_B160L.pdc_model,
 			sizeof(current_machine->pdc_model));
             return PDC_OK;
@@ -1501,10 +1510,10 @@ static int pdc_model(unsigned int *arg)
                     result[0] = current_machine->pdc_version;
                     return PDC_OK;
                 case 1: /* return PDC version */
-                    result[0] = (cpu_bit_width == 64) ? 0x20 : 0x011;
+                    result[0] = (is_64bit_CPU()) ? 0x20 : 0x011;
                     return PDC_OK;
                 case 2: /* return PDC PAT(?) version */
-                    if (cpu_bit_width == 32)
+                    if (!is_64bit_CPU())
                         break;
                     result[0] = 0x20;
                     return PDC_OK;
@@ -1520,16 +1529,18 @@ static int pdc_model(unsigned int *arg)
                 return -20;
             return PDC_OK;
         case PDC_MODEL_CPU_ID:
-            result[0] = current_machine->pdc_cpuid;
             /* if CPU does not support 64bits, use the B160L CPUID */
-            if (cpu_bit_width != 64)
+            if (is_64bit_CPU())
+                result[0] = current_machine->pdc_cpuid;
+            else
                 result[0] = machine_B160L.pdc_cpuid;
             return PDC_OK;
         case PDC_MODEL_CAPABILITIES:
-            firmware_width_locked = 0;  /* pdc unlock call */
+            /* unlock pdc call if running wide. */
+            firmware_width_locked = !(psw_defaults & PDC_PSW_WIDE_BIT);
             result[0] = current_machine->pdc_caps;
             result[0] |= PDC_MODEL_OS32; /* we only support 32-bit PDC for now. */
-            if (0 && cpu_bit_width == 64) /* and maybe 64-bit */
+            if (is_64bit_PDC()) /* and maybe 64-bit */
                 result[0] |= PDC_MODEL_OS64; /* this means 64-bit PDC calls are supported */
             else
                 result[0] &= ~PDC_MODEL_OS64;
@@ -1843,7 +1854,7 @@ static int pdc_block_tlb(unsigned int *arg)
     int ret;
 
     /* Block TLB is only supported on 32-bit CPUs */
-    if (cpu_bit_width != 32)
+    if (is_64bit_CPU())
         return PDC_BAD_PROC;
 
     asm(
@@ -1883,7 +1894,7 @@ static int pdc_mem(unsigned int *arg)
     unsigned long *result = (unsigned long *)ARG2;
 
     // only implemented on 64bit PDC variants
-    if (!is_64bit())
+    if (!is_64bit_PDC())
         return PDC_BAD_PROC;
 
     switch (option) {
@@ -2458,7 +2469,7 @@ unsigned long __VISIBLE toc_handler(struct pdc_toc_pim_11 *pim)
 
         pim11 = &pim_toc_data[cpu].pim11;
         pim20 = &pim_toc_data[cpu].pim20;
-        if (is_64bit())
+        if (is_64bit_CPU())
                 pim20->cpu_state = state;
         else
                 pim11->cpu_state = state;
@@ -2469,7 +2480,7 @@ unsigned long __VISIBLE toc_handler(struct pdc_toc_pim_11 *pim)
         printf("\n");
         printf("##### CPU %d HPA %lx: SeaBIOS TOC register dump #####\n", cpu, hpa);
         for (y = 0; y < 32; y += 8) {
-                if (is_64bit())
+                if (is_64bit_CPU())
                         p = (unsigned long *)&pim20->gr[y];
                 else
                         p = (unsigned long *)&pim11->gr[y];
@@ -2478,7 +2489,7 @@ unsigned long __VISIBLE toc_handler(struct pdc_toc_pim_11 *pim)
         }
         printf("\n");
         for (y = 0; y < 32; y += 8) {
-                if (is_64bit())
+                if (is_64bit_CPU())
                         p = (unsigned long *)&pim20->cr[y];
                 else
                         p = (unsigned long *)&pim11->cr[y];
@@ -2486,12 +2497,12 @@ unsigned long __VISIBLE toc_handler(struct pdc_toc_pim_11 *pim)
                 printf(       " %lx %lx %lx %lx\n",  p[4], p[5], p[6], p[7]);
         }
         printf("\n");
-        if (is_64bit())
+        if (is_64bit_CPU())
                 p = (unsigned long *)&pim20->sr[0];
         else
                 p = (unsigned long *)&pim11->sr[0];
         printf("SR0: %lx %lx %lx %lx %lx %lx %lx %lx\n", p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7]);
-        if (is_64bit()) {
+        if (is_64bit_CPU()) {
                 printf("IAQ: %lx.%lx %lx.%lx   PSW: %lx\n",
                         (unsigned long)pim20->cr[17], (unsigned long)pim20->cr[18],
                         (unsigned long)pim20->iasq_back, (unsigned long)pim20->iaoq_back,
@@ -2504,7 +2515,7 @@ unsigned long __VISIBLE toc_handler(struct pdc_toc_pim_11 *pim)
         }
 
         os_toc_handler = PAGE0->vec_toc;
-        if (is_64bit())
+        if (is_64bit_CPU())
                 os_toc_handler |= ((unsigned long long) PAGE0->vec_toc_hi << 32);
 
         /* release lock - let other CPUs join now. */
@@ -2973,10 +2984,11 @@ void __VISIBLE start_parisc_firmware(void)
     firmware_width_locked = 1;
 
     psw_defaults = PDC_PSW_ENDIAN_BIT;
-    if (is_64bit() && cpu_bit_width == 64) {
+    if (0 && is_64bit_PDC()) {
         /* enable 64-bit PSW by default */
         psw_defaults |= PDC_PSW_WIDE_BIT;
         current_machine->pdc_model.width = 1;
+        firmware_width_locked = 0;
     }
     mtctl(psw_defaults, CR_PSW_DEFAULT);
 
@@ -3217,7 +3229,7 @@ void __VISIBLE start_parisc_firmware(void)
     printf("SeaBIOS PA-RISC %d-bit Firmware Version " SEABIOS_HPPA_VERSION_STR
            " (QEMU %s)\n\n"
             "Duplex Console IO Dependent Code (IODC) revision 1\n"
-            "\n", is_64bit() ? 64 : 32, qemu_version);
+            "\n", is_64bit_PDC() ? 64 : 32, qemu_version);
     printf("------------------------------------------------------------------------------\n"
             "  (c) Copyright 2017-2024 Helge Deller <deller@gmx.de> and SeaBIOS developers.\n"
             "------------------------------------------------------------------------------\n\n");
@@ -3231,8 +3243,8 @@ void __VISIBLE start_parisc_firmware(void)
     printf("  Emulated machine:     HP %s (%d-bit %s) with %d-bit PDC\n"
             "  Available memory:     %lu MB\n"
             "  Good memory required: %d MB\n\n",
-            qemu_machine, cpu_bit_width, (cpu_bit_width == 64) ? "PA2.0" : "PA1.1",
-            is_64bit() ? 64 : 32,
+            qemu_machine, cpu_bit_width, is_64bit_CPU() ? "PA2.0" : "PA1.1",
+            is_64bit_PDC() ? 64 : 32,
             ram_size/1024/1024, MIN_RAM_SIZE/1024/1024);
 
     // search boot devices
