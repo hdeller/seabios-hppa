@@ -208,6 +208,22 @@ static inline u32 ror(u32 word, unsigned int shift)
         return (word >> (shift & 31)) | (word << ((-shift) & 31));
 }
 
+
+/* F_EXTEND() is used to access I/O ports. ROM_EXTEND() to access firmware ROM/RAM */
+#if defined(__LP64__)
+#define F_EXTEND(x)   ((unsigned long)(0xfffffffful<<32) | (x))
+#define ROM_EXTEND(x) ((unsigned long)(0xfffffff0ul<<32) | (x))
+#else
+#define F_EXTEND(x)   ((unsigned long)(x))
+#define ROM_EXTEND(x) ((unsigned long)(x))
+#endif
+
+static inline void builtin_console_out(char c)
+{
+    asm volatile("copy %0,%%r26 ! diag 0x101" : : "r" (c) : "r26");
+}
+
+
 extern char has_astro; /* false for B160L machine with Dino PCI chip */
 extern unsigned long hppa_port_pci_cmd;
 extern unsigned long hppa_port_pci_data;
@@ -216,7 +232,7 @@ extern unsigned long hppa_port_pci_data;
 #define pci_ioport_addr(port) ((port >= 0x1000)  && (port < FIRMWARE_START))
 #define is_astro_ioport(port) (has_astro && (port < IOS_DIST_BASE_SIZE))
 
-#define astro_ioport_addr(port) ((void *)(portaddr_t)(IOS_DIST_BASE_ADDR + port))
+#define astro_ioport_addr(port) ((void *)(portaddr_t) F_EXTEND(IOS_DIST_BASE_ADDR + port))
 
 /*  inb()/outb() accesses little-endian memory and does byteswapping to host endianess */
 
