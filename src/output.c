@@ -122,8 +122,13 @@ putc(struct putcinfo *action, char c)
         return;
     }
 
+#if 1
     void (*func)(struct putcinfo *info, char c) = GET_GLOBAL(action->func);
     func(action, c);
+#else
+    /* use Qemu's built-in function to directly output chars */
+    builtin_console_out(c);
+#endif
 }
 
 // Ouptut a string.
