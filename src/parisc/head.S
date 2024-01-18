@@ -9,6 +9,13 @@
 #include "autoconf.h"
 #include "autoversion.h"
 
+	/* load 32-bit 'value' into 'reg' with
+	   sign-extension when running in wide mode. */
+	.macro	load32_sign_extend value, reg
+	ldil	L%\value, \reg
+	ldo	R%\value(\reg), \reg
+	.endm
+
 	/* load 32-bit 'value' into 'reg' compensating for the ldil
 	 * sign-extension when running in wide mode. */
 	.macro	load32 value, reg
@@ -21,6 +28,14 @@
 
 	/* set upper 32-bits of firmware address */
 	.macro	load_fw_upper32 reg
+#ifdef CONFIG_64BIT
+	depdi   FIRMWARE_HIGH, 31, 32, \reg
+#endif
+	.endm
+
+	.macro	load32_firmware value, reg
+	ldil	L%\value, \reg
+	ldo	R%\value(\reg), \reg
 #ifdef CONFIG_64BIT
 	depdi   FIRMWARE_HIGH, 31, 32, \reg
 #endif
