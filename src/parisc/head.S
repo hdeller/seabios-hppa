@@ -6,6 +6,7 @@
 
 #include "parisc/hppa.h"
 #include "parisc/hppa_hardware.h"
+#include "parisc/pdc.h"
 #include "autoconf.h"
 #include "autoversion.h"
 
@@ -84,6 +85,7 @@ name:
 #define ANDCM   andcm,*
 #define	COND(x)	* ## x
 #define FRAME_SIZE	128
+#define FRAME_SIZE32	64
 #define CALLEE_REG_FRAME_SIZE	144
 #define ASM_ULONG_INSN	.dword
 #define WORD_LEN 8
@@ -197,7 +199,7 @@ $startup_just_rebooted:
 	mfctl   CPU_HPA_CR_REG, %r5
 
 	/* branch if this is the monarch cpu */
-	load32 CPU_HPA, %r1
+	load32_sign_extend CPU_HPA, %r1
 	comb,=,n %r5,%r1,$is_monarch_cpu_reboot
 
 	b,n	enter_smp_idle_loop
@@ -206,10 +208,13 @@ $startup_fresh_booted:
 	/* Here the machine was booted from scratch: */
 
 	/* Save CPU HPA in cr7, hopefully HP-UX will not use that register. */
+#ifdef CONFIG_64BIT
+	extrw,s,>= %r5,31,32,%r5	/* sign extend CPU HPA */
+#endif
 	mtctl   %r5, CPU_HPA_CR_REG /* store CPU HPA */
 
 	/* branch if this is the monarch cpu */
-	load32 CPU_HPA,%r1
+	load32_sign_extend CPU_HPA,%r1
 	comb,= %r5,%r1,$is_monarch_cpu
 	nop
 
@@ -227,7 +232,7 @@ ENTRY(enter_smp_idle_loop)
 	mtctl	%r0, CR_EIRR
 
 	/* Load IVT for SMT tiny loop exit */
-	load32	BOOTADDR(smp_ivt),%r1
+	load32_firmware	BOOTADDR(smp_ivt),%r1
 	mtctl	%r1, CR_IVA
 
 	/* enable CPU local interrupts */
@@ -253,11 +258,15 @@ $smp_exit_loop:
 
 	/* jump to rendevouz */
 	ldw	0x10(%r0),%r3	/* MEM_RENDEZ */
-	/* ldw	0x28(%r0),%r0	MEM_RENDEZ_HI - assume addr < 4GB */
+#ifdef CONFIG_64BIT
+	addb,*>,n %r0,%r0,1f	/* branch if narrow addressing */
+	ldw	0x28(%r0),%r1	/* MEM_RENDEZ_HI */
+	depd    %r1, 31, 32, %r3
+1:
+#endif
 	cmpb,=,n  %r0,%r3,enter_smp_idle_loop
 	nop			/* failed backward branch is nullified */
-	load32	startup, %rp
-	load_fw_upper32 %rp
+	load32_firmware	startup, %rp
 	bv,n	0(%r3)
 
 $is_monarch_cpu:
@@ -274,8 +283,7 @@ $is_monarch_cpu:
 
 $is_monarch_cpu_reboot:
 	/* Initialize stack pointer */
-	load32	BOOTADDR(parisc_stack),%r1
-	load_fw_upper32	%r1
+	load32_firmware BOOTADDR(parisc_stack),%r1
 	ldo	FRAME_SIZE(%r1),%sp
 
 	/* Initialize the global data pointer */
@@ -333,7 +341,7 @@ END(start_kernel)
         .import pim_toc_data, data
 ENTRY(toc_asm_entry)
         /* serialize CPUs on entry */
-        load32  BOOTADDR(toc_lock),TEMP
+        load32_firmware BOOTADDR(toc_lock),TEMP
 0:      ldcw,co 0(TEMP),TEMP2
         cmpib,= 0,TEMP2,0b
         nop
@@ -341,7 +349,7 @@ ENTRY(toc_asm_entry)
         mfctl   CPU_HPA_CR_REG, TEMP2   /* get CPU HPA from cr7 */
         extru   TEMP2,31-12,4, TEMP     /* extract cpu id */
 
-        load32  BOOTADDR(pim_toc_data), PIM_PTR
+        load32_firmware BOOTADDR(pim_toc_data), PIM_PTR
 
 1:      comib,= 0,TEMP,2f
         ldo     -1(TEMP),TEMP
@@ -405,12 +413,12 @@ ENTRY(toc_asm_entry)
 
 5:      /* call the "C" toc_handler in SeaBIOS */
         loadgp
-        load32  BOOTADDR(parisc_stack), %sp
+        load32_firmware BOOTADDR(parisc_stack), %sp
         b,l     toc_handler, %r2
         ldo     FRAME_SIZE(%sp),%sp
 
         /* call OS handler, in case it returns reset the system */
-        load32  BOOTADDR(reset), %rp
+        load32_firmware BOOTADDR(reset), %rp
         bv,n    0(%ret0)
 END(toc_asm_entry)
 
@@ -421,7 +429,7 @@ END(toc_asm_entry)
 
 	.macro  DEF_IVA_ENTRY
 	.align 32
-	load32 BOOTADDR($smp_exit_loop),%r1
+	load32_firmware BOOTADDR($smp_exit_loop),%r1
 	bv	0(%r1)
 	nop
 	.endm
@@ -452,47 +460,171 @@ END(smp_ivt)
 	PDC and IODC entry
  *******************************************************/
 
-/* XXX: memory location in page0: vec_pad0[], temporary storage for PSW.W */
-#define PSW_OFFSET1	24
-#define PSW_OFFSET2	28
+/* pdc_entry_table will be copied into low memory. */
+ENTRY(pdc_entry_table)
+#ifdef CONFIG_64BIT
+	/* see section "Testing the Current State of the PSW W-Bit",
+	   page I-2 in parisc2 spec */
+	addb,*>,n %r0,%r0,pdc_called_narrow /* branch if narrow addressing */
 
-ENTRY(pdc_entry)
+pdc_called_wide:
+#if 0	/* automatically set wide-bit */
+	.import psw_defaults, data
+	load32_firmware psw_defaults,%r1	/* set PDC_PSW_ENDIAN_BIT in psw_defaults */
+	ldi PDC_PSW_ENDIAN_BIT,%r31
+	stw %r31,0(%r1)
+#endif
+
+	/* we know that PDC was called with PSW.W=1 */
+	load32_firmware pdc_entry_64_64,%r1
+	bv,n %r0(%r1)
+
+pdc_called_narrow:
+	/* we know that PDC was called with PSW.W=0 */
+	load32		MEM_PDC_ENTRY + pdc_entry_64_32 - pdc_entry_table,%r1
+	bv              0(%r1)
+	set_PSW_W	/* enable PSW.W */
+#else
+ENTRY(pdc_entry_32)	/* 32-bit PDC */
 	stw %rp,-20(%sp)
 	stw %dp,-32(%sp)
 	stw %arg0,-36(%sp)
 	stw %arg1,-40(%sp)
 	stw %arg2,-44(%sp)
 	stw %arg3,-48(%sp)
-	stw %r31,PSW_OFFSET1(%r0)	/* store PSW_W */
 	ldo -FRAME_SIZE(%sp),%arg0
+
+	loadgp
+	load32		MEM_PDC_ENTRY + 1f - pdc_entry_table,%rp
+	load32 parisc_pdc_entry, %r1
+	clear_PSW_W
+	bv              0(%r1)
+	ldo FRAME_SIZE(%sp),%sp
+1:
+	ldo -FRAME_SIZE(%sp),%sp
+	ldw -20(%sp),%rp
+	ldw -32(%sp),%dp
+	bv,n %r0(%rp)
+END(pdc_entry_32)
+#endif
+END(pdc_entry_table)
+
+#ifdef CONFIG_64BIT
+ENTRY(pdc_entry_64_32)	/* 32-bit call on 64-bit PDC */
+	/* clear upper bits */
+	depdi   0, 31, 32, %sp
+	depdi   0, 31, 32, %rp
+	depdi   0, 31, 32, %dp
+	depdi   0, 31, 32, %arg0
+	depdi   0, 31, 32, %arg1
+	depdi   0, 31, 32, %arg2
+	depdi   0, 31, 32, %arg3
+
+	copy %sp,%r1	/* copy original stack pointer */
+	ldo 2*FRAME_SIZE(%sp),%sp /* build new 64-bit stack */
+
+	std %rp,-0x10(%sp)
+	std %dp,-0x18(%sp)
+	std %arg0,-0x20(%sp)
+	std %arg1,-0x28(%sp)
+	std %arg2,-0x30(%sp)
+	std %arg3,-0x38(%sp)
+
+	ldw -FRAME_SIZE32 + 12(%r1),%arg0	/* ARG4 */
+	depdi   0, 31, 32, %arg0
+	std %arg0, -0x40(%sp)
+
+	ldw -FRAME_SIZE32 + 8(%r1),%arg0	/* ARG5 */
+	depdi   0, 31, 32, %arg0
+	std %arg0, -0x48(%sp)
+
+	ldw -FRAME_SIZE32 + 4(%r1),%arg0	/* ARG6 */
+	depdi   0, 31, 32, %arg0
+	std %arg0, -0x50(%sp)
+
+	ldw -FRAME_SIZE32 + 0(%r1),%arg0	/* ARG7 */
+	depdi   0, 31, 32, %arg0
+	std %arg0, -0x58(%sp)
+
+	ldo -0x58(%sp),%arg0	/* points to arg7 */
+
+	loadgp
+	load32_firmware parisc_pdc_entry,%r1
+	load32	MEM_PDC_ENTRY + c64_32_return - pdc_entry_table,%rp
+	bv 0(%r1)
+	ldo FRAME_SIZE(%sp),%sp
+
+c64_32_return:
+	/* return from PDC call */
+	ldo -FRAME_SIZE(%sp),%sp
+	ldd -0x10(%sp),%rp
+	ldd -0x18(%sp),%dp
+	ldd -0x30(%sp),%arg2	/* addr of result buffer */
+	ldo -2*FRAME_SIZE(%sp),%sp /* restore original 32-bit stack */
+
+#if 0
+	.import psw_defaults, data
+	load32_firmware psw_defaults,%r1	/* test PDC_PSW_ENDIAN_BIT in psw_defaults */
+	ldw 0(%r1),%r1
+	ldi PDC_PSW_ENDIAN_BIT,%arg3
+	and %r1,%arg3,%r1
+	cmpb,<>,n %r1,%r0,5f	/* skip copy results */
+#elif 0
+	.import firmware_width_locked, data
+	load32_firmware firmware_width_locked,%r1
+	ldw 0(%r1),%r1
+	cmpb,=,n %r1,%r0,5f	/* skip copy results */
+#endif
+
+	cmpb,=,n %r0,%arg2,5f   /* skip copy results if target buffer is NULL */
+	cmpb,<   %ret0,%r0,5f	/* skip copy results if return value was negative (=error) */
+	ldi MEM_PDC_ENTRY,%r1
+	cmpb,>=,n %arg2,%r1,convert_ret64_buffer  /* copy results if target buffer >= MEM_PDC_ENTRY */
+	b,n .
+	.word 0xfffdead0	/* immediately halt the emulator */
+
+convert_ret64_buffer:
+	/* copy 64-bit-wide PDC result to 32-bit wide results */
+	ldi 32,%r1
+	copy %arg2,%arg3
+.L1:	ldd,ma 8(%arg2),%arg1
+	stwm %arg1, 4(%arg3)
+	ldo -1(%r1),%r1
+	cmpb,>>,n %r1,%r0,.L1
+
+5:	/* return to caller */
+	clear_PSW_W
+	bv,n %r0(%rp)
+
+ENTRY(pdc_entry_64_64)	/* 64-bit call on 64-bit PDC */
+	std %rp,-0x10(%sp)
+	stw %dp,-0x18(%sp)
+	std %arg0,-0x20(%sp)
+	std %arg1,-0x28(%sp)
+	std %arg2,-0x30(%sp)
+	std %arg3,-0x38(%sp)
+	std %r22, -0x40(%sp)
+	std %r21, -0x48(%sp)
+	std %r20, -0x50(%sp)
+	std %r19, -0x58(%sp)
+	ldo -0x58(%sp),%arg0	/* points to arg7 */
 
 	loadgp
 	b,l parisc_pdc_entry, %rp
 	ldo FRAME_SIZE(%sp),%sp
 
 	ldo -FRAME_SIZE(%sp),%sp
-	ldw -20(%sp),%rp
-	ldw -32(%sp),%dp
-	ldw PSW_OFFSET1(%r0),%r31
-	load32 0x8000000,%r1	/* mask PSW_W */
-	and,= %r31,%r1,%r0
-	bv %r0(%rp)		/* return without setting PSW_W */
-	nop
-	bv %r0(%rp)		/* return with setting PSW_W */
-	.level 2.0
-	nop // ssm PSW_W_SM,%r0
-	.level LEVEL
-END(pdc_entry)
+	ldd -0x10(%sp),%rp
+	ldd -0x18(%sp),%dp
+	bv,n %r0(%rp)
+END(pdc_entry_64_32)
+#endif
 
-/* pdc_entry_table will be copied into low memory. */
-ENTRY(pdc_entry_table)
-	load32 pdc_entry,%r1
-	clear_PSW_W
-	bv,n %r0(%r1)
-END(pdc_entry_table)
 
 ENTRY(iodc_entry_table)
 	load32 parisc_iodc_ENTRY_INIT,   %r1
+iodc_entry_table_one_entry:
+	.export iodc_entry_table_one_entry
 	load32 parisc_iodc_ENTRY_IO,     %r1
 	load32 parisc_iodc_ENTRY_SPA,    %r1
 	load32 parisc_iodc_ENTRY_CONFIG, %r1
@@ -501,8 +633,41 @@ ENTRY(iodc_entry_table)
 	load32 parisc_iodc_ENTRY_TLB,    %r1
 END(iodc_entry_table)
 
+/* the code for iodc_entry[] will be copied to user.
+   the first load32* wil be replaced by an entry from
+   the iodc_entry_table[] table above. */
 ENTRY(iodc_entry)
+	/* this first call we be replaced at runtime: */
 	load32 parisc_iodc_ENTRY_IO, %r1
+
+#ifdef CONFIG_64BIT
+	addb,*>,n %r0,%r0,iodc_narrow /* branch if narrow addressing */
+	nop
+#if 1
+	// HALT
+	load32_firmware hlt,%r1
+	bv,n %r0(%r1)
+#endif
+	b,n iodc_wide
+
+iodc_narrow:
+	/* we run narrow, but want wide! Jump to firmware to set PSW.W=1 */
+	stw %r1,-20(%sp)	/* temporarily store r1 */
+
+	/* Switch to wide mode. */
+#if 0
+1:	mfia            %r1
+	ldo             2f-1b(%r1),%r1
+	depdi           0,31,32,%r1
+#else
+	load32		MEM_PDC_ENTRY + 2f - pdc_entry_table,%r1
+#endif
+	bv              0(%r1)
+	set_PSW_W
+2:	/* now in wide mode, running in low memory */
+	depdi   0, 31, 32, %sp
+	ldw     -20(%sp),%r1	/* restore r1 */
+	load_fw_upper32 %r1
 
 	stw %rp,-20(%sp)
 	stw %dp,-32(%sp)
@@ -510,9 +675,52 @@ ENTRY(iodc_entry)
 	stw %arg1,-40(%sp)
 	stw %arg2,-44(%sp)
 	stw %arg3,-48(%sp)
+	ldo -FRAME_SIZE32(%sp),%arg0
+	loadgp
+	load32	MEM_PDC_ENTRY +  .iodc_ret32 - pdc_entry_table,%rp
+	bv %r0(%r1)
+	ldo 2*FRAME_SIZE(%sp),%sp
+.iodc_ret32:
+	ldo -2*FRAME_SIZE(%sp),%sp
+	ldw -20(%sp),%rp
+	ldw -32(%sp),%dp
+	bv   %r0(%rp)
 	clear_PSW_W
-	stw %r31,PSW_OFFSET2(%r0)	/* store PSW_W */
+	/* END for 32-bit IODC call */
+
+iodc_narrow_jump_to_firmware:
+	/* clear upper bits */
+	depdi   0, 31, 32, %rp
+	depdi   0, 31, 32, %dp
+	depdi   0, 31, 32, %arg0
+	depdi   0, 31, 32, %arg1
+	depdi   0, 31, 32, %arg2
+	depdi   0, 31, 32, %arg3
+	depdi   0, 31, 32, %r22
+	depdi   0, 31, 32, %r21
+	depdi   0, 31, 32, %r20
+	depdi   0, 31, 32, %r19
+iodc_wide:
+	std %rp,-0x10(%sp)
+	std %dp,-0x18(%sp)
+	std %arg0,-0x20(%sp)
+	std %arg1,-0x28(%sp)
+	std %arg2,-0x30(%sp)
+	std %arg3,-0x38(%sp)
+	std %r22, -0x40(%sp)
+	std %r21, -0x48(%sp)
+	std %r20, -0x50(%sp)
+	std %r19, -0x58(%sp)
+	ldo -0x58(%sp),%arg0	/* points to arg7 */
+#else
+	stw %rp,-20(%sp)
+	stw %dp,-32(%sp)
+	stw %arg0,-36(%sp)
+	stw %arg1,-40(%sp)
+	stw %arg2,-44(%sp)
+	stw %arg3,-48(%sp)
 	ldo -FRAME_SIZE(%sp),%arg0
+#endif
 
 	loadgp
 	load32 .iodc_ret, %rp
@@ -520,20 +728,20 @@ ENTRY(iodc_entry)
 	ldo FRAME_SIZE(%sp),%sp
 .iodc_ret:
 	ldo -FRAME_SIZE(%sp),%sp
+#ifdef CONFIG_64BIT
+	ldd -0x10(%sp),%rp
+	ldd -0x18(%sp),%dp
+#else
 	ldw -20(%sp),%rp
 	ldw -32(%sp),%dp
-
-// .word 0xfffdead0
-	ldw PSW_OFFSET2(%r0),%r31
-	load32 0x8000000,%r1	/* mask PSW_W */
-	and,= %r31,%r1,%r0
-	bv %r0(%rp)		/* return without setting PSW_W */
-	nop
-	bv %r0(%rp)		/* return with setting PSW_W */
-	.level 2.0
-	nop // ssm PSW_W_SM,%r0
-	.level LEVEL
+#endif
+	bv   %r0(%rp)
+	clear_PSW_W
 END(iodc_entry)
+
+/* PDC is copied up until here: */
+pdc_entry_table_end:
+	.export pdc_entry_table_end
 
 /****************************************************************
  * Rom Header for VGA / STI

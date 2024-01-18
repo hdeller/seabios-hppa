@@ -159,9 +159,11 @@ unsigned int tlb_entries = 256;
 #define PARISC_SERIAL_CONSOLE   PORT_SERIAL1
 
 extern char pdc_entry;
-extern char pdc_entry_table[4*4];
+extern char pdc_entry_table;
+extern char pdc_entry_table_end;
 extern char iodc_entry[512];
-extern char iodc_entry_table[14*4];
+extern char iodc_entry_table;
+extern char iodc_entry_table_one_entry;
 
 /* args as handed over for firmware calls */
 #define ARG0 arg[7-0]
@@ -1669,7 +1671,7 @@ static int pdc_iodc(unsigned int *arg)
 {
     unsigned long option = ARG1;
     unsigned long *result = (unsigned long *)ARG2;
-    unsigned long hpa;
+    unsigned long hpa, entry_len;
     hppa_device_t *dev;
     struct pdc_iodc *iodc_p;
     unsigned char *c;
@@ -1707,9 +1709,10 @@ static int pdc_iodc(unsigned int *arg)
             memcpy((void*) ARG5, &iodc_entry, *result);
             c = (unsigned char *) &iodc_entry_table;
             /* calculate offset into jump table. */
-            c += (ARG4 - PDC_IODC_RI_INIT) * 2 * sizeof(unsigned int);
-            memcpy((void*) ARG5, c, 2 * sizeof(unsigned int));
-            // dprintf(0, "\n\nSeaBIOS: Info PDC_IODC function OK\n");
+            entry_len = &iodc_entry_table_one_entry - &iodc_entry_table;
+            c += (ARG4 - PDC_IODC_RI_INIT) * entry_len;
+            memcpy((void*) ARG5, c, entry_len);
+            // printf("\n\nSeaBIOS: Info PDC_IODC function OK\n");
             flush_data_cache((char*)ARG5, *result);
             return PDC_OK;
             break;
@@ -3118,8 +3121,9 @@ void __VISIBLE start_parisc_firmware(void)
     /* memset((void*)PAGE0, 0, sizeof(*PAGE0)); */
 
     /* copy pdc_entry entry into low memory. */
-    memcpy((void*)MEM_PDC_ENTRY, &pdc_entry_table, 4*4);
-    flush_data_cache((char*)MEM_PDC_ENTRY, 4*4);
+    i = &pdc_entry_table_end - &pdc_entry_table;
+    memcpy((void*)MEM_PDC_ENTRY, &pdc_entry_table, i);
+    flush_data_cache((char*)MEM_PDC_ENTRY, i);
 
     PAGE0->memc_cont = ram_size;
     PAGE0->memc_phsize = ram_size;
