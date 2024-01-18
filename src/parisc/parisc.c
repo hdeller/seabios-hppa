@@ -1604,17 +1604,17 @@ static int pdc_cache(unsigned long *arg)
             machine_cache_info->ic_size = 1024; /* no instruction cache */
             machine_cache_info->dc_size = 1024; /* no data cache */
 #elif 1
-            machine_cache_info->dc_conf = (struct pdc_cache_cf) { 0 };  // .alias=1, .sh=3, };
-            machine_cache_info->ic_conf = (struct pdc_cache_cf) { 0 };  // .alias=1, .sh=3, };
+            machine_cache_info->dc_conf = (struct pdc_cache_cf) { .cc_line = 7, .cc_sh = 1, .cc_cst = 1 };
+            machine_cache_info->ic_conf = (struct pdc_cache_cf) { .cc_line = 7, .cc_sh = 1, .cc_cst = 1 };
 
             machine_cache_info->ic_size = 0; /* no instruction cache */
             machine_cache_info->ic_count = 0;
-            machine_cache_info->ic_loop = 0;
+            machine_cache_info->ic_loop = -1;
             machine_cache_info->ic_base = 0;
             machine_cache_info->ic_stride = 0;
             machine_cache_info->dc_size = 0; /* no data cache */
             machine_cache_info->dc_count = 0;
-            machine_cache_info->dc_loop = 0;
+            machine_cache_info->dc_loop = -1;
             machine_cache_info->dc_base = 0;
             machine_cache_info->dc_stride = 0;
 #endif
