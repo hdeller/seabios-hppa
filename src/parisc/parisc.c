@@ -244,6 +244,14 @@ void __VISIBLE __noreturn reset(void)
     while (1);
 }
 
+void __VISIBLE __noreturn firmware_fault_handler(unsigned long fault)
+{
+    printf("\n***************************\n"
+        "SeaBIOS: Detected trap #%lu, at 0x%lx:0x%lx, IIR=0x%lx, IOR addr=0x%lx:0x%lx\n", fault,
+        mfctl(17), mfctl(18), mfctl(19), mfctl(20), mfctl(21));
+    while (1) { asm("or %r10,%r10,%r10"); };
+}
+
 #undef BUG_ON
 #define BUG_ON(cond) \
     if (unlikely(cond)) { \
