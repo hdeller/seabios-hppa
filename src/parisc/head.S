@@ -244,6 +244,10 @@ $smp_exit_loop:
 	rsm	PSW_I, %r0	/* disable local irqs */
 	mtctl	%r0, CR_EIEM
 
+	/* Load IVT to detect and report crashes */
+	load32_firmware	BOOTADDR(firmware_default_ivt),%r1
+	mtctl	%r1, CR_IVA
+
 	/* provide PDCE_PROC entry in arg0 (required on 64-bit) */
 	load32	MEM_PDC_ENTRY, %arg0
 
@@ -287,8 +291,11 @@ $bss_loop:
 	cmpb,<<,n %r3,%r4,$bss_loop
 	STREGM	%r0,WORD_LEN(%r3)
 
-	load32	BOOTADDR(start_parisc_firmware),%r3
-	load_fw_upper32 %r3
+	/* Load IVT to detect and report crashes */
+	load32_firmware	BOOTADDR(firmware_default_ivt),%r1
+	mtctl	%r1, CR_IVA
+
+	load32_firmware	BOOTADDR(start_parisc_firmware),%r3
 	bv	0(%r3)
 	copy	%r0,%r2
 END(startup)
@@ -425,6 +432,21 @@ ENTRY(smp_ivt)
 	DEF_IVA_ENTRY
 	.endr
 END(smp_ivt)
+
+	.align 32
+ENTRY(firmware_default_ivt)	/* to detect crashes */
+	.set loop,0
+	.import firmware_fault_handler,code
+	.rept 32
+	.align 32
+	load32_firmware firmware_fault_handler,%arg0
+	loadgp
+	bv	0(%arg0)
+	ldi  loop,%arg0
+	.set loop,loop+1
+	.endr
+END(smp_ivt)
+
 
 /*******************************************************
 	PDC and IODC entry
