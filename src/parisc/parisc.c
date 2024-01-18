@@ -1950,7 +1950,7 @@ static int pdc_psw(unsigned long *arg)
     unsigned long *result = (unsigned long *)ARG2;
     unsigned long mask;
 
-    if (cpu_bit_width == 64 /* && !firmware_width_locked */)
+    if (is_64bit_CPU() /* && !firmware_width_locked*/)
         mask = PDC_PSW_WIDE_BIT | PDC_PSW_ENDIAN_BIT;
     else
         mask = PDC_PSW_ENDIAN_BIT;
@@ -1967,6 +1967,9 @@ static int pdc_psw(unsigned long *arg)
         BUG_ON((psw_defaults & PDC_PSW_ENDIAN_BIT) == 1);
         /* tell qemu the default mask */
         mtctl(psw_defaults, CR_PSW_DEFAULT);
+        /* let model know that we support 64-bit */
+        current_machine->pdc_model.width = (psw_defaults & PDC_PSW_WIDE_BIT) ? 1 : 0;
+        NO_COMPAT_RETURN_VALUE(ARG2);
     }
     return PDC_OK;
 }
