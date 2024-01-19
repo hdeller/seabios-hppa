@@ -1,6 +1,17 @@
+/* HP C3700 workstation */
 /* AUTO-GENERATED HEADER FILE FOR SEABIOS FIRMWARE */
 /* generated with Linux kernel */
 /* search for PARISC_QEMU_MACHINE_HEADER in Linux */
+
+#if 0
+1. Astro BC Runway Port [10] at 0xfffffffffed00000 { type:12, hv:0x582, sv:0xb, rev:0x0 }
+2. Elroy PCI Bridge [10:0] at 0xfffffffffed30000 { type:13, hv:0x782, sv:0xa, rev:0x0 }
+3. Elroy PCI Bridge [10:1] at 0xfffffffffed32000 { type:13, hv:0x782, sv:0xa, rev:0x0 }
+4. Elroy PCI Bridge [10:4] at 0xfffffffffed38000 { type:13, hv:0x782, sv:0xa, rev:0x0 }
+5. Elroy PCI Bridge [10:6] at 0xfffffffffed3c000 { type:13, hv:0x782, sv:0xa, rev:0x0 }
+6. Allegro W2 [32] at 0xfffffffffffa0000 { type:0, hv:0x5dc, sv:0x4, rev:0x0 }
+7. Memory [49] at 0xfffffffffed10200 { type:1, hv:0x9c, sv:0x9, rev:0x0 }
+#endif
 
 #define PARISC_MODEL "9000/785/C3700"
 
@@ -12,7 +23,7 @@
 
 #define PARISC_PDC_CAPABILITIES 0x0007
 
-#define PARISC_PDC_ENTRY_ORG 0xf0000018
+#define PARISC_PDC_ENTRY_ORG 0xfffffff0f0000018
 
 #define PARISC_PDC_CACHE_INFO \
 	0xc0000, 0x91802000, 0x20000, 0x0040, 0x0c00 \
