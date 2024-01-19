@@ -344,6 +344,10 @@ struct machine_info {
 #include "parisc/c3700.h"
 #include "parisc/machine-create.h"
 
+#define MACHINE	715
+#include "parisc/715_64.h"
+#include "parisc/machine-create.h"
+
 struct machine_info *current_machine = &machine_B160L;
 
 static hppa_device_t *parisc_devices = machine_B160L.device_list;
@@ -3085,6 +3089,15 @@ void __VISIBLE start_parisc_firmware(void)
         /* no serial port for now, will find later */
         mem_cons_boot.hpa = 0;
         mem_kbd_boot.hpa = 0;
+    }
+    if (strcmp(str, "715") == 0) {
+        has_astro = 0; /* No Astro */
+        current_machine = &machine_715;
+        pci_hpa = 0; /* No PCI bus */
+        hppa_port_pci_cmd  = 0;
+        hppa_port_pci_data = 0;
+        mem_cons_boot.hpa = 0xf0105000; /* serial port */
+        mem_kbd_boot.hpa = 0xf0105000;
     }
     parisc_devices = current_machine->device_list;
     strtcpy(qemu_machine, str, sizeof(qemu_machine));
