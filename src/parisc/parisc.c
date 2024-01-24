@@ -329,7 +329,7 @@ struct machine_info {
         int			pdc_version;
         int			pdc_cpuid;
         int			pdc_caps;
-        int			pdc_entry;
+        unsigned long		pdc_entry;
         unsigned long		pdc_cache_info[30];
         hppa_device_t		device_list[MAX_DEVICES];
 };
