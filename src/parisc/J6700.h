@@ -13,6 +13,17 @@ Found devices:
 6. Duet W2 [32] at 0xfffffffffffa0000 { type:0, hv:0x5dd, sv:0x4, rev:0x0 }
 7. Duet W2 [34] at 0xfffffffffffa2000 { type:0, hv:0x5dd, sv:0x4, rev:0x0 }
 8. Memory [49] at 0xfffffffffed10200 { type:1, hv:0xa, sv:0x9, rev:0x0 }
+
+lspci:
+00:0c.0 Ethernet controller: Digital Equipment Corporation DECchip 21142/43 (rev 41)
+00:0d.0 Multimedia audio controller: Analog Devices Device 1889
+00:0e.0 IDE interface: National Semiconductor Corporation 87415/87560 IDE (rev 03)
+00:0e.1 Bridge: National Semiconductor Corporation 87560 Legacy I/O (rev 01)
+00:0e.2 USB controller: National Semiconductor Corporation USB Controller (rev 02)
+00:0f.0 SCSI storage controller: Broadcom / LSI 53C896/897 (rev 07)
+00:0f.1 SCSI storage controller: Broadcom / LSI 53C896/897 (rev 07)
+01:01.0 Ethernet controller: Broadcom Inc. and subsidiaries NetXtreme BCM5701 Gigabit Ethernet (rev 15)
+02:02.0 Display controller: Hewlett-Packard Company Visualize FX (rev 02)
 #endif
 
 #define PARISC_MODEL "9000/785/J6700"
