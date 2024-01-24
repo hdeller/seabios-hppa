@@ -3115,9 +3115,8 @@ void __VISIBLE start_parisc_firmware(void)
     }
 
     /* real-time-clock addr */
-    rtc_ptr = (int *) (unsigned long)
-        romfile_loadint("/etc/hppa/rtc-addr", (unsigned long) LASI_RTC_HPA);
-    // dprintf(0, "RTC PTR 0x%x\n", (int)rtc_ptr);
+    rtc_ptr = (int *) F_EXTEND(romfile_loadint("/etc/hppa/rtc-addr", (int) LASI_RTC_HPA));
+    // dprintf(0, "RTC PTR 0x%p\n", rtc_ptr);
 
     /* use -fw_cfg opt/pdc_debug,string=255 to enable all firmware debug infos */
     pdc_debug = romfile_loadstring_to_int("opt/pdc_debug", 0);
