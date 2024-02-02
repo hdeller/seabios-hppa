@@ -203,6 +203,9 @@ static unsigned int chassis_code = 0;
 int powersw_nop;
 int *powersw_ptr;
 
+/* allow 64-bit OS installation on 64-bit firmware */
+int enable_OS64 = 1;
+
 /*
  * Real time clock emulation
  * Either LASI or Astro will provide access to an emulated RTC clock.
@@ -1556,8 +1559,8 @@ static int pdc_model(unsigned long *arg)
             /* unlock pdc call if running wide. */
             firmware_width_locked = !(psw_defaults & PDC_PSW_WIDE_BIT);
             result[0] = current_machine->pdc_caps;
-            result[0] |= PDC_MODEL_OS32; /* we only support 32-bit PDC for now. */
-            if (is_64bit_PDC()) /* and maybe 64-bit */
+            result[0] |= PDC_MODEL_OS32; /* we always support 32-bit PDC */
+            if (is_64bit_PDC() && enable_OS64) /* and maybe 64-bit */
                 result[0] |= PDC_MODEL_OS64; /* this means 64-bit PDC calls are supported */
             else
                 result[0] &= ~PDC_MODEL_OS64;
@@ -3113,6 +3116,9 @@ void __VISIBLE start_parisc_firmware(void)
     if (i == 0) {
         powersw_ptr = NULL;
     }
+
+    /* possibility to disable 64-bit OS installation: "-fw_cfg opt/OS64,string=0" */
+    enable_OS64 = romfile_loadstring_to_int("opt/OS64", enable_OS64);
 
     /* real-time-clock addr */
     rtc_ptr = (int *) F_EXTEND(romfile_loadint("/etc/hppa/rtc-addr", (int) LASI_RTC_HPA));
