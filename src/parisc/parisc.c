@@ -372,7 +372,7 @@ static const char *hpa_name(unsigned long hpa)
     struct pci_device *pci;
     int i;
 
-    #define DO(x) if (hpa == x) return #x;
+    #define DO(x) if (hpa == F_EXTEND(x)) return #x;
     DO(GSC_HPA)
     DO(DINO_HPA)
     DO(DINO_UART_HPA)
