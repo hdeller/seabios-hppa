@@ -550,7 +550,7 @@ static int HPA_is_keyboard_device(unsigned long hpa)
 
 static int artist_present(void)
 {
-    return !!(*(u32 *)0xf8380004 == 0x6dc20006);
+    return !!(*(u32 *)F_EXTEND(0xf8380004) == 0x6dc20006);
 }
 
 int HPA_is_LASI_graphics(unsigned long hpa)
@@ -808,7 +808,7 @@ static void remove_parisc_devices(unsigned int num_cpus)
     uninitialized = 0;
 
     /* check if qemu emulates LASI chip (LASI_IAR exists) */
-    if (*(unsigned long *)(LASI_HPA+16) == 0) {
+    if (has_astro || *(unsigned long *)(LASI_HPA+16) == 0) {
         remove_from_keep_list(LASI_UART_HPA);
         remove_from_keep_list(LASI_LAN_HPA);
         remove_from_keep_list(LASI_LPT_HPA);
@@ -2118,6 +2118,8 @@ static int pdc_lan_station_id(unsigned long *arg)
 
     switch (option) {
         case PDC_LAN_STATION_ID_READ:
+            if (has_astro)
+                return PDC_INVALID_ARG;
             if (ARG3 != LASI_LAN_HPA)
                 return PDC_INVALID_ARG;
             if (!keep_this_hpa(LASI_LAN_HPA))
@@ -3007,6 +3009,8 @@ void __VISIBLE start_parisc_firmware(void)
     char bootdrive = (char)cmdline; // c = hdd, d = CD/DVD
     show_boot_menu = (linux_kernel_entry == 1);
 
+    has_astro = (sizeof(long) != 4); /* 64-bit firmware does not support Dino */
+
     initialize_iodc_entry();
 
 #ifndef __LP64__
@@ -3053,7 +3057,6 @@ void __VISIBLE start_parisc_firmware(void)
      * but cfg() tries to initialize the PCI bus.
      */
     PAGE0->mem_cons.hpa = 0;
-    has_astro = 0;
     pci_hpa = PCI_HPA;    /* HPA of Dino or Elroy0 */
     hppa_port_pci_cmd  = (PCI_HPA + DINO_PCI_ADDR);
     hppa_port_pci_data = (PCI_HPA + DINO_CONFIG_DATA);
