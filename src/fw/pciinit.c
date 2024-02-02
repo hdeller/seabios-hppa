@@ -527,6 +527,9 @@ static void dino_mem_addr_setup(struct pci_device *dev, void *arg)
     pcimem_start = 0xf2000000ULL;
     pcimem_end   = 0xff800000ULL;
 
+    if (has_astro || sizeof(long) != 4)
+        return;
+
     /* Setup DINO PCI I/O and mem window */
 
     outl(DINO_HPA | 1, 0xfffc0020); /* Set Dino Flex (Address) */
