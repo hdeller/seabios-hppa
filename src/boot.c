@@ -820,12 +820,16 @@ void find_initial_parisc_boot_drives(struct drive_s **harddisc,
 
 struct drive_s *select_parisc_boot_drive(char bootdrive)
 {
-    printf("  Available boot devices:\n");
+    int found = 0;
 
     // Show menu items
     struct bootentry_s *pos;
     hlist_for_each_entry(pos, &BootList, node) {
         char desc[77];
+        if (!found) {
+            printf("  Available boot devices:\n");
+            found = 1;
+        }
         printf("  FWSCSI.%d.0 : %s\n", pos->drive->target
                , strtcpy(desc, pos->description, ARRAY_SIZE(desc)));
     }
