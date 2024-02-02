@@ -441,17 +441,43 @@ ENTRY(smp_ivt)
 	.endr
 END(smp_ivt)
 
+/*******************************************************
+	Fault detection & reporting Interrupt vector table (IVT)
+ *******************************************************/
+
+/* fault happened at bootup. Return to instruction after fault. */
+ENTRY(fault_return_to_caller)
+	mfctl	%cr18,TEMP
+	ldo	4(TEMP),TEMP
+	mtctl	TEMP,%cr18	/* IIAOQ head */
+	ldo	4(TEMP),TEMP
+	mtctl	TEMP,%cr18	/* IIAOQ tail */
+	rfi
+	nop
+END(fault_return_to_caller)
+
+/* call firmware_fault_handler in parisc.c and halt. */
+ENTRY(fault_call_firmware)
+	load32_firmware firmware_fault_handler,TEMP
+	loadgp
+	bv,n	0(TEMP)
+END(fault_call_firmware)
+
 	.align 32
 ENTRY(firmware_default_ivt)	/* to detect crashes */
 	.set loop,0
 	.import firmware_fault_handler,code
 	.rept 32
-	.align 32
-	load32_firmware firmware_fault_handler,%arg0
-	loadgp
-	bv	0(%arg0)
-	ldi  loop,%arg0
+	/* Make sure to use shadow registers only! */
+	/* While booting up we check if various devices are available.
+	   Allow such checks and do not raise an HPMC. */
+	ldi	loop,TEMP	/* trap# into TEMP */
+	cmpib,= 1,TEMP,fault_return_to_caller
+	nop
+	b	fault_call_firmware
+	ldi	loop,%arg0	/* trap# into arg0 */
 	.set loop,loop+1
+	.align 32
 	.endr
 END(smp_ivt)
 
