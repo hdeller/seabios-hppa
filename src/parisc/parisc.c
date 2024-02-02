@@ -2942,7 +2942,7 @@ static void find_scsi_pci_card(void)
 
 
 /* Prepare boot paths in PAGE0 and stable memory */
-static void prepare_boot_path(volatile struct pz_device *dest,
+static int prepare_boot_path(volatile struct pz_device *dest,
         const struct pz_device *source,
         unsigned int stable_offset)
 {
@@ -2952,7 +2952,8 @@ static void prepare_boot_path(volatile struct pz_device *dest,
 
     hpa = source->hpa;
     dev = find_hpa_device(hpa);
-    BUG_ON(!dev);
+    if (!dev)
+        return 1;
 
     if (0 && DEV_is_storage_device(dev))
         mod_path = &mod_path_emulated_drives;
@@ -2971,6 +2972,7 @@ static void prepare_boot_path(volatile struct pz_device *dest,
 
     BUG_ON(sizeof(*mod_path) != 0x20);
     BUG_ON(sizeof(struct pdc_module_path) != 0x20);
+    return 0;
 }
 
 unsigned long _atoul(char *str)
@@ -3324,7 +3326,8 @@ void __VISIBLE start_parisc_firmware(void)
         mod_path_emulated_drives.layers[1] = parisc_boot_harddisc->lun;
     }
 
-    prepare_boot_path(&(PAGE0->mem_boot), &mem_boot_boot, 0x0);
+    if (prepare_boot_path(&(PAGE0->mem_boot), &mem_boot_boot, 0x0))
+        printf("Note: No supported SCSI controller or SCSI boot device found.\n");
 
     // copy primary boot path to alt boot path
     memcpy(&stable_storage[0x80], &stable_storage[0], 0x20);
