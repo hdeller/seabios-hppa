@@ -1044,7 +1044,7 @@ static void parisc_serial_out(char c)
     /* might not be initialized if problems happen during early bootup */
     if (!addr) {
         /* use debugoutput instead */
-        dprintf(0, "%c", c);
+        builtin_console_out(c);
         return;
     }
     if (0) {
