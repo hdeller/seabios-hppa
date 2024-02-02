@@ -293,8 +293,8 @@ $is_monarch_cpu_reboot:
 	.import _bss,data
 	.import _ebss,data
 
-	load32	BOOTADDR(_bss),%r3
-	load32	BOOTADDR(_ebss),%r4
+	load32_firmware	BOOTADDR(_bss),%r3
+	load32_firmware	BOOTADDR(_ebss),%r4
 $bss_loop:
 	cmpb,<<,n %r3,%r4,$bss_loop
 	STREGM	%r0,WORD_LEN(%r3)
