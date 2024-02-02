@@ -3209,7 +3209,7 @@ void __VISIBLE start_parisc_firmware(void)
 
     add_index_all_devices();
     /* Show list of HPA devices which are still returned by firmware. */
-    if (1) {
+    if (0) {
         hppa_device_t *dev;
         unsigned long hpa;
         for (i=0; parisc_devices[i].hpa; i++) {
