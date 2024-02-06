@@ -204,7 +204,8 @@ int powersw_nop;
 int *powersw_ptr;
 
 /* allow 64-bit OS installation on 64-bit firmware */
-int enable_OS64 = 1;
+#define OS64_32_DEFAULT (is_64bit_PDC() ? PDC_MODEL_OS64 | PDC_MODEL_OS32 : PDC_MODEL_OS32)
+int enable_OS64 = OS64_32_DEFAULT;
 
 /*
  * Real time clock emulation
@@ -1560,8 +1561,11 @@ static int pdc_model(unsigned long *arg)
             /* unlock pdc call if running wide. */
             firmware_width_locked = !(psw_defaults & PDC_PSW_WIDE_BIT);
             result[0] = current_machine->pdc_caps;
-            result[0] |= PDC_MODEL_OS32; /* we always support 32-bit PDC */
-            if (is_64bit_PDC() && enable_OS64) /* and maybe 64-bit */
+            if (!is_64bit_PDC() || (enable_OS64 & PDC_MODEL_OS32))
+                result[0] |= PDC_MODEL_OS32; /* we support 32-bit PDC */
+            else
+                result[0] &= ~PDC_MODEL_OS32;
+            if (is_64bit_PDC() && (enable_OS64 & PDC_MODEL_OS64)) /* and maybe 64-bit */
                 result[0] |= PDC_MODEL_OS64; /* this means 64-bit PDC calls are supported */
             else
                 result[0] &= ~PDC_MODEL_OS64;
@@ -3129,8 +3133,12 @@ void __VISIBLE start_parisc_firmware(void)
         powersw_ptr = NULL;
     }
 
-    /* possibility to disable 64-bit OS installation: "-fw_cfg opt/OS64,string=0" */
-    enable_OS64 = romfile_loadstring_to_int("opt/OS64", enable_OS64);
+    /* possibility to disable or limit to 64-bit OS installation: "-fw_cfg opt/OS64,string=3" */
+    if (is_64bit_PDC()) {
+        enable_OS64 = romfile_loadstring_to_int("opt/OS64", enable_OS64);
+        if ((enable_OS64 & OS64_32_DEFAULT) == 0)
+            enable_OS64 = OS64_32_DEFAULT;
+    }
 
     /* real-time-clock addr */
     rtc_ptr = (int *) F_EXTEND(romfile_loadint("/etc/hppa/rtc-addr", (int) LASI_RTC_HPA));
@@ -3291,7 +3299,7 @@ void __VISIBLE start_parisc_firmware(void)
     printf("\n");
     printf("SeaBIOS PA-RISC %d-bit Firmware Version " SEABIOS_HPPA_VERSION_STR
            " (QEMU %s)\n\n"
-            "Duplex Console IO Dependent Code (IODC) revision 1\n"
+            "Duplex Console IO Dependent Code (IODC) revision " SEABIOS_HPPA_VERSION_STR "\n"
             "\n", is_64bit_PDC() ? 64 : 32, qemu_version);
     printf("------------------------------------------------------------------------------\n"
             "  (c) Copyright 2017-2024 Helge Deller <deller@gmx.de> and SeaBIOS developers.\n"
@@ -3303,11 +3311,13 @@ void __VISIBLE start_parisc_firmware(void)
                 " MHz    %s                 Functional            0 KB\n",
                 i < 10 ? " ":"", i, i?"Idle  ":"Active");
     printf("\n\n");
-    printf("  Emulated machine:     HP %s (%d-bit %s) with %d-bit PDC\n"
+    printf("  Emulated machine:     HP %s (%d-bit %s), %d-bit PDC%s%s\n"
             "  Available memory:     %lu MB\n"
             "  Good memory required: %d MB\n\n",
             qemu_machine, cpu_bit_width, is_64bit_CPU() ? "PA2.0" : "PA1.1",
             is_64bit_PDC() ? 64 : 32,
+            enable_OS64 & PDC_MODEL_OS32 ? ", OS32":"",
+            enable_OS64 & PDC_MODEL_OS64 ? ", OS64":"",
             ram_size/1024/1024, MIN_RAM_SIZE/1024/1024);
 
     // search boot devices
