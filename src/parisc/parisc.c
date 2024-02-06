@@ -1756,6 +1756,7 @@ static int pdc_tod(unsigned long *arg)
             return PDC_OK;
         case PDC_TOD_WRITE:
             *rtc_ptr = ARG2;
+            NO_COMPAT_RETURN_VALUE(ARG2);
             return PDC_OK;
         case 2: /* PDC_TOD_CALIBRATE_TIMERS */
             /* double-precision floating-point with frequency of Interval Timer in megahertz: */
