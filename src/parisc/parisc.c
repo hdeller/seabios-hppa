@@ -1547,6 +1547,7 @@ static int pdc_model(unsigned long *arg)
         case PDC_MODEL_DISPEC:
             if (ARG3 != current_machine->pdc_model.pot_key)
                 return -20;
+            NO_COMPAT_RETURN_VALUE(ARG2);
             return PDC_OK;
         case PDC_MODEL_CPU_ID:
             /* if CPU does not support 64bits, use the B160L CPUID */
@@ -1579,6 +1580,7 @@ static int pdc_model(unsigned long *arg)
             strtcpy((char *)ARG3, model_str, 16);
             /* use: current_machine->pdc_model.sw_id ? */
             strtcpy((char *)ARG4, "001122334455", 16);
+            NO_COMPAT_RETURN_VALUE(ARG2);
             return PDC_OK;
     }
     dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_MODEL function %ld %lx %lx %lx %lx\n", ARG1, ARG2, ARG3, ARG4, ARG5);
@@ -1942,6 +1944,7 @@ static int pdc_mem(unsigned long *arg)
             return PDC_OK;
         case PDC_MEM_GOODMEM:
             GoldenMemory = (unsigned int)ARG3;
+            NO_COMPAT_RETURN_VALUE(ARG2);
             return PDC_OK;
         case PDC_MEM_GET_MEMORY_SYSTEM_TABLES_SIZE:
         case PDC_MEM_GET_MEMORY_SYSTEM_TABLES:
@@ -2073,6 +2076,7 @@ static int pdc_soft_power(unsigned long *arg)
              * software (ARG3=1) control. */
             *powersw_ptr = (ARG3 & 1) << 8 | (*powersw_ptr & 1);
             check_powersw_button();
+            NO_COMPAT_RETURN_VALUE(ARG2);
             return PDC_OK;
     }
     // dprintf(0, "\n\nSeaBIOS: PDC_SOFT_POWER called with ARG2=%x ARG3=%x ARG4=%x\n", ARG2, ARG3, ARG4);
@@ -2108,6 +2112,7 @@ static int pdc_io(unsigned long *arg)
             // return PDC_BAD_OPTION;
         case PDC_IO_RESET:
         case PDC_IO_RESET_DEVICES:
+            NO_COMPAT_RETURN_VALUE(ARG2);
             return PDC_OK;
     }
     return PDC_BAD_OPTION;
@@ -2127,6 +2132,7 @@ static int pdc_lan_station_id(unsigned long *arg)
                 return PDC_INVALID_ARG;
             /* Let qemu store the MAC of NIC to address @ARG2 */
             *(unsigned long *)(LASI_LAN_HPA+12) = ARG2;
+            NO_COMPAT_RETURN_VALUE(ARG2);
             return PDC_OK;
     }
     return PDC_BAD_OPTION;
