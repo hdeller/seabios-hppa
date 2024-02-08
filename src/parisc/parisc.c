@@ -370,7 +370,6 @@ static hppa_device_t *parisc_devices = machine_B160L.device_list;
 
 static const char *hpa_name(unsigned long hpa)
 {
-    struct pci_device *pci;
     int i;
 
     #define DO(x) if (hpa == F_EXTEND(x)) return #x;
@@ -407,17 +406,12 @@ static const char *hpa_name(unsigned long hpa)
         }
     }
 
-    /* could be a PCI device */
-    foreachpci(pci) {
-        unsigned long mem, mmio;
-        mem = pci_config_readl(pci->bdf, PCI_BASE_ADDRESS_0);
-        mem &= PCI_BASE_ADDRESS_MEM_MASK;
-        if (hpa == mem)
-            return "HPA_PCI_CARD_MEM";
-        mmio = pci_config_readl(pci->bdf, PCI_BASE_ADDRESS_2);
-        mmio &= PCI_BASE_ADDRESS_MEM_MASK;
-        if (hpa == mem)
-            return "HPA_PCI_CARD_MMIO";
+    /* search PCI devices */
+    hppa_device_t *dev = find_hpa_device(hpa);
+    if (dev) {
+        static char pci_dev_name[12];
+        snprintf(pci_dev_name, sizeof(pci_dev_name), "PCI_%pP", dev->pci);
+        return pci_dev_name;
     }
 
     return "UNKNOWN HPA";
