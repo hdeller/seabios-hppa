@@ -2677,12 +2677,14 @@ static void menu_loop(void)
     char input[24];
     char *c, reply;
 
-    // snprintf(input, sizeof(input), "BOOT FWSCSI.%d.0", boot_drive->target);
 again:
     print_menu();
 
 again2:
     input[0] = '\0';
+    if (is_64bit_PDC() && HPA_is_LASI_graphics(PAGE0->mem_cons.hpa)) {
+        printf("WARNING: USB Keyboard not yet functional in boot menu with 64-bit firmware!\n");
+    }
     printf("Main Menu: Enter command > ");
     /* ask user for boot menu command */
     enter_text(input, sizeof(input)-1);
