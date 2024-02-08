@@ -130,7 +130,7 @@ void sti_console_init(struct sti_rom *rom)
 
 void sti_putc(const char c)
 {
-    struct sti_rom *rom = (struct sti_rom *)PAGE0->proc_sti;
+    struct sti_rom *rom = (struct sti_rom *) ROM_EXTEND(PAGE0->proc_sti);
     struct sti_rom_font *font = (void *)rom + rom->font_start;
     static int row, col;
 

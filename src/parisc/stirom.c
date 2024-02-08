@@ -34,6 +34,8 @@
 
 #define __stifunc(_name) __attribute__((section(".sti.text." _name)))
 
+#define STI_F_EXTEND(x) ((void*)(long)(int)(x))
+
 static const __stidata char user_data[256] __aligned(32);
 
 static const region_t sti_region_list[STI_REGION_MAX] __stidata __aligned(32) = {
@@ -3283,7 +3285,7 @@ struct sti_rom __stiheader sti_proc_rom = {
 static void __stitext write_artist(struct sti_glob_cfg *cfg,
                                    int reg, u32 val)
 {
-    gsc_writel((void *)cfg->region_ptrs[2] + reg, val);
+    gsc_writel(STI_F_EXTEND(cfg->region_ptrs[2] + reg), val);
 }
 
 static int __stifunc("state_mgmt") sti_state_mgmt(struct sti_state_flags *flags,
@@ -3347,7 +3349,7 @@ static int __stifunc("font_unpmv") sti_font_unpmv(struct sti_font_flags *flags,
                                                   struct sti_font_outptr *out,
                                                   struct sti_glob_cfg *cfg)
 {
-    struct font *font = (struct font *) in->font_start_addr;
+    struct font *font = (struct font *) ROM_EXTEND(in->font_start_addr);
     int bpc = font->hdr.bytes_per_char;
     int width = font->hdr.width;
     unsigned char *src;
@@ -3396,8 +3398,8 @@ static int __stifunc("init_graph") sti_init_graph(struct sti_init_flags *flags,
         struct sti_init_outptr *out,
         struct sti_glob_cfg *cfg)
 {
-    u32 *cmap = (u32 *)cfg->region_ptrs[1];
-    u32 resolution = *(u32 *)(cfg->region_ptrs[2] + 0x111110);
+    u32 *cmap = STI_F_EXTEND(cfg->region_ptrs[1]);
+    u32 resolution = *(u32 *)STI_F_EXTEND(cfg->region_ptrs[2] + 0x111110);
 
     out->errno = 0;
     if (resolution & (1 << 31)) {
@@ -3531,7 +3533,7 @@ int __stifunc("set_cm_entry") sti_set_cm_entry(struct setcm_flags *flags,
                                                struct setcm_outptr *out,
                                                struct sti_glob_cfg *cfg)
 {
-    u32 *cmap = (u32 *)cfg->region_ptrs[1];
+    u32 *cmap = STI_F_EXTEND(cfg->region_ptrs[1]);
     (void)flags;
     (void)cfg;
 
