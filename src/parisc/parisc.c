@@ -3082,6 +3082,7 @@ void __VISIBLE start_parisc_firmware(void)
     boot_init();
 
     DebugOutputPort = romfile_loadint("/etc/hppa/DebugOutputPort", CPU_HPA + 24);
+    DebugOutputPort = F_EXTEND(DebugOutputPort);
 
     i = romfile_loadint("/etc/firmware-min-version", 0);
     if (i && i > SEABIOS_HPPA_VERSION) {
