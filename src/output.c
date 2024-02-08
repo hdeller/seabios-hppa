@@ -313,7 +313,11 @@ bvprintf(struct putcinfo *action, const char *fmt, va_list args)
 #endif
             if (!MODESEGMENT && GET_GLOBAL(*(u8*)(n+1)) == 'P') {
                 // %pP is 'struct pci_device' printer
+#ifdef __LP64__
+                put_pci_device(action, (void*)val64);
+#else
                 put_pci_device(action, (void*)val);
+#endif
                 n++;
                 break;
             }
