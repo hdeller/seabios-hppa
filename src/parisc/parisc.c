@@ -1862,6 +1862,8 @@ static int pdc_add_valid(unsigned long *arg)
         return 1;
     if (arg2 <= 0xffffffff)
         return PDC_OK;
+    if (find_hpa_device(arg2))
+        return PDC_OK;
     dprintf(0, "\n\nSeaBIOS: FAILED!!!! PDC_ADD_VALID function %ld arg2=%lx called.\n", option, arg2);
     return PDC_REQ_ERR_0; /* Operation completed with a requestor bus error. */
 }
