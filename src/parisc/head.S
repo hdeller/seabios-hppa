@@ -494,13 +494,6 @@ ENTRY(pdc_entry_table)
 	addb,*>,n %r0,%r0,pdc_called_narrow /* branch if narrow addressing */
 
 pdc_called_wide:
-#if 0	/* automatically set wide-bit */
-	.import psw_defaults, data
-	load32_firmware psw_defaults,%r1	/* set PDC_PSW_ENDIAN_BIT in psw_defaults */
-	ldi PDC_PSW_ENDIAN_BIT,%r31
-	stw %r31,0(%r1)
-#endif
-
 	/* we know that PDC was called with PSW.W=1 */
 	load32_firmware pdc_entry_64_64,%r1
 	bv,n %r0(%r1)
@@ -588,20 +581,6 @@ c64_32_return:
 	ldd -0x30(%sp),%arg2	/* addr of result buffer */
 	ldo -2*FRAME_SIZE(%sp),%sp /* restore original 32-bit stack */
 
-#if 0
-	.import psw_defaults, data
-	load32_firmware psw_defaults,%r1	/* test PDC_PSW_ENDIAN_BIT in psw_defaults */
-	ldw 0(%r1),%r1
-	ldi PDC_PSW_ENDIAN_BIT,%arg3
-	and %r1,%arg3,%r1
-	cmpb,<>,n %r1,%r0,5f	/* skip copy results */
-#elif 0
-	.import firmware_width_locked, data
-	load32_firmware firmware_width_locked,%r1
-	ldw 0(%r1),%r1
-	cmpb,=,n %r1,%r0,5f	/* skip copy results */
-#endif
-
 	cmpb,=,n %r0,%arg2,5f   /* skip copy results if target buffer is NULL */
 	cmpb,<   %ret0,%r0,5f	/* skip copy results if return value was negative (=error) */
 	ldi MEM_PDC_ENTRY,%r1
@@ -623,8 +602,9 @@ convert_ret64_buffer:
 	bv,n %r0(%rp)
 
 ENTRY(pdc_entry_64_64)	/* 64-bit call on 64-bit PDC */
+	ldo FRAME_SIZE(%sp),%sp
 	std %rp,-0x10(%sp)
-	stw %dp,-0x18(%sp)
+	std %dp,-0x18(%sp)
 	std %arg0,-0x20(%sp)
 	std %arg1,-0x28(%sp)
 	std %arg2,-0x30(%sp)
@@ -642,7 +622,8 @@ ENTRY(pdc_entry_64_64)	/* 64-bit call on 64-bit PDC */
 	ldo -FRAME_SIZE(%sp),%sp
 	ldd -0x10(%sp),%rp
 	ldd -0x18(%sp),%dp
-	bv,n %r0(%rp)
+	bv  %r0(%rp)
+	ldo -FRAME_SIZE(%sp),%sp
 END(pdc_entry_64_32)
 #endif
 
