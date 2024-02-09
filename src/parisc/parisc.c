@@ -61,6 +61,7 @@ char cpu_bit_width;
 #endif
 
 #define is_64bit_CPU()     (cpu_bit_width == 64)  /* 64-bit CPU? */
+#define pat_disabled()     1    // !is_64bit_PDC()
 
 /* running 64-bit PDC, but called from 32-bit app */
 #define is_compat_mode()  (is_64bit_PDC() && ((psw_defaults & PDC_PSW_WIDE_BIT) == 0))
@@ -1411,6 +1412,7 @@ static const char *pdc_name(unsigned long num)
         DO(PDC_PAT_CELL)
         DO(PDC_PAT_CHASSIS_LOG)
         DO(PDC_PAT_CPU)
+        DO(PDC_PAT_EVENT)
         DO(PDC_PAT_PD)
         DO(PDC_LINK)
 #undef DO
@@ -2266,6 +2268,8 @@ static int pdc_pat_cell(unsigned long *arg)
             return PDC_OK;
         case PDC_PAT_CELL_GET_INFO:
             return PDC_BAD_OPTION; /* optional on single-cell machines */
+        case PDC_PAT_CELL_MODULE:
+            return PDC_BAD_OPTION;
         default:
             break;
     }
@@ -2293,6 +2297,22 @@ static int pdc_pat_cpu(unsigned long *arg)
             result[0] = hpa;
             result[1] = hpa;    /* location */
             result[2] = 0;      /* num siblings */
+            return PDC_OK;
+        default:
+            break;
+    }
+    dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_PAT_CPU OPTION %lu called with ARG2=%lx ARG3=%lx ARG4=%lx\n", option, ARG2, ARG3, ARG4);
+    return PDC_BAD_OPTION;
+}
+
+static int pdc_pat_event(unsigned long *arg)
+{
+    unsigned long option = ARG1;
+    unsigned long *result = (unsigned long *)ARG2;
+
+    switch (option) {
+        case PDC_PAT_EVENT_GET_CAPS:
+            result[0] = result[1] = 0x0f;       /* XXX: review caps! */
             return PDC_OK;
         default:
             break;
@@ -2469,28 +2489,33 @@ int __VISIBLE parisc_pdc_entry(unsigned long *arg FUNC_MANY_ARGS)
 
         /* PDC PAT functions */
         case PDC_PAT_CELL:
-            if (firmware_width_locked)
+            if (pat_disabled())
                 return PDC_BAD_PROC;
             return pdc_pat_cell(arg);
 
         case PDC_PAT_CHASSIS_LOG:
-            if (firmware_width_locked)
+            if (pat_disabled())
                 return PDC_BAD_PROC;
             dprintf(0, "\n\nSeaBIOS: PDC_PAT_CHASSIS_LOG OPTION %lu called with ARG2=%lx ARG3=%lx ARG4=%lx\n", option, ARG2, ARG3, ARG4);
             return PDC_BAD_PROC;
 
         case PDC_PAT_CPU:
-            if (firmware_width_locked)
+            if (pat_disabled())
                 return PDC_BAD_PROC;
             return pdc_pat_cpu(arg);
 
+        case PDC_PAT_EVENT:
+            if (pat_disabled())
+                return PDC_BAD_PROC;
+            return pdc_pat_event(arg);
+
         case PDC_PAT_PD:
-            if (firmware_width_locked)
+            if (pat_disabled())
                 return PDC_BAD_PROC;
             return pdc_pat_pd(arg);
 
         case PDC_PAT_MEM:
-            if (firmware_width_locked)
+            if (pat_disabled())
                 return PDC_BAD_PROC;
             return pdc_pat_mem(arg);
     }
