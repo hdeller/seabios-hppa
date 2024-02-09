@@ -659,21 +659,12 @@ ENTRY(iodc_entry)
 
 iodc_narrow:
 	/* we run narrow, but want wide! Jump to firmware to set PSW.W=1 */
-	stw %r1,-20(%sp)	/* temporarily store r1 */
-
 	/* Switch to wide mode. */
-#if 0
-1:	mfia            %r1
-	ldo             2f-1b(%r1),%r1
-	depdi           0,31,32,%r1
-#else
-	load32		MEM_PDC_ENTRY + 2f - pdc_entry_table,%r1
-#endif
-	bv              0(%r1)
+	load32		MEM_PDC_ENTRY + 2f - pdc_entry_table,%r31
+	bv              0(%r31)
 	set_PSW_W
 2:	/* now in wide mode, running in low memory */
 	depdi   0, 31, 32, %sp
-	ldw     -20(%sp),%r1	/* restore r1 */
 	load_fw_upper32 %r1
 
 	stw %rp,-20(%sp)
