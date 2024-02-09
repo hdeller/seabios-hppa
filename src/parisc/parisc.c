@@ -1568,8 +1568,16 @@ static int pdc_model(unsigned long *arg)
             result[0] &= ~0x30; /* remove NVA bits, we have no issues with non-equiv. aliasing */
             return PDC_OK;
         case PDC_MODEL_GET_INSTALL_KERNEL:
-            // No need to provide a special install kernel during installation of HP-UX
-            return PDC_BAD_OPTION;
+            /* default to IPL standard kernel on 32-bit OS */
+            if (!is_64bit_PDC() || (enable_OS64 & PDC_MODEL_OS64) == 0)
+                return PDC_BAD_OPTION;
+            // dprintf(1, "Default install kernel from IPL is: %s\n", (char *)ARG3);
+            /* tell IPL to load 64-bit install kernel called "WINSTALL" */
+            if (ARG5 > 9)
+                ARG5 = 9;
+            strtcpy((char *)ARG4, "WINSTALL", ARG5);
+            result[0] = ARG5;
+            return PDC_OK;
         case PDC_MODEL_GET_PLATFORM_INFO:
             if (1)      /* not supported on B160L or C3700 */
                 return PDC_BAD_OPTION;
