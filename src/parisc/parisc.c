@@ -3212,6 +3212,10 @@ void __VISIBLE start_parisc_firmware(void)
     memcpy((void*)MEM_PDC_ENTRY, &pdc_entry_table, i);
     flush_data_cache((char*)MEM_PDC_ENTRY, i);
 
+    if (is_64bit_PDC()) {
+        /* HP-UX 11 checks RAM in rminit() from this address */
+        *(unsigned int *) 0x33c = ram_size >> 12; /* # of pages */
+    }
     PAGE0->memc_cont = ram_size;
     PAGE0->memc_phsize = ram_size;
     PAGE0->memc_adsize = ram_size;
