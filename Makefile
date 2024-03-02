@@ -299,7 +299,7 @@ help: ; $(call do-kconfig, $@)
 ################ Generic rules
 
 clean:
-	$(Q)rm -rf $(OUT)
+	$(Q)rm -rf $(OUT) out-64/
 
 distclean: clean
 	$(Q)rm -f .config .config.old
