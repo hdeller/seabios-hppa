@@ -499,7 +499,8 @@ int DEV_is_serial_device(hppa_device_t *dev)
 {
     BUG_ON(!dev);
     if (dev->pci)
-        return (dev->pci->class == PCI_CLASS_COMMUNICATION_SERIAL);
+        return (dev->pci->class == PCI_CLASS_COMMUNICATION_SERIAL ||
+                dev->pci->class == PCI_CLASS_COMMUNICATION_MULTISERIAL);
     return ((dev->iodc->type & 0xf) == 0x0a); /* HPHW_FIO */
 }
 
@@ -2933,7 +2934,8 @@ static void find_serial_pci_card(void)
 {
     struct pci_device *pci;
     hppa_device_t *pdev;
-    u32 pmem;
+    unsigned long pmem;
+    char mm_mapped;
 
     if (!has_astro)     /* use built-in LASI serial port for console */
         return;
@@ -2945,9 +2947,26 @@ static void find_serial_pci_card(void)
     dprintf(1, "PCI: Enabling %pP for primary SERIAL PORT\n", pci);
     pci_config_maskw(pci->bdf, PCI_COMMAND, 0,
                      PCI_COMMAND_IO | PCI_COMMAND_MEMORY);
-    pmem = pci_enable_iobar(pci, PCI_BASE_ADDRESS_0);
-    dprintf(1, "PCI: Enabling %pP for primary SERIAL PORT mem %x\n", pci, pmem);
-    pmem += IOS_DIST_BASE_ADDR;
+    /* prefer memory-mapped I/O. Required for GSP for 64-bit HP-UX 11 */
+    mm_mapped = 1;
+    pmem = 0;
+    if (!pmem && !(pci_config_readl(pci->bdf, PCI_BASE_ADDRESS_0) & PCI_BASE_ADDRESS_SPACE_IO)
+        && (pci_config_readl(pci->bdf, PCI_BASE_ADDRESS_0) & PCI_BASE_ADDRESS_MEM_MASK))
+        pmem = (uintptr_t) pci_enable_membar(pci, PCI_BASE_ADDRESS_0);
+    if (!pmem && !(pci_config_readl(pci->bdf, PCI_BASE_ADDRESS_1) & PCI_BASE_ADDRESS_SPACE_IO)
+        && (pci_config_readl(pci->bdf, PCI_BASE_ADDRESS_1) & PCI_BASE_ADDRESS_MEM_MASK))
+        pmem = (uintptr_t) pci_enable_membar(pci, PCI_BASE_ADDRESS_1);
+    if (!pmem) {
+        mm_mapped = 0;
+        if (pci_config_readl(pci->bdf, PCI_BASE_ADDRESS_0) & PCI_BASE_ADDRESS_SPACE_IO)
+            pmem = pci_enable_iobar(pci, PCI_BASE_ADDRESS_0);
+        else
+            pmem = pci_enable_iobar(pci, PCI_BASE_ADDRESS_1);
+    }
+    dprintf(1, "PCI: Enabling %pP for primary SERIAL PORT %s %lx\n",
+        pci, mm_mapped ? "mem":"i/o", pmem);
+    if (!mm_mapped)
+        pmem += IOS_DIST_BASE_ADDR;
 
     /* set serial port for console output and keyboard input */
     pdev = &hppa_pci_devices[0];
