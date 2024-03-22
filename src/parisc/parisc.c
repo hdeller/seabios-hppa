@@ -1118,12 +1118,7 @@ void iodc_log_call(unsigned int *arg, const char *func)
     }
 }
 
-#define FUNC_MANY_ARGS , \
-    int a0, int a1, int a2, int a3,  int a4,  int a5,  int a6, \
-    int a7, int a8, int a9, int a10, int a11, int a12
-
-
-int __VISIBLE parisc_iodc_ENTRY_IO(unsigned int *arg FUNC_MANY_ARGS)
+int __VISIBLE parisc_iodc_ENTRY_IO(unsigned int *arg)
 {
     unsigned long hpa = COMPAT_VAL(ARG0);
     unsigned long option = ARG1;
@@ -1238,7 +1233,7 @@ int __VISIBLE parisc_iodc_ENTRY_IO(unsigned int *arg FUNC_MANY_ARGS)
 }
 
 
-int __VISIBLE parisc_iodc_ENTRY_INIT(unsigned int *arg FUNC_MANY_ARGS)
+int __VISIBLE parisc_iodc_ENTRY_INIT(unsigned int *arg)
 {
     unsigned long hpa = COMPAT_VAL(ARG0);
     unsigned long option = ARG1;
@@ -1282,20 +1277,20 @@ int __VISIBLE parisc_iodc_ENTRY_INIT(unsigned int *arg FUNC_MANY_ARGS)
     return PDC_BAD_OPTION;
 }
 
-int __VISIBLE parisc_iodc_ENTRY_SPA(unsigned int *arg FUNC_MANY_ARGS)
+int __VISIBLE parisc_iodc_ENTRY_SPA(unsigned int *arg)
 {
     iodc_log_call(arg, __FUNCTION__);
     return PDC_BAD_OPTION;
 }
 
-int __VISIBLE parisc_iodc_ENTRY_CONFIG(unsigned int *arg FUNC_MANY_ARGS)
+int __VISIBLE parisc_iodc_ENTRY_CONFIG(unsigned int *arg)
 {
     iodc_log_call(arg, __FUNCTION__);
     // BUG_ON(1);
     return PDC_BAD_OPTION;
 }
 
-int __VISIBLE parisc_iodc_ENTRY_TEST(unsigned int *arg FUNC_MANY_ARGS)
+int __VISIBLE parisc_iodc_ENTRY_TEST(unsigned int *arg)
 {
     unsigned long hpa = COMPAT_VAL(ARG0);
     unsigned long option = ARG1;
@@ -1325,7 +1320,7 @@ int __VISIBLE parisc_iodc_ENTRY_TEST(unsigned int *arg FUNC_MANY_ARGS)
     return PDC_BAD_OPTION;
 }
 
-int __VISIBLE parisc_iodc_ENTRY_TLB(unsigned int *arg FUNC_MANY_ARGS)
+int __VISIBLE parisc_iodc_ENTRY_TLB(unsigned int *arg)
 {
     unsigned long option = ARG1;
     unsigned int *result = (unsigned int *)ARG4;
@@ -2369,7 +2364,7 @@ static int pdc_pat_mem(unsigned long *arg)
 }
 
 
-int __VISIBLE parisc_pdc_entry(unsigned long *arg FUNC_MANY_ARGS)
+int __VISIBLE parisc_pdc_entry(unsigned long *arg)
 {
     unsigned long proc = ARG0;
     unsigned long option = ARG1;
