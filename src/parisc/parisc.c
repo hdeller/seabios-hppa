@@ -2364,7 +2364,7 @@ static int pdc_pat_mem(unsigned long *arg)
 }
 
 
-int __VISIBLE parisc_pdc_entry(unsigned long *arg)
+int __VISIBLE parisc_pdc_entry(unsigned long *arg, unsigned long narrow_mode)
 {
     unsigned long proc = ARG0;
     unsigned long option = ARG1;

@@ -512,6 +512,7 @@ ENTRY(pdc_entry_32)	/* 32-bit PDC */
 	stw %arg2,-44(%sp)
 	stw %arg3,-48(%sp)
 	ldo -FRAME_SIZE(%sp),%arg0
+	ldi 1,%arg1		/* called with wide-bit cleared (narrow mode) */
 
 	loadgp
 	load32		MEM_PDC_ENTRY + 1f - pdc_entry_table,%rp
@@ -566,6 +567,7 @@ ENTRY(pdc_entry_64_32)	/* 32-bit call on 64-bit PDC */
 	std %arg0, -0x58(%sp)
 
 	ldo -0x58(%sp),%arg0	/* points to arg7 */
+	ldi 1,%arg1		/* called with wide-bit cleared (narrow mode) */
 
 	loadgp
 	load32_firmware parisc_pdc_entry,%r1
@@ -614,6 +616,7 @@ ENTRY(pdc_entry_64_64)	/* 64-bit call on 64-bit PDC */
 	std %r20, -0x50(%sp)
 	std %r19, -0x58(%sp)
 	ldo -0x58(%sp),%arg0	/* points to arg7 */
+	ldi 0,%arg1		/* called with wide-bit set (not narrow) */
 
 	loadgp
 	b,l parisc_pdc_entry, %rp
