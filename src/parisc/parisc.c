@@ -1499,11 +1499,14 @@ static int pdc_pim(unsigned long *arg)
     return PDC_BAD_OPTION;
 }
 
-static int pdc_model(unsigned long *arg)
+static int pdc_model(unsigned long *arg, unsigned long narrow_mode)
 {
     const char *model_str = current_machine->pdc_modelstr;
     unsigned long option = ARG1;
     unsigned long *result = (unsigned long *)ARG2;
+    unsigned int *result_narrow = (unsigned int *)ARG2;
+    unsigned long *source;
+    int i;
 
     switch (option) {
         case PDC_MODEL_INFO:
@@ -1512,10 +1515,21 @@ static int pdc_model(unsigned long *arg)
              * with old qemu versions which will try to run 64-bit instructions
              * kernel sr_disable_hash() function
              */
-            memset(result, 0, 32 * sizeof(unsigned long));
-            memcpy(result, (is_64bit_CPU()) ?
-                    &current_machine->pdc_model : &machine_B160L.pdc_model,
-			sizeof(current_machine->pdc_model));
+            source = is_64bit_CPU() ? &current_machine->pdc_model.hversion
+                                    : &machine_B160L.pdc_model.hversion;
+
+            /* make sure to only copy the necessary bytes. */
+            NO_COMPAT_RETURN_VALUE(ARG2);
+            for (i = 0; i < sizeof(machine_B160L.pdc_model)/sizeof(unsigned long); i++) {
+                if (is_64bit_PDC() && narrow_mode) {
+                    *result_narrow = *source;
+                    result_narrow++;
+                } else {
+                    *result = *source;
+                    result++;
+                }
+                source++;
+            }
             return PDC_OK;
         case PDC_MODEL_VERSIONS:
             switch (ARG3) {
@@ -2387,7 +2401,7 @@ int __VISIBLE parisc_pdc_entry(unsigned long *arg, unsigned long narrow_mode)
             return pdc_pim(arg);
 
         case PDC_MODEL: /* model information */
-            return pdc_model(arg);
+            return pdc_model(arg, narrow_mode);
 
         case PDC_CACHE:
             return pdc_cache(arg);
