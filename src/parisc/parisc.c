@@ -1169,9 +1169,10 @@ int __VISIBLE parisc_iodc_ENTRY_IO(unsigned int *arg)
         switch (option) {
             case ENTRY_IO_BOOTIN: /* boot medium IN */
             case ENTRY_IO_BBLOCK_IN: /* boot block medium IN */
+            case ENTRY_IO_BOOTOUT:
                 disk_op.drive_fl = boot_drive;
                 disk_op.buf_fl = (void*)ARG6;
-                disk_op.command = CMD_READ;
+                disk_op.command = option == ENTRY_IO_BOOTOUT ? CMD_WRITE : CMD_READ;
 
                 // Make sure we know how many bytes we can read at once!
                 // NOTE: LSI SCSI can not read more than 8191 blocks, esp only 64k
