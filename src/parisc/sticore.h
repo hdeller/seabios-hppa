@@ -2,7 +2,16 @@
 #ifndef STICORE_H
 #define STICORE_H
 
+#ifdef BUILD_STI_ROM
+#define u8      unsigned char
+#define u16     unsigned short
+#define u32     unsigned int
+#define s8      signed char
+#define s16     signed short
+#define s32     signed int
+#else
 #include "types.h"
+#endif
 
 /* generic STI structures & functions */
 

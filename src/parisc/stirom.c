@@ -22,7 +22,7 @@
 #define ARTIST_VRAM_SIZE_TRIGGER_WINFILL 0xa04
 #define ARTIST_VRAM_DEST_TRIGGER_BLOCKMOVE 0xb00
 
-#define __stiheader __attribute__((section(".sti.hdr")))
+#define __stiheader __attribute__((section(".sti.hdr"))) __aligned(32)
 #define __stidata __attribute__((section(".sti.data")))
 #define __stitext __attribute__((section(".sti.text")))
 #define __stifont __attribute__((section(".sti.font"))) __aligned(32)
@@ -36,10 +36,10 @@
 
 #define STI_F_EXTEND(x) ((void*)(long)(int)(x))
 
-static const __stidata char user_data[256] __aligned(32);
+static const __stidata char sti_user_data[256] __aligned(32);
 
 static const region_t sti_region_list[STI_REGION_MAX] __stidata __aligned(32) = {
-    { .region_desc = { .offset = 0, .btlb = 1, .length = 2 }, },
+    { .region_desc = { .offset = 0, .btlb = 0, .length = 64*1024/4096 }, },
     { .region_desc = { .offset = (ARTIST_FB_ADDR - LASI_GFX_HPA) / 4096, .btlb = 1, .length = (ARTIST_FB_ADDR - LASI_GFX_HPA) / 4096} },
     { .region_desc = { .offset = (0xf8100000 - LASI_GFX_HPA)/ 4096, .btlb = 1, .length = ((0xf8380000-0xf8100000) / 4096), } },
     { .region_desc = { .offset = (0xf8380000 - LASI_GFX_HPA)/ 4096, .sys_only = 1, .length = 1, .last = 1, } }
@@ -3401,6 +3401,10 @@ static int __stifunc("init_graph") sti_init_graph(struct sti_init_flags *flags,
     u32 *cmap = STI_F_EXTEND(cfg->region_ptrs[1]);
     u32 resolution = *(u32 *)STI_F_EXTEND(cfg->region_ptrs[2] + 0x111110);
 
+    /* set default size if not available. NEEDS FIXING FOR PCI CARD !! */
+    if (!resolution)
+        resolution = 1280 << 16 | 1024;
+
     out->errno = 0;
     if (resolution & (1 << 31)) {
         cfg->text_planes = 1;
@@ -3670,7 +3674,7 @@ void sti_rom_init(void)
     sti_proc_rom.font_unpmv = STI_OFFSET(sti_font_unpmv);
     sti_proc_rom.self_test = STI_OFFSET(sti_self_test);
     sti_proc_rom.mon_tbl_addr = STI_OFFSET(sti_mon_table);
-    sti_proc_rom.user_data_addr = STI_OFFSET(user_data);
+    sti_proc_rom.user_data_addr = STI_OFFSET(sti_user_data);
     sti_proc_rom.excep_hdlr = STI_OFFSET(sti_excep_hdlr);
     sti_proc_rom.set_cm_entry = STI_OFFSET(sti_set_cm_entry);
     sti_proc_rom.dma_ctrl = STI_OFFSET(sti_dma_ctrl);
