@@ -593,11 +593,14 @@ static unsigned long add_lmmio_directed_range(unsigned long size, int rope)
             addr = 0xfa000000;  /* graphics card area for parisc, f8 is used by artist */
             addr += i * 0x02000000;
 
-            writel(reg + LMMIO_DIRECT0_BASE, addr | 1);
+            /* clear bit 0 of address to disable LMMIO while we modify things */
+            writel(reg + LMMIO_DIRECT0_BASE, addr & ~1ULL);
             writel(reg + LMMIO_DIRECT0_ROUTE, rope & (ROPES_PER_IOC - 1));
             size = 0xfff8000000 | ~(size-1); /* is -1 correct? */
             // dprintf(1, "use  addr %lx  size %lx\n", addr|1, size);
             writel(reg + LMMIO_DIRECT0_MASK, size);
+            /* finally turn on the modified LMMIO region */
+            writel(reg + LMMIO_DIRECT0_BASE, addr | 1);
             return addr;
     }
 #endif /* CONFIG_PARISC */
