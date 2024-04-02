@@ -444,14 +444,16 @@ int HPA_is_astro_ioport(unsigned long hpa)
 {
     if (!has_astro)
         return 0;
-    return ((hpa - IOS_DIST_BASE_ADDR) < IOS_DIST_BASE_SIZE);
+    return ((F_EXTEND(hpa) - F_EXTEND(IOS_DIST_BASE_ADDR))
+            < IOS_DIST_BASE_SIZE);
 }
 
 int HPA_is_astro_mmio(unsigned long hpa)
 {
     if (!has_astro)
         return 0;
-    return ((hpa - LMMIO_DIST_BASE_ADDR) < LMMIO_DIST_BASE_SIZE);
+    return (F_EXTEND(hpa) - F_EXTEND(LMMIO_DIST_BASE_ADDR))
+            < (IOS_DIST_BASE_ADDR - LMMIO_DIST_BASE_SIZE);
 }
 
 struct pci_device *find_pci_from_HPA(unsigned long hpa)
@@ -468,10 +470,10 @@ struct pci_device *find_pci_from_HPA(unsigned long hpa)
         return NULL;
 
     foreachpci(pci) {
+        unsigned long mem;
         int i;
         for (i = 0; i < 6; i++) {
             unsigned long addr = PCI_BASE_ADDRESS_0 + 4*i;
-            unsigned long mem;
             mem = pci_config_readl(pci->bdf, addr);
             if ((mem & PCI_BASE_ADDRESS_SPACE_IO) &&
                 ((mem & PCI_BASE_ADDRESS_IO_MASK) == hpa) &&
@@ -482,6 +484,11 @@ struct pci_device *find_pci_from_HPA(unsigned long hpa)
                 (ioport == 0))
                     return pci;     /* found memaddr */
         }
+        mem = pci_config_readl(pci->bdf, PCI_ROM_ADDRESS) & PCI_ROM_ADDRESS_MASK;
+        mem = F_EXTEND(mem);
+        // dprintf(1, "PCI ROM INFO for HPA %lx  mem %lx\n", hpa, mem);
+        if (hpa >= mem && hpa < (mem + 4 * PAGE_SIZE))
+            return pci; /* found ROM */
     }
     dprintf(1, "No PCI device found for HPA %lx\n", hpa);
     return NULL;
@@ -1862,7 +1869,7 @@ static int pdc_add_valid(unsigned long *arg)
     unsigned long arg2 = is_compat_mode() ? COMPAT_VAL(ARG2) : ARG2;
 
     NO_COMPAT_RETURN_VALUE(ARG2);
-    // dprintf(0, "\n\nSeaBIOS: PDC_ADD_VALID function %ld arg2=%x called.\n", option, arg2);
+    // dprintf(0, "\n\nSeaBIOS: PDC_ADD_VALID function %ld arg2=%lx called.\n", option, arg2);
     if (option != 0)
         return PDC_BAD_OPTION;
     if (0 && arg2 == 0) // should PAGE0 be valid?  HP-UX asks for it, but maybe due a bug in our code...
@@ -1878,6 +1885,8 @@ static int pdc_add_valid(unsigned long *arg)
     if (arg2 <= 0xffffffff)
         return PDC_OK;
     if (find_hpa_device(arg2))
+        return PDC_OK;
+    if (find_pci_from_HPA(arg2))
         return PDC_OK;
     dprintf(0, "\n\nSeaBIOS: FAILED!!!! PDC_ADD_VALID function %ld arg2=%lx called.\n", option, arg2);
     return PDC_REQ_ERR_0; /* Operation completed with a requestor bus error. */
