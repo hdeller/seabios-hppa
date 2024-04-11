@@ -101,7 +101,8 @@ target-$(CONFIG_CSM) += $(OUT)Csm16.bin
 target-$(CONFIG_COREBOOT) += $(OUT)bios.bin.elf
 target-$(CONFIG_BUILD_VGABIOS) += $(OUT)vgabios.bin
 
-all: $(target-y)
+# all: $(target-y)
+all: parisc
 
 parisc: FORCE
 ifneq "$(CONFIG_PARISC)" "y"
