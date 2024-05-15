@@ -79,4 +79,8 @@
 #define LMMIO_DIRECT0_MASK  0x308
 #define LMMIO_DIRECT0_ROUTE 0x310
 
+/* space register hashing */
+#define HPPA64_DIAG_SPHASH_ENABLE       0x200   /* DIAG_SPHASH_ENAB (bit 54) */
+#define HPPA64_PDC_CACHE_RET_SPID_VAL   0xfe0   /* PDC return value on 64-bit CPU */
+
 #endif

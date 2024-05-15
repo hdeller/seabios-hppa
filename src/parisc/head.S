@@ -481,6 +481,26 @@ ENTRY(firmware_default_ivt)	/* to detect crashes */
 	.endr
 END(smp_ivt)
 
+/*******************************************************
+ Check if space register hashing is enabled.
+ Returns non-zero if sr-hashing in CPU is enabled.
+ Needs adjustment when we emulate PCX-T later.
+ Requires at least qemu v9.x
+ *******************************************************/
+ENTRY(sr_hashing_enabled)
+	copy %r0,%r26
+	copy %r0,%r28		/* zero-initialize %r28 in case qemu can't emulate mfdiag call */
+#ifdef CONFIG_64BIT
+	.word 0x144008bc	/* PCXU,PCXU+,PCXW,PCXW+,PCXW2: mfdiag %dr2, %r28 */
+	depdi 1,54,1, %r26	/* set DIAG_SPHASH_ENABLE (bit 54) of %dr2 */
+#else
+	.word 0x141c0600	/* PCXL: mfdiag %dr0, %r28 */
+	depwi 3,28,2, %r26	/* Set DHASH_EN & IHASH_EN of %dr0 */
+#endif
+	bv    %r0(%rp)
+	and   %r28, %r26, %r28	/* mask hash enable bits */
+END(sr_hashing_enabled)
+
 
 /*******************************************************
 	PDC and IODC entry

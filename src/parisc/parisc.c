@@ -165,6 +165,7 @@ extern char pdc_entry_table_end;
 extern char iodc_entry[512];
 extern char iodc_entry_table;
 extern char iodc_entry_table_one_entry;
+extern long sr_hashing_enabled(void);
 
 /* args as handed over for firmware calls */
 #define ARG0 arg[7-0]
@@ -1656,9 +1657,18 @@ static int pdc_cache(unsigned long *arg)
 
             memcpy(result, machine_cache_info, sizeof(*machine_cache_info));
             return PDC_OK;
-        case PDC_CACHE_RET_SPID:	/* returns space-ID bits when sr-hasing is enabled */
-            memset(result, 0, 32 * sizeof(unsigned long));
-            result[0] = 0;
+        case PDC_CACHE_RET_SPID:
+            /*
+             * Return space-ID bits when space register hashing is enabled.
+             * The Linux kernel disables sr-hashing, while HP-UX 11 (64-bit) uses hashing.
+             * For details check the assembly in arch/parisc/kernel/pacache.S in the Linux kernel
+             * and read some analysis here:
+             * https://patchwork.ozlabs.org/project/qemu-devel/patch/20240324080945.991100-3-svens@stackframe.org/#3289160
+             */
+            if (sr_hashing_enabled() == 0)
+                result[0] = 0;
+            else /* when HPPA64_DIAG_SPHASH_ENABLE bit is set: */
+                result[0] = HPPA64_PDC_CACHE_RET_SPID_VAL;
             return PDC_OK;
     }
     dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_CACHE function %ld %lx %lx %lx %lx\n", ARG1, ARG2, ARG3, ARG4, ARG5);
