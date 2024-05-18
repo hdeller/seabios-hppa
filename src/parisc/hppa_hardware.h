@@ -1,5 +1,5 @@
 /* HPPA cores and system support chips.  */
-/* Be aware: This file is shared as-is with seabios-hppa. */
+/* Be aware: QEMU and seabios-hppa repositories share this file as-is. */
 
 #ifndef HW_HPPA_HPPA_HARDWARE_H
 #define HW_HPPA_HPPA_HARDWARE_H
@@ -31,6 +31,7 @@
 #define CPU_HPA         0xfffb0000
 #define MEMORY_HPA      0xfffff000
 
+#define IDE_HPA         0xf9000000      /* Boot disc controller */
 #define ASTRO_HPA       0xfed00000
 #define ELROY0_HPA      0xfed30000
 #define ELROY2_HPA      0xfed32000
@@ -59,7 +60,6 @@
 #define CR_PSW_DEFAULT  6       /* used by SeaBIOS & QEMU for default PSW */
 #define CPU_HPA_CR_REG  7       /* store CPU HPA in cr7 (SeaBIOS internal) */
 #define PIM_STORAGE_SIZE 600	/* storage size of pdc_pim_toc_struct (64bit) */
-
 
 #define ASTRO_BUS_MODULE        0x0a            /* C3700: 0x0a, others maybe 0 ? */
 
