@@ -194,6 +194,12 @@ static int index_of_CPU_HPA(unsigned long hpa) {
 }
 
 static unsigned long GoldenMemory = MIN_RAM_SIZE;
+static unsigned long ram_size_low;
+#if defined(__LP64__)
+static unsigned long ram_size_high = 0;
+#else
+#define ram_size_high   0   /* Memory limited to < 4GB with 32-bit firmware */
+#endif
 
 static unsigned int chassis_code = 0;
 
@@ -1768,7 +1774,7 @@ static int pdc_iodc(unsigned long *arg)
         case PDC_IODC_DINIT:	/* destructive init */
             result[0] = 0; /* IO_STATUS */
             result[1] = 0; /* max_spa */
-            result[2] = ram_size; /* max memory */
+            result[2] = ram_size_low; /* max memory */
             result[3] = 0;
             return PDC_OK;
         case PDC_IODC_MEMERR:
@@ -1885,7 +1891,7 @@ static int pdc_add_valid(unsigned long *arg)
     if (0 && arg2 == 0) // should PAGE0 be valid?  HP-UX asks for it, but maybe due a bug in our code...
         return 1;
     // if (arg2 < PAGE_SIZE) return PDC_ERROR;
-    if (arg2 < ram_size)
+    if (arg2 < ram_size_low)
         return PDC_OK;
     if (arg2 >= (unsigned long)_sti_rom_start &&
         arg2 <= (unsigned long)_sti_rom_end)
@@ -1990,6 +1996,30 @@ static int pdc_mem(unsigned long *arg)
         case PDC_MEM_GET_MEMORY_SYSTEM_TABLES:
             /* not yet implemented for 64-bit */
             return PDC_BAD_PROC;
+#ifdef __LP64__
+        case PDC_MEM_TABLE:     /* old method on Sprockets, e.g. C3700 machine */
+        {
+            struct pdc_memory_table_raddr *raddr = (void *)ARG2;
+            struct pdc_memory_table *table = (void *)ARG3;
+            unsigned long entries = (unsigned long)ARG4;
+
+            if (entries < 1)
+                return PDC_INVALID_ARG;
+            raddr->entries_returned = 1;
+            raddr->entries_total = ram_size_high ? 2 : 1;
+            table->paddr = 0;
+            table->pages = ram_size_low / PAGE_SIZE; /* Length in 4K pages */
+            table->reserved = 0;
+            if (ram_size_high && entries > 1) {
+                raddr->entries_returned++;
+                table++;
+                table->paddr = RAM_MAP_HIGH;
+                table->pages = ram_size_high / PAGE_SIZE; /* Length in 4K pages */
+                table->reserved = 0;
+            }
+            return PDC_OK;
+        }
+#endif
     }
     dprintf(0, "\n\nSeaBIOS: Check PDC_MEM option %ld ARG3=%lx ARG4=%lx ARG5=%lx\n", option, ARG3, ARG4, ARG5);
     return PDC_BAD_PROC;
@@ -2355,22 +2385,30 @@ static int pdc_pat_pd(unsigned long *arg)
 {
     unsigned long option = ARG1;
     unsigned long *result = (unsigned long *)ARG2;
-    struct pdc_pat_pd_addr_map_entry *mem_table = (void *)ARG3;
+    struct pdc_pat_pd_addr_map_entry *dest = (void *)ARG3;
     unsigned long count = ARG4;
     unsigned long offset = ARG5;
+    static struct pdc_pat_pd_addr_map_entry mem_table[2] = {
+     { .entry_type = PAT_MEMORY_DESCRIPTOR, .memory_type = PAT_MEMTYPE_MEMORY,
+       .memory_usage = PAT_MEMUSE_GENERAL },
+     { .entry_type = PAT_MEMORY_DESCRIPTOR, .memory_type = PAT_MEMTYPE_MEMORY,
+       .memory_usage = PAT_MEMUSE_GENERAL },
+    };
+    unsigned long table_size = (ram_size_high ? 2:1) * sizeof(mem_table[0]);
 
     switch (option) {
         case PDC_PAT_PD_GET_ADDR_MAP:
-            if (count < sizeof(*mem_table) || offset != 0)
+            if (count > table_size)
+                count = table_size;
+            if (offset > count)
                 return PDC_INVALID_ARG;
-            memset(mem_table, 0, sizeof(*mem_table));
-            mem_table->entry_type = PAT_MEMORY_DESCRIPTOR;
-            mem_table->memory_type = PAT_MEMTYPE_MEMORY;
-            mem_table->memory_usage = PAT_MEMUSE_GENERAL; /* ?? */
-            mem_table->paddr = 0;  /* note: 64bit! */
-            mem_table->pages = ram_size / 4096; /* Length in 4K pages */
-            mem_table->cell_map = 0;
-            result[0] = sizeof(*mem_table);
+            mem_table[0].paddr = 0;
+            mem_table[0].pages = ram_size_low / PAGE_SIZE;
+            mem_table[1].paddr = RAM_MAP_HIGH;
+            mem_table[1].pages = ram_size_high / PAGE_SIZE;
+            count -= offset;
+            memcpy(dest, ((char *)&mem_table) + offset, count);
+            result[0] = count;
             return PDC_OK;
 
         case PDC_PAT_PD_GET_PDC_INTERF_REV:
@@ -3131,8 +3169,13 @@ void __VISIBLE start_parisc_firmware(void)
         smp_cpus = HPPA_MAX_CPUS;
     num_online_cpus = smp_cpus;
 
-    if (ram_size >= FIRMWARE_START)
-        ram_size = FIRMWARE_START;
+    ram_size_low = ram_size;
+    if (ram_size_low >= FIRMWARE_START) {
+        ram_size_low = FIRMWARE_START;
+#if defined(__LP64__)
+        ram_size_high = ram_size - FIRMWARE_START;
+#endif
+    }
 
     /* Initialize malloc stack */
     malloc_preinit();
@@ -3262,11 +3305,11 @@ void __VISIBLE start_parisc_firmware(void)
 
     if (is_64bit_PDC()) {
         /* HP-UX 11 checks RAM in rminit() from this address */
-        *(unsigned int *) 0x33c = ram_size >> 12; /* # of pages */
+        *(unsigned int *) 0x33c = ram_size_low >> 12; /* # of pages */
     }
-    PAGE0->memc_cont = ram_size;
-    PAGE0->memc_phsize = ram_size;
-    PAGE0->memc_adsize = ram_size;
+    PAGE0->memc_cont = ram_size_low;
+    PAGE0->memc_phsize = ram_size_low;
+    PAGE0->memc_adsize = ram_size_low;
     PAGE0->mem_pdc_hi = (MEM_PDC_ENTRY + 0ULL) >> 32;
     PAGE0->mem_free = 0x6000; // min PAGE_SIZE
     PAGE0->mem_hpa = CPU_HPA; // HPA of boot-CPU
@@ -3287,8 +3330,8 @@ void __VISIBLE start_parisc_firmware(void)
         *powersw_ptr = 0x01; /* button not pressed, hw controlled. */
 
     /* PAGE0->imm_hpa - is set later (MEMORY_HPA) */
-    PAGE0->imm_spa_size = ram_size;
-    PAGE0->imm_max_mem = ram_size;
+    PAGE0->imm_spa_size = ram_size_low;
+    PAGE0->imm_max_mem = ram_size_low;
 
     /* initialize graphics (if available) */
     if (artist_present()) {
