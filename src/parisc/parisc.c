@@ -1674,7 +1674,7 @@ static int pdc_cache(unsigned long *arg)
             if (sr_hashing_enabled() == 0)
                 result[0] = 0;
             else /* when HPPA64_DIAG_SPHASH_ENABLE bit is set: */
-                result[0] = HPPA64_PDC_CACHE_RET_SPID_VAL;
+                result[0] = HPPA64_PDC_CACHE_RET_SPID_VAL << 16;
             return PDC_OK;
     }
     dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_CACHE function %ld %lx %lx %lx %lx\n", ARG1, ARG2, ARG3, ARG4, ARG5);
