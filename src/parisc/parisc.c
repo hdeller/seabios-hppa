@@ -2237,13 +2237,15 @@ static void iosapic_table_setup(void)
         // if (!pci->irq) continue;
         BUG_ON(irt_table_entries >= MAX_IRT_TABLE_ENTRIES);
         irt_table_entries++;
-        dprintf(5, "IRT ENTRY #%d: bdf %02x\n", irt_table_entries, pci->bdf);
+        slot = pci->bdf >> 3;
+        dprintf(5, "IRT ENTRY #%d: bdf:%02x, slot:%d, irq:%d\n",
+                   irt_table_entries, pci->bdf, slot, pci->irq);
         /* write the 16 bytes */
         /* 1: entry_type, entry_length, interrupt_type, polarity_trigger */
         *p++ = 0x8b10000f;      // oder 0x8b10000d
         /* 2: src_bus_irq_devno, src_bus_id, src_seg_id, dest_iosapic_intin */
         /* irq_devno = (slot << 2) | (intr_pin-1); */
-        irq_devno = (slot++ << 2) | (pci->irq - 1);
+        irq_devno = (slot << 2) | (pci->irq - 1);
         bus_id = 0;
         *p++ = (irq_devno << 24) | (bus_id << 16) | (0 << 8) | (iosapic_intin << 0);
         *p++ = IOSAPIC_HPA >> 32;
