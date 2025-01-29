@@ -2523,6 +2523,13 @@ int __VISIBLE parisc_pdc_entry(unsigned long *arg, unsigned long narrow_mode)
         case PDC_SCSI_PARMS: // is the architected firmware interface to replace the Hversion PDC_INITIATOR procedure.
             return PDC_BAD_PROC;
 
+        case 73:
+            // Unknown PDC call, seems similiar to PDC_NVOLATILE:
+            // Unimplemented PDC proc UNKNOWN!(73) option 3 result=0 ARG3=0 ARG4=0 ARG5=0 ARG6=0 ARG7=dfb078
+            // Unimplemented PDC proc UNKNOWN!(73) option 2 result=c25780 ARG3=0 ARG4=0 ARG5=0 ARG6=0 ARG7=dfb078
+            // Called by HP-UX 11 64-bit on C3700 machine, which returns PDC_BAD_PROC
+            return PDC_BAD_PROC;
+
 	case PDC_MEM_MAP:
             return pdc_mem_map(arg);
 
