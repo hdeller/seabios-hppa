@@ -2520,7 +2520,7 @@ int __VISIBLE parisc_pdc_entry(unsigned long *arg, unsigned long narrow_mode)
                a chance to see the kernel panic */
             return PDC_OK;
 
-        case 26: // PDC_SCSI_PARMS is the architected firmware interface to replace the Hversion PDC_INITIATOR procedure.
+        case PDC_SCSI_PARMS: // is the architected firmware interface to replace the Hversion PDC_INITIATOR procedure.
             return PDC_BAD_PROC;
 
 	case PDC_MEM_MAP:
