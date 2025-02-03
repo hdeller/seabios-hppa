@@ -62,6 +62,32 @@ char *sti_rom_start;
     #define host_to_le32(x)     __builtin_bswap32(x)
 #endif
 
+static void update_crc_rom(struct sti_rom *rom)
+{
+    u8 *c, *romend = (u8 *)rom + host_to_be32(rom->last_addr) - 2;
+    u16 code = 0, poly = 0x8408, accum = 0;
+    int i, j;
+
+    for (c = (u8 *)rom, j = 0; c <= romend; c++, j++) {
+        accum = (accum << 8) | (*c & 0xff);
+        if (j & 1) {
+            accum ^= code;
+            for (i = 0; i < 16; i++) {
+                /* do a left rotate */
+                if (accum & 0x8000) {
+                    accum = (accum << 1) | 0x0001;
+                    accum ^= poly;
+                } else {
+                    accum <<= 1;
+                }
+            }
+            code = accum;
+        }
+    }
+    *(u16 *)(romend+1) = host_to_be16(code);
+}
+
+
 int main(int argc, char *argv[])
 {
     int fh;
@@ -212,7 +238,7 @@ int main(int argc, char *argv[])
     sti_proc_rom->set_cm_entry = host_to_be32(STI_OFFSET(sti_set_cm_entry));
     sti_proc_rom->dma_ctrl = host_to_be32(STI_OFFSET(sti_dma_ctrl));
     sti_proc_rom->end = host_to_be32(STI_OFFSET(sti_end));
-//     update_crc(&sti_proc_rom);
+    update_crc_rom(sti_proc_rom);
 
 
     /* finally write ROM image */
