@@ -3279,7 +3279,8 @@ struct sti_rom __stiheader sti_proc_rom = {
     .type = { 0x03, 0x03, 0x03, 0x03 },
     .num_mons = ARRAY_SIZE(sti_mon_table),
     .revno = { 0x84, 0x07 },
-    .graphics_id = { 0x2b4ded6d, 0x40a00499 },
+    .graphics_id = { 0x2b4ded6d, 0x40a00499 }, // 32-bit B160L
+    // .graphics_id = { 0x2d08c0a7, 0x9a02587 }, // C3700 PCI_GRAFFITIX1280 (but crashes currently!)
 };
 
 static void __stitext write_artist(struct sti_glob_cfg *cfg,
