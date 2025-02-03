@@ -598,16 +598,47 @@ static int HPA_is_keyboard_device(unsigned long hpa)
 }
 #endif
 
+static hppa_device_t *gfx_card;
+
+/* shall detect Artist GSC card only, not the Visualize EG PCI! */
 static int artist_present(void)
 {
-    return !!(*(u32 *)F_EXTEND(0xf8380004) == 0x6dc20006);
+    /* qemu sets identifier at 0xf8380004 */
+    return !is_64bit_PDC() && (*(u32 *)F_EXTEND(LASI_GFX_HPA + 0x0380004) == 0x6dc20006);
+}
+
+static void find_graphics_card(void)
+{
+    gfx_card = NULL;
+
+    if (artist_present()) {
+        gfx_card = find_hpa_device(LASI_GFX_HPA);
+    }
+
+    if (!gfx_card && is_64bit_PDC()) {
+        /* find Visualize EG PCI card (artist, to be used as console) */
+        struct pci_device *pci;
+        pci = pci_find_device(PCI_VENDOR_ID_HP, PCI_DEVICE_ID_HP_VISUALIZE_EG);
+        if (pci) {
+            void *p = pci_enable_membar(pci, PCI_BASE_ADDRESS_0);
+            gfx_card = find_hpa_device((uintptr_t) p);
+        }
+    }
+
+    if (is_64bit_PDC() && gfx_card) {
+        sti_rom_init();
+        sti_console_init(&sti_proc_rom, gfx_card->hpa);
+        if (has_astro)
+            kbd_init();
+    }
 }
 
 int HPA_is_LASI_graphics(unsigned long hpa)
 {
     /* return true if hpa is LASI graphics (artist graphics card) */
-    return (hpa == LASI_GFX_HPA) && artist_present();
+    return hpa && gfx_card && F_EXTEND(hpa) == F_EXTEND(gfx_card->hpa);
 }
+
 #define GFX_NUM_PAGES 0x2000
 int HPA_is_graphics_device(unsigned long hpa)
 {
@@ -1118,8 +1149,10 @@ static void parisc_serial_out(char c)
 
 static void parisc_putchar_internal(char c)
 {
-    if (HPA_is_LASI_graphics(PAGE0->mem_cons.hpa))
+    if (HPA_is_LASI_graphics(PAGE0->mem_cons.hpa)) {
         sti_putc(c);
+        builtin_console_out(c);         // XXX temporary hack to show same output on serial console during debugging artist PCI
+    }
     else
         parisc_serial_out(c);
 }
@@ -3037,7 +3070,7 @@ static int parisc_boot_menu(unsigned long *iplstart, unsigned long *iplend,
  ********************************************************/
 
 static struct pz_device mem_cons_sti_boot = {
-    .hpa = LASI_GFX_HPA,
+    .hpa = LASI_GFX_HPA,        /* will be overwritten */
     .cl_class = CL_DISPL,
 };
 
@@ -3446,14 +3479,12 @@ void __VISIBLE start_parisc_firmware(void)
     PAGE0->imm_max_mem = ram_size_low;
 
     /* initialize graphics (if available) */
-    if (artist_present()) {
+    if (!is_64bit_PDC() && artist_present()) {
         sti_rom_init();
-        sti_console_init(&sti_proc_rom);
+        sti_console_init(&sti_proc_rom, gfx_card->hpa);
+        /* proc_sti will be set for GSC card only */
         PAGE0->proc_sti = (uintptr_t)&sti_proc_rom;
-        if (has_astro)
-            kbd_init();
-        else
-            ps2port_setup();
+        ps2port_setup();
     } else {
         drop_parisc_device(LASI_GFX_HPA);
         drop_parisc_device(lasi_hpa + LASI_PS2);
@@ -3523,14 +3554,20 @@ void __VISIBLE start_parisc_firmware(void)
     /* find SCSI PCI card when running on Astro or Dino */
     find_scsi_pci_card();
 
+    /* find Artist GSC or Visualize EG PCI card */
+    find_graphics_card();
+
     // Initialize boot paths (graphics & keyboard)
+printf("ARTIST PRESENT %p    IS_GRAPHICS %d\n", gfx_card, pdc_console == CONSOLE_GRAPHICS);
     if (pdc_console != CONSOLE_SERIAL) {
-	if (artist_present())
+	if (gfx_card)
             pdc_console = CONSOLE_GRAPHICS;
 	else
             pdc_console = CONSOLE_SERIAL;
     }
+printf("ARTIST PRESENT %p    WANTS_GRAPHICS %d\n", gfx_card, pdc_console == CONSOLE_GRAPHICS);
     if (pdc_console == CONSOLE_GRAPHICS) {
+        mem_cons_sti_boot.hpa = gfx_card->hpa;
         prepare_boot_path(&(PAGE0->mem_cons), &mem_cons_sti_boot, 0x60);
         prepare_boot_path(&(PAGE0->mem_kbd),  &mem_kbd_sti_boot, 0xa0);
     } else {

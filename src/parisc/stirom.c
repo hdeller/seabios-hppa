@@ -3349,7 +3349,8 @@ static int __stifunc("font_unpmv") sti_font_unpmv(struct sti_font_flags *flags,
                                                   struct sti_font_outptr *out,
                                                   struct sti_glob_cfg *cfg)
 {
-    struct font *font = (struct font *) ROM_EXTEND(in->font_start_addr);
+    // struct font *font = (struct font *) ROM_EXTEND(in->font_start_addr);
+    struct font *font = (struct font *) (0xfffffff0f0000000 | in->font_start_addr);
     int bpc = font->hdr.bytes_per_char;
     int width = font->hdr.width;
     unsigned char *src;
