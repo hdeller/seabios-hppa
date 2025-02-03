@@ -103,6 +103,7 @@ endif
 
 target-y :=
 target-$(CONFIG_PARISC) += $(OUT)hppa-firmware$(BIT_SUFFIX).img
+target-$(CONFIG_PARISC) += $(OUT)artist-pci.rom
 
 all: $(target-y)
 
@@ -171,6 +172,22 @@ $(OUT)hppa-firmware$(BIT_SUFFIX).img: $(OUT)autoconf.h $(OUT)head.o $(OUT)ccode3
 	$(Q)$(CC) $(CFLAGS32FLAT) -c src/version.c -o $(OUT)version.o
 	$(Q)$(LD) -N -T $(OUT)pafirmware.lds $(OUT)head.o $(OUT)version.o -X -o $@ -e startup --as-needed $(OUT)ccode32flat.o $(LIBGCC)
 	$(Q)chmod -x $@
+
+$(OUT)sti-rom.bin: $(OUT)hppa-firmware$(BIT_SUFFIX).img
+	@echo "  Building $@"
+	$(Q)$(OBJCOPY) -j .sti $< $(OUT)sti-rom.elf
+	$(Q)$(OBJDUMP) -t $(OUT)sti-rom.elf  | grep " sti_" | sort | \
+	       awk -F ' ' '{print "#define off$(BIT_SUFFIX)_" $$6 "\t0x" $$1}' > $(OUT)sti-rom-offsets.h
+	$(Q)$(OBJCOPY) $(OUT)sti-rom.elf --output-target binary $@
+
+$(OUT)sti-rom-offsets.h: $(OUT)sti-rom.bin
+
+$(OUT)make-sti-rom$(BIT_SUFFIX): src/parisc/make-sti-rom.c $(OUT)sti-rom-offsets.h
+	$(HOSTCC) -I. $< -o $@
+
+$(OUT)artist-pci.rom: $(OUT)make-sti-rom$(BIT_SUFFIX) $(OUT)sti-rom.bin $(OUT)sti-rom-offsets.h
+	$(OUT)make-sti-rom$(BIT_SUFFIX) $(OUT)sti-rom.bin $@
+
 
 ################ Kconfig rules
 
