@@ -440,6 +440,8 @@ void cpuid(u32 index, u32 *eax, u32 *ebx, u32 *ecx, u32 *edx);
 // pci.c
 unsigned long elroy_offset(u16 bdf);
 void *elroy_port(unsigned long port, unsigned long offs);
+// pciinit.c
+unsigned long add_lmmio_directed_range(unsigned long size, int rope);
 
 #endif // !__ASSEMBLY__
 #endif

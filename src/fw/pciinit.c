@@ -574,10 +574,13 @@ static void parisc_mem_addr_setup(struct pci_device *dev, void *arg)
 }
 #endif /* CONFIG_PARISC */
 
-static unsigned long add_lmmio_directed_range(unsigned long size, int rope)
+unsigned long add_lmmio_directed_range(unsigned long size, int rope)
 {
 #ifdef CONFIG_PARISC
     int i;
+
+    if (!has_astro)
+        return -1;
 
     /* Astro has 4 directed ranges. */
     for (i = 0; i < 4; i++) {
@@ -590,7 +593,7 @@ static unsigned long add_lmmio_directed_range(unsigned long size, int rope)
 
             /* fixme for multiple addresses */
             /* Linux driver currently only allows one distr. range per IOC */
-            addr = 0xfa000000;  /* graphics card area for parisc, f8 is used by artist */
+            addr = 0xf8000000;  /* graphics card area for parisc, LASI_GFX_HPA is usually artist */
             addr += i * 0x02000000;
 
             /* clear bit 0 of address to disable LMMIO while we modify things */
