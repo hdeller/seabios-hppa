@@ -316,6 +316,11 @@ ENTRY(start_kernel)
 	clear_PSW_W	/* clear PSW before we start the kernel! */
 #else
 	ldw	-0x34(%sp),%r1
+	stw	%r0, -0x34(%sp)	// clear bootapiversion for NetBSD
+	stw	%r0, -0x38(%sp) // clear argv
+	stw	%r0, -0x3c(%sp) // clear argc
+	stw	%r0, -0x40(%sp) // clear argc
+	stw	%r0, -0x44(%sp) // clear bootinfo
 	bv,n	0(%r1)
 #endif
 END(start_kernel)
