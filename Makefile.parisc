@@ -43,7 +43,7 @@ SRC32FLAT=$(SRCBOTH) post.c e820map.c romfile.c optionroms.c \
     hw/pcidevice.c hw/ahci.c hw/pvscsi.c hw/usb-xhci.c hw/usb-hub.c hw/sdcard.c \
     fw/coreboot.c fw/lzmadecode.c fw/multiboot.c fw/biostables.c \
     fw/paravirt.c fw/shadow.c fw/pciinit.c fw/smm.c fw/xen.c \
-    fw/acpi.c fw/mptable.c fw/pirtable.c fw/smbios.c fw/romfile_loader.c \
+    fw/mptable.c fw/pirtable.c fw/smbios.c fw/romfile_loader.c \
     hw/virtio-ring.c hw/virtio-pci.c hw/virtio-blk.c hw/virtio-scsi.c \
     hw/tpm_drivers.c hw/nvme.c \
     version.c parisc/malloc.c parisc/parisc.c parisc/sti.c parisc/lasips2.c parisc/stirom.c

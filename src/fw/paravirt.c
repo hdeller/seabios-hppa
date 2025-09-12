@@ -251,7 +251,7 @@ qemu_platform_setup(void)
             warn_internalerror();
     }
 
-    acpi_setup();
+    // acpi_setup();
 }
 
 
