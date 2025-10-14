@@ -407,6 +407,7 @@ static hppa_device_t *parisc_devices = machine_B160L.device_list;
     /* DINO_SCSI_HPA, */ \
     LASI_UART_HPA, \
     LASI_LAN_HPA, \
+    LASI_SCSI_HPA, \
     LASI_LPT_HPA, \
     LASI_GFX_HPA,\
     LASI_PS2KBD_HPA, \
@@ -418,30 +419,36 @@ static const char *hpa_name(unsigned long hpa)
 {
     int i;
 
-    #define DO(x) if (hpa == F_EXTEND(x)) return #x;
-    DO(GSC_HPA)
-    DO(DINO_HPA)
-    DO(DINO_UART_HPA)
-    DO(DINO_SCSI_HPA)
-    DO(CPU_HPA)
-    DO(MEMORY_HPA)
-    DO(SCSI_HPA)
-    DO(LASI_HPA)
-    DO(LASI_UART_HPA)
-    DO(LASI_SCSI_HPA)
-    DO(LASI_LAN_HPA)
-    DO(LASI_LPT_HPA)
-    DO(LASI_AUDIO_HPA)
-    DO(LASI_PS2KBD_HPA)
-    DO(LASI_PS2MOU_HPA)
-    DO(LASI_GFX_HPA)
-    DO(ASTRO_HPA)
-    DO(ASTRO_MEMORY_HPA)
-    DO(ELROY0_HPA)
-    DO(ELROY2_HPA)
-    DO(ELROY8_HPA)
-    DO(ELROYc_HPA)
-    #undef DO
+    /* mask out possible disable flag */
+    hpa &= ~HPA_DISABLED_DEVICE;
+
+    #define DO2(y,x)    if (hpa == F_EXTEND(x)) return #y;
+    #define DO1(x)      DO2(x,x)
+    DO1(GSC_HPA)
+    DO1(DINO_HPA)
+    DO1(DINO_UART_HPA)
+    DO1(DINO_SCSI_HPA)
+    DO1(CPU_HPA)
+    DO1(MEMORY_HPA)
+    DO1(SCSI_HPA)
+    DO2(LASI_HPA, lasi_hpa)
+    DO2(LASI_UART_HPA,  lasi_hpa + LASI_UART)
+    DO2(LASI_SCSI_HPA,  lasi_hpa + LASI_SCSI)
+    DO2(LASI_LAN_HPA,   lasi_hpa + LASI_LAN)
+    DO2(LASI_LPT_HPA,   lasi_hpa + LASI_LPT)
+    DO2(LASI_AUDIO_HPA, lasi_hpa + LASI_AUDIO)
+    DO2(LASI_PS2KBD_HPA,lasi_hpa + LASI_PS2)
+    DO2(LASI_PS2MOU_HPA,lasi_hpa + LASI_PS2 + 0x100)
+    DO2(LASI_FDC,       lasi_hpa + LASI_FDC)
+    DO1(LASI_GFX_HPA)
+    DO1(ASTRO_HPA)
+    DO1(ASTRO_MEMORY_HPA)
+    DO1(ELROY0_HPA)
+    DO1(ELROY2_HPA)
+    DO1(ELROY8_HPA)
+    DO1(ELROYc_HPA)
+    #undef DO1
+    #undef DO2
 
     /* could be one of the SMP CPUs */
     for (i = 1; i < smp_cpus; i++) {
@@ -859,21 +866,29 @@ static void remove_parisc_devices(unsigned int num_cpus)
     uninitialized = 0;
 
     /* check if qemu emulates LASI chip (LASI_IAR exists) */
-    if (has_astro || *(unsigned long *)(LASI_HPA+16) == 0) {
-        remove_from_keep_list(LASI_UART_HPA);
-        remove_from_keep_list(LASI_LAN_HPA);
-        remove_from_keep_list(LASI_LPT_HPA);
+    if (!lasi_hpa) {
+        remove_from_keep_list(lasi_hpa + LASI_UART);
+        remove_from_keep_list(lasi_hpa + LASI_SCSI);
+        remove_from_keep_list(lasi_hpa + LASI_LAN);
+        remove_from_keep_list(lasi_hpa + LASI_LPT);
+        remove_from_keep_list(lasi_hpa + LASI_AUDIO);
+        remove_from_keep_list(lasi_hpa + LASI_PS2);
+        remove_from_keep_list(lasi_hpa + LASI_PS2 + 0x100);
+        remove_from_keep_list(lasi_hpa + LASI_FDC);
     } else {
         /* check if qemu emulates LASI i82596 LAN card */
-        if (*(unsigned long *)(LASI_LAN_HPA+12) != 0xBEEFBABE)
-            remove_from_keep_list(LASI_LAN_HPA);
+        if (*(unsigned long *)(lasi_hpa + LASI_LAN + 12) != 0xBEEFBABE)
+            remove_from_keep_list(lasi_hpa + LASI_LAN);
     }
 
     p = t = 0;
     while ((hpa = parisc_devices[p].hpa) != 0) {
+        // hpa = (unsigned int) hpa;
+        // printf("TEST keep hpa %lx %s\n", hpa, hpa_name(hpa));
         if (keep_this_hpa(hpa)) {
+            // printf("     keep hpa %lx\n", hpa);
             parisc_devices[t] = parisc_devices[p];
-            if (hpa == CPU_HPA)
+            if (hpa == CPU_HPA || (parisc_devices[p].iodc->type & 0x1f) == HPHW_NPROC)
                 cpu_dev = &parisc_devices[t];
             t++;
         }
@@ -3417,7 +3432,9 @@ void __VISIBLE start_parisc_firmware(void)
         for (i=0; parisc_devices[i].hpa; i++) {
             dev = &parisc_devices[i];
             hpa = dev->hpa;
-            printf("Kept #%d at 0x%lx %s  parent_hpa 0x%lx index %d\n", i, hpa, hpa_name(hpa), dev->hpa_parent, dev->index );
+            printf("Kept #%d at 0x%lx %s  parent_hpa 0x%lx index %d ",
+                i, hpa, hpa_name(hpa), dev->hpa_parent, dev->index);
+            print_mod_path(dev->mod_path, 1);
         }
     }
 
