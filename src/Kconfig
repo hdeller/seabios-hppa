@@ -222,6 +222,12 @@ menu "Hardware support"
         default y
         help
             Support boot from AMD PCscsi storage.
+    config NCR710_SCSI
+        depends on DRIVES && QEMU_HARDWARE
+        bool "NCR 53c710 SCSI controllers"
+        default y
+        help
+            Support boot from NCR 53c710 SCSI controllers on PA-RISC systems (LASI, DINO).
     config LSI_SCSI
         depends on DRIVES && QEMU_HARDWARE
         bool "lsi53c895a scsi controllers"

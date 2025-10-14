@@ -84,6 +84,7 @@ struct drive_s {
 #define DTYPE_MEGASAS      0x82
 #define DTYPE_PVSCSI       0x83
 #define DTYPE_MPT_SCSI     0x84
+#define DTYPE_NCR710_SCSI  0x85
 #define DTYPE_SDCARD       0x90
 #define DTYPE_NVME         0x91
 
