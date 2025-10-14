@@ -23,6 +23,10 @@
 16. Memory [9] at 0xfffbf000 { type:1, hv:0x4a, sv:0x9, rev:0x0 }
 #endif
 
+/* AUTO-GENERATED HEADER FILE FOR SEABIOS FIRMWARE */
+/* generated with Linux kernel */
+/* search for PARISC_QEMU_MACHINE_HEADER in Linux */
+
 #define PARISC_MODEL "9000/715"
 
 #define PARISC_PDC_MODEL 0x60a0, 0x481, 0x0, 0x0, 0x0, 0x0, 0x4, 0x72, 0x72, 0x0
@@ -51,8 +55,7 @@ static struct pdc_system_map_mod_info mod_info_hpa_f8000000_715 = {
 	.add_addrs = 0x0,
 };
 static struct pdc_module_path mod_path_hpa_f8000000_715 = {
-	.path = { .flags = 0x1, .bc = { 0x20, 0x80, 0x8a, 0x0, 0x0, 0x85 }, .mod = 0x0  },
-	.layers = { 0x1000000, 0xed260002, 0x0, 0xf, 0x114b6b5c, 0x114a1de8 }
+	.path = { .flags = 0xff, .bc = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff }, .mod = 0x1 }
 };
 static struct pdc_iodc iodc_data_hpa_f8000000_715 = {
 	.hversion_model = 0x0001,
@@ -67,10 +70,9 @@ static struct pdc_iodc iodc_data_hpa_f8000000_715 = {
 	.features = 0x0000,
 	.checksum = 0xed26,
 	.length = 0x0002,
-	/* pad: 0x0000, 0x000f */
 };
-#define HPA_f8000000_715_num_addr 0
-#define HPA_f8000000_715_add_addr 0
+#define HPA_f8000000_num_addr 0
+#define HPA_f8000000_add_addr 0
 
 
 #define HPA_f0100000_DESCRIPTION "Mirage Jr Core BA"
@@ -80,8 +82,7 @@ static struct pdc_system_map_mod_info mod_info_hpa_f0100000 = {
 	.add_addrs = 0x0,
 };
 static struct pdc_module_path mod_path_hpa_f0100000 = {
-	.path = { .flags = 0x2, .bc = { 0x80, 0x80, 0x8b, 0x0, 0x0, 0x81 }, .mod = 0x0  },
-	.layers = { 0x0, 0xfbe50000, 0x0, 0xf, 0x114b6b5c, 0x114a1de8 }
+	.path = { .flags = 0xff, .bc = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff }, .mod = 0x2 }
 };
 static struct pdc_iodc iodc_data_hpa_f0100000 = {
 	.hversion_model = 0x0002,
@@ -96,7 +97,6 @@ static struct pdc_iodc iodc_data_hpa_f0100000 = {
 	.features = 0x0000,
 	.checksum = 0xfbe5,
 	.length = 0x0000,
-	/* pad: 0x0000, 0x000f */
 };
 #define HPA_f0100000_num_addr 0
 #define HPA_f0100000_add_addr 0
@@ -108,8 +108,7 @@ static struct pdc_system_map_mod_info mod_info_hpa_f0106000 = {
 	.add_addrs = 0x0,
 };
 static struct pdc_module_path mod_path_hpa_f0106000 = {
-	.path = { .flags = 0x2, .bc = { 0x80, 0x80, 0x8a, 0x0, 0x0, 0x82 }, .mod = 0x0  },
-	.layers = { 0x1000000, 0xe8a10002, 0x0, 0xf, 0x114b6b5c, 0x114a1de8 }
+	.path = { .flags = 0xff, .bc = { 0xff, 0xff, 0xff, 0xff, 0x2, 0x0 }, .mod = 0x1 }
 };
 static struct pdc_iodc iodc_data_hpa_f0106000 = {
 	.hversion_model = 0x0002,
@@ -124,7 +123,6 @@ static struct pdc_iodc iodc_data_hpa_f0106000 = {
 	.features = 0x0000,
 	.checksum = 0xe8a1,
 	.length = 0x0002,
-	/* pad: 0x0000, 0x000f */
 };
 #define HPA_f0106000_num_addr 0
 #define HPA_f0106000_add_addr 0
@@ -137,8 +135,7 @@ static struct pdc_system_map_mod_info mod_info_hpa_f0107000 = {
 	.add_addrs = 0x0,
 };
 static struct pdc_module_path mod_path_hpa_f0107000 = {
-	.path = { .flags = 0x2, .bc = { 0x80, 0x80, 0x8a, 0x0, 0x0, 0x8a }, .mod = 0x0  },
-	.layers = { 0x2000000, 0xda120002, 0x0, 0xf, 0x114b6b5c, 0x114a1de8 }
+	.path = { .flags = 0xff, .bc = { 0xff, 0xff, 0xff, 0xff, 0x2, 0x0 }, .mod = 0x2 }
 };
 static struct pdc_iodc iodc_data_hpa_f0107000 = {
 	.hversion_model = 0x0002,
@@ -153,7 +150,6 @@ static struct pdc_iodc iodc_data_hpa_f0107000 = {
 	.features = 0x0000,
 	.checksum = 0xda12,
 	.length = 0x0002,
-	/* pad: 0x0000, 0x000f */
 };
 #define HPA_f0107000_num_addr 0
 #define HPA_f0107000_add_addr 0
@@ -166,8 +162,7 @@ static struct pdc_system_map_mod_info mod_info_hpa_f0105000 = {
 	.add_addrs = 0x0,
 };
 static struct pdc_module_path mod_path_hpa_f0105000 = {
-	.path = { .flags = 0x2, .bc = { 0x80, 0x80, 0x8a, 0x0, 0x0, 0x8c }, .mod = 0x0  },
-	.layers = { 0x1000000, 0xe3f30002, 0x0, 0xf, 0x114b6b5c, 0x114a1de8 }
+	.path = { .flags = 0xff, .bc = { 0xff, 0xff, 0xff, 0xff, 0x2, 0x0 }, .mod = 0x4 }
 };
 static struct pdc_iodc iodc_data_hpa_f0105000 = {
 	.hversion_model = 0x0002,
@@ -182,7 +177,6 @@ static struct pdc_iodc iodc_data_hpa_f0105000 = {
 	.features = 0x0000,
 	.checksum = 0xe3f3,
 	.length = 0x0002,
-	/* pad: 0x0000, 0x000f */
 };
 #define HPA_f0105000_num_addr 0
 #define HPA_f0105000_add_addr 0
@@ -195,8 +189,7 @@ static struct pdc_system_map_mod_info mod_info_hpa_f0102000 = {
 	.add_addrs = 0x0,
 };
 static struct pdc_module_path mod_path_hpa_f0102000 = {
-	.path = { .flags = 0x2, .bc = { 0x80, 0x80, 0xa, 0x0, 0x0, 0x74 }, .mod = 0x0  },
-	.layers = { 0x1000000, 0xe3f30002, 0x0, 0xf, 0x114b6b5c, 0x114a1de8 }
+	.path = { .flags = 0xff, .bc = { 0xff, 0xff, 0xff, 0xff, 0x2, 0x0 }, .mod = 0x6 }
 };
 static struct pdc_iodc iodc_data_hpa_f0102000 = {
 	.hversion_model = 0x0002,
@@ -206,12 +199,11 @@ static struct pdc_iodc iodc_data_hpa_f0102000 = {
 	.sversion_rev = 0x0000,
 	.sversion_model = 0x003a,
 	.sversion_opt = 0x0000,
-	.rev = 0x0001,
-	.dep = 0x0000,
-	.features = 0x0000,
-	.checksum = 0xe3f3,
-	.length = 0x0002,
-	/* pad: 0x0000, 0x000f */
+	.rev = 0x00ff,
+	.dep = 0x00ff,
+	.features = 0x00ff,
+	.checksum = 0xffff,
+	.length = 0xffff,
 };
 #define HPA_f0102000_num_addr 0
 #define HPA_f0102000_add_addr 0
@@ -224,8 +216,7 @@ static struct pdc_system_map_mod_info mod_info_hpa_f0104000 = {
 	.add_addrs = 0x0,
 };
 static struct pdc_module_path mod_path_hpa_f0104000 = {
-	.path = { .flags = 0x2, .bc = { 0x80, 0x80, 0xa, 0x0, 0x0, 0x7b }, .mod = 0x0  },
-	.layers = { 0x1000000, 0xe3f30002, 0x0, 0xf, 0x114b6b5c, 0x114a1de8 }
+	.path = { .flags = 0xff, .bc = { 0xff, 0xff, 0xff, 0xff, 0x2, 0x0 }, .mod = 0x8 }
 };
 static struct pdc_iodc iodc_data_hpa_f0104000 = {
 	.hversion_model = 0x0002,
@@ -235,12 +226,11 @@ static struct pdc_iodc iodc_data_hpa_f0104000 = {
 	.sversion_rev = 0x0000,
 	.sversion_model = 0x003d,
 	.sversion_opt = 0x0080,
-	.rev = 0x0001,
-	.dep = 0x0000,
-	.features = 0x0000,
-	.checksum = 0xe3f3,
-	.length = 0x0002,
-	/* pad: 0x0000, 0x000f */
+	.rev = 0x00ff,
+	.dep = 0x00ff,
+	.features = 0x00ff,
+	.checksum = 0xffff,
+	.length = 0xffff,
 };
 #define HPA_f0104000_num_addr 0
 #define HPA_f0104000_add_addr 0
@@ -253,8 +243,7 @@ static struct pdc_system_map_mod_info mod_info_hpa_f010a000 = {
 	.add_addrs = 0x0,
 };
 static struct pdc_module_path mod_path_hpa_f010a000 = {
-	.path = { .flags = 0x2, .bc = { 0x80, 0x80, 0xa, 0x0, 0x0, 0x83 }, .mod = 0x0  },
-	.layers = { 0x1000000, 0xe3f30002, 0x0, 0xf, 0x114b6b5c, 0x114a1de8 }
+	.path = { .flags = 0xff, .bc = { 0xff, 0xff, 0xff, 0xff, 0x2, 0x0 }, .mod = 0xa }
 };
 static struct pdc_iodc iodc_data_hpa_f010a000 = {
 	.hversion_model = 0x0002,
@@ -264,12 +253,11 @@ static struct pdc_iodc iodc_data_hpa_f010a000 = {
 	.sversion_rev = 0x0000,
 	.sversion_model = 0x0041,
 	.sversion_opt = 0x0080,
-	.rev = 0x0001,
-	.dep = 0x0000,
-	.features = 0x0000,
-	.checksum = 0xe3f3,
-	.length = 0x0002,
-	/* pad: 0x0000, 0x000f */
+	.rev = 0x00ff,
+	.dep = 0x00ff,
+	.features = 0x00ff,
+	.checksum = 0xffff,
+	.length = 0xffff,
 };
 #define HPA_f010a000_num_addr 0
 #define HPA_f010a000_add_addr 0
@@ -282,8 +270,7 @@ static struct pdc_system_map_mod_info mod_info_hpa_f0108000 = {
 	.add_addrs = 0x0,
 };
 static struct pdc_module_path mod_path_hpa_f0108000 = {
-	.path = { .flags = 0x2, .bc = { 0x80, 0x80, 0x8a, 0x0, 0x0, 0x84 }, .mod = 0x0  },
-	.layers = { 0x1000000, 0xedbd0002, 0x0, 0xf, 0x114b6b5c, 0x114a1de8 }
+	.path = { .flags = 0xff, .bc = { 0xff, 0xff, 0xff, 0xff, 0x2, 0x0 }, .mod = 0xb }
 };
 static struct pdc_iodc iodc_data_hpa_f0108000 = {
 	.hversion_model = 0x0002,
@@ -298,7 +285,6 @@ static struct pdc_iodc iodc_data_hpa_f0108000 = {
 	.features = 0x0000,
 	.checksum = 0xedbd,
 	.length = 0x0002,
-	/* pad: 0x0000, 0x000f */
 };
 #define HPA_f0108000_num_addr 0
 #define HPA_f0108000_add_addr 0
@@ -311,8 +297,7 @@ static struct pdc_system_map_mod_info mod_info_hpa_f0108100 = {
 	.add_addrs = 0x0,
 };
 static struct pdc_module_path mod_path_hpa_f0108100 = {
-	.path = { .flags = 0x2, .bc = { 0x80, 0x80, 0x8a, 0x0, 0x0, 0x84 }, .mod = 0x0  },
-	.layers = { 0x1000000, 0xedbd0002, 0x0, 0xf, 0x114b6b5c, 0x114a1de8 }
+	.path = { .flags = 0xff, .bc = { 0xff, 0xff, 0xff, 0xff, 0x2, 0x0 }, .mod = 0xc }
 };
 static struct pdc_iodc iodc_data_hpa_f0108100 = {
 	.hversion_model = 0x0002,
@@ -327,7 +312,6 @@ static struct pdc_iodc iodc_data_hpa_f0108100 = {
 	.features = 0x0000,
 	.checksum = 0xedbd,
 	.length = 0x0002,
-	/* pad: 0x0000, 0x000f */
 };
 #define HPA_f0108100_num_addr 0
 #define HPA_f0108100_add_addr 0
@@ -340,8 +324,7 @@ static struct pdc_system_map_mod_info mod_info_hpa_fc000000 = {
 	.add_addrs = 0x0,
 };
 static struct pdc_module_path mod_path_hpa_fc000000 = {
-	.path = { .flags = 0x2, .bc = { 0x80, 0x1a, 0xb, 0x0, 0x0, 0x90 }, .mod = 0x0  },
-	.layers = { 0x1000000, 0xedbd0002, 0x0, 0xf, 0x114b6b5c, 0x114a1de8 }
+	.path = { .flags = 0xff, .bc = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff }, .mod = 0x4 }
 };
 static struct pdc_iodc iodc_data_hpa_fc000000 = {
 	.hversion_model = 0x0002,
@@ -351,12 +334,11 @@ static struct pdc_iodc iodc_data_hpa_fc000000 = {
 	.sversion_rev = 0x0000,
 	.sversion_model = 0x0048,
 	.sversion_opt = 0x0000,
-	.rev = 0x0001,
-	.dep = 0x0000,
-	.features = 0x0000,
-	.checksum = 0xedbd,
-	.length = 0x0002,
-	/* pad: 0x0000, 0x000f */
+	.rev = 0x00ff,
+	.dep = 0x00ff,
+	.features = 0x00ff,
+	.checksum = 0xffff,
+	.length = 0xffff,
 };
 #define HPA_fc000000_num_addr 0
 #define HPA_fc000000_add_addr 0
@@ -369,8 +351,7 @@ static struct pdc_system_map_mod_info mod_info_hpa_f0200000 = {
 	.add_addrs = 0x0,
 };
 static struct pdc_module_path mod_path_hpa_f0200000 = {
-	.path = { .flags = 0x1, .bc = { 0x20, 0x1a, 0xb, 0x0, 0x0, 0x8e }, .mod = 0x0  },
-	.layers = { 0x1000000, 0xedbd0002, 0x0, 0xf, 0x114b6b5c, 0x114a1de8 }
+	.path = { .flags = 0xff, .bc = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff }, .mod = 0x5 }
 };
 static struct pdc_iodc iodc_data_hpa_f0200000 = {
 	.hversion_model = 0x0001,
@@ -380,12 +361,11 @@ static struct pdc_iodc iodc_data_hpa_f0200000 = {
 	.sversion_rev = 0x0000,
 	.sversion_model = 0x0047,
 	.sversion_opt = 0x0000,
-	.rev = 0x0001,
-	.dep = 0x0000,
-	.features = 0x0000,
-	.checksum = 0xedbd,
-	.length = 0x0002,
-	/* pad: 0x0000, 0x000f */
+	.rev = 0x00ff,
+	.dep = 0x00ff,
+	.features = 0x00ff,
+	.checksum = 0xffff,
+	.length = 0xffff,
 };
 #define HPA_f0200000_num_addr 0
 #define HPA_f0200000_add_addr 0
@@ -397,8 +377,7 @@ static struct pdc_system_map_mod_info mod_info_hpa_f0201000 = {
 	.add_addrs = 0x0,
 };
 static struct pdc_module_path mod_path_hpa_f0201000 = {
-	.path = { .flags = 0x1, .bc = { 0x20, 0x0, 0x8a, 0x0, 0x0, 0x73 }, .mod = 0x0  },
-	.layers = { 0x1000000, 0x81670002, 0x0, 0xf, 0x114b6b5c, 0x114a1de8 }
+	.path = { .flags = 0xff, .bc = { 0xff, 0xff, 0xff, 0xff, 0x5, 0x0 }, .mod = 0x1 }
 };
 static struct pdc_iodc iodc_data_hpa_f0201000 = {
 	.hversion_model = 0x0001,
@@ -413,7 +392,6 @@ static struct pdc_iodc iodc_data_hpa_f0201000 = {
 	.features = 0x0000,
 	.checksum = 0x8167,
 	.length = 0x0002,
-	/* pad: 0x0000, 0x000f */
 };
 #define HPA_f0201000_num_addr 0
 #define HPA_f0201000_add_addr 0
@@ -426,8 +404,7 @@ static struct pdc_system_map_mod_info mod_info_hpa_f0202000 = {
 	.add_addrs = 0x0,
 };
 static struct pdc_module_path mod_path_hpa_f0202000 = {
-	.path = { .flags = 0x1, .bc = { 0x20, 0x80, 0x8a, 0x0, 0x0, 0x8c }, .mod = 0x0  },
-	.layers = { 0x1000000, 0xe3f30002, 0x0, 0xf, 0x114b6b5c, 0x114a1de8 }
+	.path = { .flags = 0xff, .bc = { 0xff, 0xff, 0xff, 0xff, 0x5, 0x0 }, .mod = 0x2 }
 };
 static struct pdc_iodc iodc_data_hpa_f0202000 = {
 	.hversion_model = 0x0001,
@@ -442,7 +419,6 @@ static struct pdc_iodc iodc_data_hpa_f0202000 = {
 	.features = 0x0000,
 	.checksum = 0xe3f3,
 	.length = 0x0002,
-	/* pad: 0x0000, 0x000f */
 };
 #define HPA_f0202000_num_addr 0
 #define HPA_f0202000_add_addr 0
@@ -455,8 +431,7 @@ static struct pdc_system_map_mod_info mod_info_hpa_fffbe000 = {
 	.add_addrs = 0x0,
 };
 static struct pdc_module_path mod_path_hpa_fffbe000 = {
-	.path = { .flags = 0x60, .bc = { 0xa0, 0x0, 0x0, 0x0, 0x0, 0x4 }, .mod = 0x81  },
-	.layers = { 0x1000000, 0xe3f30002, 0x0, 0xf, 0x114b6b5c, 0x114a1de8 }
+	.path = { .flags = 0xff, .bc = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff }, .mod = 0x8 }
 };
 static struct pdc_iodc iodc_data_hpa_fffbe000 = {
 	.hversion_model = 0x0060,
@@ -466,26 +441,24 @@ static struct pdc_iodc iodc_data_hpa_fffbe000 = {
 	.sversion_rev = 0x0000,
 	.sversion_model = 0x0002,
 	.sversion_opt = 0x0040,
-	.rev = 0x0001,
-	.dep = 0x0000,
-	.features = 0x0000,
-	.checksum = 0xe3f3,
-	.length = 0x0002,
-	/* pad: 0x0000, 0x000f */
+	.rev = 0x00ff,
+	.dep = 0x00ff,
+	.features = 0x00ff,
+	.checksum = 0xffff,
+	.length = 0xffff,
 };
 #define HPA_fffbe000_num_addr 0
 #define HPA_fffbe000_add_addr 0
 
 
-#define HPA_fffbf000_715_DESCRIPTION "Memory"
+#define HPA_fffbf000_DESCRIPTION "Memory"
 static struct pdc_system_map_mod_info mod_info_hpa_fffbf000_715 = {
 	.mod_addr = 0x3a,
 	.mod_pgs = 0x0,
 	.add_addrs = 0x0,
 };
 static struct pdc_module_path mod_path_hpa_fffbf000_715 = {
-	.path = { .flags = 0x4, .bc = { 0xa0, 0x1c, 0x1, 0x0, 0x0, 0x9 }, .mod = 0x0  },
-	.layers = { 0x1000000, 0xe3f30002, 0x0, 0xf, 0x114b6b5c, 0x114a1de8 }
+	.path = { .flags = 0xff, .bc = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff }, .mod = 0x7 /* 0x9 */ }
 };
 static struct pdc_iodc iodc_data_hpa_fffbf000_715 = {
 	.hversion_model = 0x0004,
@@ -495,25 +468,24 @@ static struct pdc_iodc iodc_data_hpa_fffbf000_715 = {
 	.sversion_rev = 0x0000,
 	.sversion_model = 0x0004,
 	.sversion_opt = 0x0080,
-	.rev = 0x0001,
-	.dep = 0x0000,
-	.features = 0x0000,
-	.checksum = 0xe3f3,
-	.length = 0x0002,
-	/* pad: 0x0000, 0x000f */
+	.rev = 0x00ff,
+	.dep = 0x00ff,
+	.features = 0x00ff,
+	.checksum = 0xffff,
+	.length = 0xffff,
 };
-#define HPA_fffbf000_715_num_addr 0
-#define HPA_fffbf000_715_add_addr 0
+#define HPA_fffbf000_num_addr 0
+#define HPA_fffbf000_add_addr 0
 
 
 
 #define PARISC_DEVICE_LIST \
-	{	.hpa = 0xf8000000,\
+	{	.hpa = LASI_GFX_HPA,\
 		.iodc = &iodc_data_hpa_f8000000_715,\
 		.mod_info = &mod_info_hpa_f8000000_715,\
 		.mod_path = &mod_path_hpa_f8000000_715,\
-		.num_addr = HPA_f8000000_715_num_addr,\
-		.add_addr = { HPA_f8000000_715_add_addr } },\
+		.num_addr = HPA_f8000000_num_addr,\
+		.add_addr = { HPA_f8000000_add_addr } },\
 	{	.hpa = 0xf0100000,\
 		.iodc = &iodc_data_hpa_f0100000,\
 		.mod_info = &mod_info_hpa_f0100000,\
@@ -544,13 +516,13 @@ static struct pdc_iodc iodc_data_hpa_fffbf000_715 = {
 		.mod_path = &mod_path_hpa_f0102000,\
 		.num_addr = HPA_f0102000_num_addr,\
 		.add_addr = { HPA_f0102000_add_addr } },\
-	{	.hpa = 0xf0104000,\
+	{	.hpa = 0xf0104000 + HPA_DISABLED_DEVICE,\
 		.iodc = &iodc_data_hpa_f0104000,\
 		.mod_info = &mod_info_hpa_f0104000,\
 		.mod_path = &mod_path_hpa_f0104000,\
 		.num_addr = HPA_f0104000_num_addr,\
 		.add_addr = { HPA_f0104000_add_addr } },\
-	{	.hpa = 0xf010a000,\
+	{	.hpa = 0xf010a000 + HPA_DISABLED_DEVICE,\
 		.iodc = &iodc_data_hpa_f010a000,\
 		.mod_info = &mod_info_hpa_f010a000,\
 		.mod_path = &mod_path_hpa_f010a000,\
@@ -568,40 +540,40 @@ static struct pdc_iodc iodc_data_hpa_fffbf000_715 = {
 		.mod_path = &mod_path_hpa_f0108100,\
 		.num_addr = HPA_f0108100_num_addr,\
 		.add_addr = { HPA_f0108100_add_addr } },\
-	{	.hpa = 0xfc000000,\
+	{	.hpa = 0xfc000000 + HPA_DISABLED_DEVICE,\
 		.iodc = &iodc_data_hpa_fc000000,\
 		.mod_info = &mod_info_hpa_fc000000,\
 		.mod_path = &mod_path_hpa_fc000000,\
 		.num_addr = HPA_fc000000_num_addr,\
 		.add_addr = { HPA_fc000000_add_addr } },\
-	{	.hpa = 0xf0200000,\
+	{	.hpa = 0xf0200000 + HPA_DISABLED_DEVICE,\
 		.iodc = &iodc_data_hpa_f0200000,\
 		.mod_info = &mod_info_hpa_f0200000,\
 		.mod_path = &mod_path_hpa_f0200000,\
 		.num_addr = HPA_f0200000_num_addr,\
 		.add_addr = { HPA_f0200000_add_addr } },\
-	{	.hpa = 0xf0201000,\
+	{	.hpa = 0xf0201000 + HPA_DISABLED_DEVICE,\
 		.iodc = &iodc_data_hpa_f0201000,\
 		.mod_info = &mod_info_hpa_f0201000,\
 		.mod_path = &mod_path_hpa_f0201000,\
 		.num_addr = HPA_f0201000_num_addr,\
 		.add_addr = { HPA_f0201000_add_addr } },\
-	{	.hpa = 0xf0202000,\
+	{	.hpa = 0xf0202000 + HPA_DISABLED_DEVICE,\
 		.iodc = &iodc_data_hpa_f0202000,\
 		.mod_info = &mod_info_hpa_f0202000,\
 		.mod_path = &mod_path_hpa_f0202000,\
 		.num_addr = HPA_f0202000_num_addr,\
 		.add_addr = { HPA_f0202000_add_addr } },\
-	{	.hpa = 0xfffbe000,\
+	{	.hpa = CPU_HPA, /* 0xfffbe000 */\
 		.iodc = &iodc_data_hpa_fffbe000,\
 		.mod_info = &mod_info_hpa_fffbe000,\
 		.mod_path = &mod_path_hpa_fffbe000,\
 		.num_addr = HPA_fffbe000_num_addr,\
 		.add_addr = { HPA_fffbe000_add_addr } },\
-	{	.hpa = 0xfffbf000,\
+	{	.hpa = MEMORY_HPA, /* 0xfffbf000 */\
 		.iodc = &iodc_data_hpa_fffbf000_715,\
 		.mod_info = &mod_info_hpa_fffbf000_715,\
 		.mod_path = &mod_path_hpa_fffbf000_715,\
-		.num_addr = HPA_fffbf000_715_num_addr,\
-		.add_addr = { HPA_fffbf000_715_add_addr } },\
+		.num_addr = HPA_fffbf000_num_addr,\
+		.add_addr = { HPA_fffbf000_add_addr } },\
 	{ 0, }
