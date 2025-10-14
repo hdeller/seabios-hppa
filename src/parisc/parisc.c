@@ -2232,7 +2232,9 @@ static int pdc_mem_map(unsigned long *arg)
             dev = find_hppa_device_by_path(dp, NULL, 0);
             if (!dev)
                 return PDC_NE_MOD;
-            memcpy(memmap, dev->mod_info, sizeof(*memmap));
+
+            memmap->hpa = dev->hpa;
+            memmap->more_pgs = dev->mod_info->mod_pgs;
             return PDC_OK;
     }
     return PDC_BAD_OPTION;
