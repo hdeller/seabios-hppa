@@ -147,6 +147,8 @@ unsigned long pci_hpa = PCI_HPA;    /* HPA of Dino or Elroy0 */
 unsigned long hppa_port_pci_cmd  = (PCI_HPA + DINO_PCI_ADDR);
 unsigned long hppa_port_pci_data = (PCI_HPA + DINO_CONFIG_DATA);
 
+unsigned long lasi_hpa; /* HPA of Lasi, different on B160L and 715 */
+
 /* Want PDC boot menu? Enable via qemu "-boot menu=on" option. */
 unsigned int show_boot_menu;
 unsigned int interact_ipl;
@@ -157,7 +159,9 @@ unsigned int __VISIBLE psw_defaults;
 unsigned long PORT_QEMU_CFG_CTL;
 unsigned int tlb_entries = 256;
 
-#define PARISC_SERIAL_CONSOLE   PORT_SERIAL1
+#define PARISC_SERIAL_CONSOLE   (LASI_UART_HPA + 0x800)
+unsigned long port_serial_1 = PARISC_SERIAL_CONSOLE;
+unsigned long port_serial_2;
 
 extern char pdc_entry;
 extern char pdc_entry_table;
@@ -587,15 +591,16 @@ static const char *hpa_device_name(unsigned long hpa, int output)
     return HPA_is_LASI_graphics(hpa) ? "GRAPHICS(1)" :
             HPA_is_graphics_device(hpa) ? "VGA" :
             HPA_is_LASI_keyboard(hpa) ? "PS2" :
-            ((hpa + 0x800) == PORT_SERIAL1) ?
+            ((hpa + 0x800) == port_serial_1) ?
                 "SERIAL_1.9600.8.none" : "SERIAL_2.9600.8.none";
 }
 
-static void print_mod_path(struct pdc_module_path *p)
+static void print_mod_path(struct pdc_module_path *p, int newline)
 {
-    dprintf(1, "PATH %d/%d/%d/%d/%d/%d/%d:%d.%d.%d ", p->path.bc[0], p->path.bc[1],
+    printf("PATH %d/%d/%d/%d/%d/%d/%d:%d.%d.%d %s", p->path.bc[0], p->path.bc[1],
             p->path.bc[2],p->path.bc[3],p->path.bc[4],p->path.bc[5],
-            p->path.mod, p->layers[0], p->layers[1], p->layers[2]);
+            p->path.mod, p->layers[0], p->layers[1], p->layers[2],
+            newline ? "\n":"");
 }
 
 void make_module_path_from_pcidev(struct pci_device *pci,
@@ -1060,14 +1065,13 @@ static void parisc_serial_out(char c)
     }
     if (0) {
         dprintf(1,"parisc_serial_out  search hpa %x   ", PAGE0->mem_cons.hpa);
-        print_mod_path(&PAGE0->mem_cons.dp);
-        dprintf(1,"  \n");
+        print_mod_path(&PAGE0->mem_cons.dp, 1);
     }
     hppa_device_t *dev;
     dev = find_hppa_device_by_path(&PAGE0->mem_cons.dp, NULL, 0);
     if (0) {
         dprintf(1,"parisc_serial_out  hpa %x\n", PAGE0->mem_cons.hpa);
-        print_mod_path(dev->mod_path);
+        print_mod_path(dev->mod_path, 0);
     }
     if (!dev) hlt();
     BUG_ON(!dev);
@@ -1150,9 +1154,9 @@ int __VISIBLE parisc_iodc_ENTRY_IO(unsigned int *arg)
     }
 
     if (1 &&
-            (((DEV_is_serial_device(dev) || HPA_is_graphics_device(hpa)) && option == ENTRY_IO_COUT) ||
-             ((DEV_is_serial_device(dev) || HPA_is_graphics_device(hpa)) && option == ENTRY_IO_CIN) ||
-             ((DEV_is_storage_device(dev) && option == ENTRY_IO_BOOTIN && !(pdc_debug & DEBUG_BOOT_IO)))) ) {
+            (( option == ENTRY_IO_COUT   && (DEV_is_serial_device(dev) || HPA_is_graphics_device(hpa))) ||
+             ( option == ENTRY_IO_CIN    && (DEV_is_serial_device(dev) || HPA_is_graphics_device(hpa))) ||
+             ((option == ENTRY_IO_BOOTIN && !(pdc_debug & DEBUG_BOOT_IO)) && DEV_is_storage_device(dev))) ) {
         /* avoid debug messages */
     } else {
         iodc_log_call(arg, __FUNCTION__);
@@ -2073,7 +2077,7 @@ static int pdc_system_map(unsigned long *arg)
 
             if (0) {
                 dprintf(1, "PDC_FIND_MODULE dev=%p hpa=%lx ", dev, dev ? dev->hpa:0UL);
-                print_mod_path(dev->mod_path);
+                print_mod_path(dev->mod_path, 0);
                 if (dev->pci)
                     dprintf(1, "PCI %pP ", dev->pci);
                 dprintf(1, "\n");
@@ -2112,7 +2116,7 @@ static int pdc_system_map(unsigned long *arg)
             hppa_device_t *dev = find_hppa_device_by_path(mod_path, &hpa_index, 1); // XXX
             if (0) {
                 dprintf(1, "PDC_TRANSLATE_PATH dev=%p hpa=%lx ", dev, dev ? dev->hpa:0UL);
-                print_mod_path(mod_path);
+                print_mod_path(mod_path, 0);
                 if (dev && dev->pci)
                     dprintf(1, "PCI %pP ", dev->pci);
                 dprintf(1, "\n");
@@ -2196,12 +2200,12 @@ static int pdc_lan_station_id(unsigned long *arg)
         case PDC_LAN_STATION_ID_READ:
             if (has_astro)
                 return PDC_INVALID_ARG;
-            if (ARG3 != LASI_LAN_HPA)
+            if (ARG3 != lasi_hpa + LASI_LAN)
                 return PDC_INVALID_ARG;
-            if (!keep_this_hpa(LASI_LAN_HPA))
+            if (!keep_this_hpa(lasi_hpa + LASI_LAN))
                 return PDC_INVALID_ARG;
             /* Let qemu store the MAC of NIC to address @ARG2 */
-            *(unsigned long *)(LASI_LAN_HPA+12) = ARG2;
+            *(unsigned long *)(lasi_hpa + LASI_LAN + 12) = ARG2;
             NO_COMPAT_RETURN_VALUE(ARG2);
             return PDC_OK;
     }
@@ -2960,7 +2964,7 @@ static struct pz_device mem_cons_sti_boot = {
 };
 
 static struct pz_device mem_kbd_sti_boot = {
-    .hpa = LASI_PS2KBD_HPA,
+    .hpa = 0, /* initialized to PS2 port if available */
     .cl_class = CL_KEYBD,
 };
 
@@ -2976,7 +2980,7 @@ static struct pz_device mem_kbd_boot = {
 
 static struct pz_device mem_boot_boot = {
     .dp.path.flags = PF_AUTOBOOT,
-    .hpa = DINO_SCSI_HPA,  // will be overwritten
+    .hpa = 0, /* initialized to some SCSI card if available */
     .cl_class = CL_RANDOM,
 };
 
@@ -3222,14 +3226,23 @@ void __VISIBLE start_parisc_firmware(void)
 
     /* which machine shall we emulate? */
     str = romfile_loadfile("/etc/hppa/machine", NULL);
-    if (!str) {
-        str = "B160L";
+    if (!is_64bit_PDC() && !str)
+        str = "B160L";  /* default machine */
+    if (!is_64bit_PDC() && strcmp(str, "B160L") == 0) {
+        has_astro = 0; /* No Astro */
         current_machine = &machine_B160L;
         pci_hpa = DINO_HPA;
         hppa_port_pci_cmd  = pci_hpa + DINO_PCI_ADDR;
         hppa_port_pci_data = pci_hpa + DINO_CONFIG_DATA;
-    }
-    if (strcmp(str, "C3700") == 0) {
+        lasi_hpa = LASI_HPA;
+        port_serial_1 = lasi_hpa + LASI_UART + 0x800;
+        port_serial_2 = DINO_UART_HPA + 0x800;
+        mem_cons_boot.hpa = lasi_hpa + LASI_UART; /* serial port */
+        mem_kbd_boot.hpa = lasi_hpa + LASI_UART;
+        mem_kbd_sti_boot.hpa = lasi_hpa + LASI_PS2;
+        mem_boot_boot.hpa = lasi_hpa + LASI_SCSI;
+    } else
+    if (is_64bit_PDC() && strcmp(str, "C3700") == 0) {
         has_astro = 1;
         current_machine = &machine_C3700;
         pci_hpa = (unsigned long) ELROY0_BASE_HPA;
@@ -3353,8 +3366,8 @@ void __VISIBLE start_parisc_firmware(void)
             ps2port_setup();
     } else {
         remove_from_keep_list(LASI_GFX_HPA);
-        remove_from_keep_list(LASI_PS2KBD_HPA);
-        remove_from_keep_list(LASI_PS2MOU_HPA);
+        remove_from_keep_list(lasi_hpa + LASI_PS2);
+        remove_from_keep_list(lasi_hpa + LASI_PS2 + 0x100);
     }
 
     /* Initialize device list */
