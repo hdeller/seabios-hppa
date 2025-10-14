@@ -186,6 +186,25 @@ extern long sr_hashing_enabled(void);
 
 #define MIN_RAM_SIZE	(16*1024*1024) // 16 MB
 
+/* HP hardware identifiers */
+#define HPHW_NPROC     0
+#define HPHW_MEMORY    1
+#define HPHW_B_DMA     2
+#define HPHW_OBSOLETE  3
+#define HPHW_A_DMA     4
+#define HPHW_A_DIRECT  5
+#define HPHW_OTHER     6
+#define HPHW_BCPORT    7
+#define HPHW_CIO       8
+#define HPHW_CONSOLE   9
+#define HPHW_FIO       10
+#define HPHW_BA        11
+#define HPHW_IOA       12
+#define HPHW_BRIDGE    13
+#define HPHW_FABRIC    14
+#define HPHW_MC	       15
+#define HPHW_FAULTY    31
+
 #define CPU_HPA_IDX(i)  (F_EXTEND(CPU_HPA) + (i)*0x1000) /* CPU_HPA of CPU#i */
 
 static int index_of_CPU_HPA(unsigned long hpa) {
@@ -314,6 +333,21 @@ static struct pdc_module_path mod_path_emulated_drives = {
     .path = { .flags = 0x0, .bc = { 0xff, 0xff, 0xff, 0x8, 0x0, 0x0 }, .mod = 0x0  },
     .layers = { 0x0, 0x0, 0x0, 0x0, 0x0, 0x0 } // first two layer entries get replaced
 };
+
+const char *drive_name(struct drive_s *drive)
+{
+    switch (drive->type) {
+    case DTYPE_ATA:
+    case DTYPE_ATA_ATAPI:       return "ATA";
+    case DTYPE_LSI_SCSI:
+    case DTYPE_ESP_SCSI:
+    case DTYPE_MEGASAS:
+    case DTYPE_PVSCSI:
+    case DTYPE_MPT_SCSI:        return "FWSCSI";
+    case DTYPE_NCR710_SCSI:     return "SCSI";
+    default:                    return "Unkown";
+    }
+}
 
 /********************************************************
  * FIRMWARE IO Dependent Code (IODC) HANDLER
@@ -510,7 +544,7 @@ int DEV_is_storage_device(hppa_device_t *dev)
     BUG_ON(!dev);
     if (dev->pci)
         return (dev->pci->class == PCI_CLASS_STORAGE_SCSI);
-    return ((dev->iodc->type & 0xf) == 0x04); /* HPHW_A_DMA */
+    return ((dev->iodc->type & 0x1f) == HPHW_FIO);
 }
 
 int DEV_is_serial_device(hppa_device_t *dev)
@@ -519,7 +553,7 @@ int DEV_is_serial_device(hppa_device_t *dev)
     if (dev->pci)
         return (dev->pci->class == PCI_CLASS_COMMUNICATION_SERIAL ||
                 dev->pci->class == PCI_CLASS_COMMUNICATION_MULTISERIAL);
-    return ((dev->iodc->type & 0xf) == 0x0a); /* HPHW_FIO */
+    return ((dev->iodc->type & 0x1f) == HPHW_FIO); // HPHW_CIO ??
 }
 
 int HPA_is_serial_device(unsigned long hpa)
@@ -537,12 +571,12 @@ int DEV_is_network_device(hppa_device_t *dev)
     BUG_ON(!dev);
     if (dev->pci)
         return (dev->pci->class == PCI_CLASS_NETWORK_ETHERNET);
-    return ((dev->iodc->type & 0xf) == 0x0a); /* HPHW_FIO */
+    return ((dev->iodc->type & 0x1f) == HPHW_FIO);
 }
 
 static int HPA_is_LASI_keyboard(unsigned long hpa)
 {
-    return !has_astro && (hpa == LASI_PS2KBD_HPA);
+    return !has_astro && (hpa == (lasi_hpa + LASI_PS2));
 }
 
 #if 0
@@ -787,18 +821,19 @@ static int keep_add_generic_devices(void)
     while (keep_list[i]) i++;
 
     while (dev->hpa) {
-	switch (dev->iodc->type) {
-	case 0x0041:	/* Memory. Save HPA in PAGE0 entry. */
-                        /* MEMORY_HPA or ASTRO_MEMORY_HPA */
-                PAGE0->imm_hpa = dev->hpa;
-                /* fallthrough */
-	case 0x0007:	/* GSC+ Port bridge */
-	case 0x004d:	/* Dino PCI bridge */
-	case 0x004b:	/* Core Bus adapter (LASI) */
-	case 0x0040:	/* CPU */
-	case 0x000d:	/* Elroy PCI bridge */
-	case 0x000c:	/* Runway port */
-		keep_list[i++] = dev->hpa;
+        switch (dev->iodc->type & 0x1f) {
+        case HPHW_MEMORY:       /* Memory. Save HPA in PAGE0 entry. */
+                                /* MEMORY_HPA or ASTRO_MEMORY_HPA */
+            PAGE0->imm_hpa = dev->hpa;
+            /* fallthrough */
+        case HPHW_NPROC:        /* CPU */
+        case HPHW_BCPORT:       /* GSC+ Port bridge */
+        case HPHW_FIO:          /* Serial & UART devices */
+        case HPHW_BA:           /* Core Bus adapter (LASI) */
+        case HPHW_IOA:          /* Runway port */
+        case HPHW_BRIDGE:       /* Elroy/Dino PCI bridge */
+             if ((dev->hpa & HPA_DISABLED_DEVICE) == 0)
+                keep_list[i++] = dev->hpa;
 	}
 	dev++;
     }
