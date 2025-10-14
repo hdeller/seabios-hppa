@@ -394,9 +394,13 @@ struct machine_info {
 #include "parisc/c3700.h"
 #include "parisc/machine-create.h"
 
+#if !defined(__LP64__)
 #define MACHINE	715
 #include "parisc/715_64.h"
 #include "parisc/machine-create.h"
+#else
+#define machine_715 machine_B160L
+#endif
 
 struct machine_info *current_machine = &machine_B160L;
 
@@ -792,7 +796,7 @@ static hppa_device_t *find_hpa_device(unsigned long hpa)
     return NULL;
 }
 
-static unsigned long keep_list[20] = { PARISC_KEEP_LIST };
+static unsigned long keep_list[24] = { PARISC_KEEP_LIST };
 
 static void remove_from_keep_list(unsigned long hpa)
 {
@@ -3308,19 +3312,29 @@ void __VISIBLE start_parisc_firmware(void)
         hppa_port_pci_data = pci_hpa + 0x048;
         // but report back ASTRO_HPA
         // pci_hpa = (unsigned long) ASTRO_HPA;
+        lasi_hpa = 0;
         /* no serial port for now, will find later */
+        port_serial_1 = 0;
+        port_serial_2 = 0;
         mem_cons_boot.hpa = 0;
         mem_kbd_boot.hpa = 0;
-    }
-    if (strcmp(str, "715") == 0) {
+        mem_kbd_sti_boot.hpa = 0;
+    } else
+    if (!is_64bit_PDC() && strcmp(str, "715") == 0) {
         has_astro = 0; /* No Astro */
         current_machine = &machine_715;
         pci_hpa = 0; /* No PCI bus */
         hppa_port_pci_cmd  = 0;
         hppa_port_pci_data = 0;
-        mem_cons_boot.hpa = 0xf0105000; /* serial port */
-        mem_kbd_boot.hpa = 0xf0105000;
-    }
+        lasi_hpa = LASI_HPA_715;
+        port_serial_1 = lasi_hpa + LASI_UART + 0x800;
+        port_serial_2 = 0;
+        mem_cons_boot.hpa = lasi_hpa + LASI_UART; /* serial port */
+        mem_kbd_boot.hpa = lasi_hpa + LASI_UART;
+        mem_kbd_sti_boot.hpa = lasi_hpa + LASI_PS2;
+        mem_boot_boot.hpa = lasi_hpa + LASI_SCSI;
+    } else
+        BUG_ON(1);
     parisc_devices = current_machine->device_list;
     strtcpy(qemu_machine, str, sizeof(qemu_machine));
 
@@ -3471,16 +3485,19 @@ void __VISIBLE start_parisc_firmware(void)
     RamSize = ram_size;
     // coreboot_preinit();
 
-    pci_setup();
-    if (has_astro) {
-        iosapic_table_setup();
-    }
-    hppa_pci_build_devices_list();
+    if (pci_hpa) {
+        pci_setup();
+        if (has_astro) {
+            iosapic_table_setup();
+        }
+        hppa_pci_build_devices_list();
 
-    /* find serial PCI card when running on Astro */
-    find_serial_pci_card();
+        /* find serial PCI card when running on Astro */
+        find_serial_pci_card();
+    }
 
     serial_setup();
+    ps2port_setup();
     // usb_setup();
     // ohci_setup();
     block_setup();
