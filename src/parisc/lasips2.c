@@ -63,6 +63,9 @@ int lasips2_command(u16 cmd)
 
 void ps2port_setup(void)
 {
+    if (!CONFIG_PARISC || lasi_hpa == 0)
+        return;
+
     writeb(LASIPS2_KBD_RESET, 0);
     udelay(1000);
     writeb(LASIPS2_KBD_CONTROL, LASIPS2_KBD_CONTROL_EN);
