@@ -899,9 +899,11 @@ static void remove_parisc_devices(unsigned int num_cpus)
     BUG_ON(!cpu_dev);
     cpu_dev->mod_info->mod_addr = F_EXTEND(CPU_HPA);
     if (has_astro)
-        cpu_offset = CPU_HPA - 32*0x1000;
+        cpu_offset = CPU_HPA - 32 * 0x1000;
+    else if (pci_hpa)
+        cpu_offset = pci_hpa;   /* B160L */
     else
-        cpu_offset = pci_hpa;
+        cpu_offset = CPU_HPA - 8 * 0x1000; /* 715 */
     cpu_dev->mod_path->path.mod = (CPU_HPA - cpu_offset) / 0x1000;
 
     /* Generate other CPU devices */
@@ -1584,8 +1586,9 @@ static int pdc_model(unsigned long *arg, unsigned long narrow_mode)
              * with old qemu versions which will try to run 64-bit instructions
              * kernel sr_disable_hash() function
              */
-            source = is_64bit_CPU() ? &current_machine->pdc_model.hversion
-                                    : &machine_B160L.pdc_model.hversion;
+            source = !is_64bit_PDC() || is_64bit_CPU() ?
+                        &current_machine->pdc_model.hversion
+                      : &machine_B160L.pdc_model.hversion;
 
             /* make sure to only copy the necessary bytes. */
             NO_COMPAT_RETURN_VALUE(ARG2);
@@ -2118,6 +2121,11 @@ static int pdc_system_map(unsigned long *arg)
     unsigned long hpa_index;
 
     // dprintf(0, "\n\nSeaBIOS: Info: PDC_SYSTEM_MAP function %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
+
+    /* old machines (715 is Snake type) do not support PDC_SYSTEM_MAP */
+    if (!is_64bit_PDC() && current_machine != &machine_B160L)
+        return PDC_BAD_OPTION;
+
     switch (option) {
         case PDC_FIND_MODULE:
             hpa_index = ARG4;
