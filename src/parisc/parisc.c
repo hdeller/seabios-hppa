@@ -1,6 +1,6 @@
 // Glue code for parisc architecture
 //
-// Copyright (C) 2017-2024 Helge Deller <deller@gmx.de>
+// Copyright (C) 2017-2025 Helge Deller <deller@gmx.de>
 // Copyright (C) 2019 Sven Schnelle <svens@stackframe.org>
 //
 // This file may be distributed under the terms of the GNU LGPLv3 license.
@@ -2884,7 +2884,7 @@ again2:
         printf("Unknown command, please try again.\n\n");
         goto again2;
     }
-    // from here on we handle "BOOT PRI/ALT/FWSCSI.x"
+    // from here on we handle "BOOT PRI/ALT/SCSI.x"
     c = input;
     while (*c && (*c != ' '))   c++;    // search space
     // preset with default boot target (this is same as "BOOT PRI"
@@ -2900,7 +2900,7 @@ again2:
     }
 
     if (!parisc_get_scsi_target(&boot_drive, scsi_boot_target)) {
-        printf("No FWSCSI.%d.0 device available for boot. Please try again.\n\n",
+        printf("No SCSI.%d.0 device available for boot. Please try again.\n\n",
             scsi_boot_target);
         goto again2;
     }
@@ -3530,7 +3530,7 @@ void __VISIBLE start_parisc_firmware(void)
             "Duplex Console IO Dependent Code (IODC) revision " SEABIOS_HPPA_VERSION_STR "\n"
             "\n", is_64bit_PDC() ? 64 : 32, qemu_version);
     printf("------------------------------------------------------------------------------\n"
-            "  (c) Copyright 2017-2024 Helge Deller <deller@gmx.de> and SeaBIOS developers.\n"
+            "  (c) Copyright 2017-2025 Helge Deller <deller@gmx.de> and SeaBIOS developers.\n"
             "------------------------------------------------------------------------------\n\n");
     printf( "  Processor   Speed            State           Coprocessor State  Cache Size\n"
             "  ---------  --------   ---------------------  -----------------  ----------\n");
@@ -3551,12 +3551,12 @@ void __VISIBLE start_parisc_firmware(void)
     // search boot devices
     find_initial_parisc_boot_drives(&parisc_boot_harddisc, &parisc_boot_cdrom);
 
-    printf("  Primary boot path:    FWSCSI.%d.%d\n"
-           "  Alternate boot path:  FWSCSI.%d.%d\n"
+    printf("  Primary boot path:    %s.%d.%d\n"
+           "  Alternate boot path:  %s.%d.%d\n"
            "  Console path:         %s\n"
            "  Keyboard path:        %s\n\n",
-            parisc_boot_harddisc->target, parisc_boot_harddisc->lun,
-            parisc_boot_cdrom->target, parisc_boot_cdrom->lun,
+            drive_name(parisc_boot_harddisc), parisc_boot_harddisc->target, parisc_boot_harddisc->lun,
+            drive_name(parisc_boot_cdrom),    parisc_boot_cdrom->target, parisc_boot_cdrom->lun,
             hpa_device_name(PAGE0->mem_cons.hpa, 1),
             hpa_device_name(PAGE0->mem_kbd.hpa, 0));
 
