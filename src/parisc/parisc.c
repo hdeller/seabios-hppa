@@ -1812,9 +1812,9 @@ static int pdc_iodc(unsigned long *arg)
         case PDC_IODC_NINIT:	/* non-destructive init - for memory */
         case PDC_IODC_DINIT:	/* destructive init */
             result[0] = 0; /* IO_STATUS */
-            result[1] = 0; /* max_spa */
-            result[2] = ram_size_low; /* max memory */
-            result[3] = 0;
+            result[1] = ram_size_low; /* max_spa = max_mem + mappable_mem */
+            result[2] = ram_size_low; /* max_memory */
+            result[3] = 0; /* mappable memory */
             return PDC_OK;
         case PDC_IODC_MEMERR:
             result[0] = 0; /* IO_STATUS */
