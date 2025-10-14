@@ -11,6 +11,7 @@
 #include "hw/ahci.h" // process_ahci_op
 #include "hw/esp-scsi.h" // esp_scsi_process_op
 #include "hw/lsi-scsi.h" // lsi_scsi_process_op
+#include "hw/ncr710-scsi.h" // ncr710_scsi_process_op
 #include "hw/megasas.h" // megasas_process_op
 #include "hw/mpt-scsi.h" // mpt_scsi_process_op
 #include "hw/pci.h" // pci_bdf_to_bus
@@ -519,6 +520,7 @@ block_setup(void)
     megasas_setup();
     pvscsi_setup();
     mpt_scsi_setup();
+    ncr710_scsi_setup();
     nvme_setup();
 }
 
@@ -562,6 +564,8 @@ process_op_both(struct disk_op_s *op)
         return megasas_process_op(op);
     case DTYPE_MPT_SCSI:
         return mpt_scsi_process_op(op);
+    case DTYPE_NCR710_SCSI:
+        return ncr710_scsi_process_op(op);
     default:
         if (!MODESEGMENT)
             return DISK_RET_EPARAM;
