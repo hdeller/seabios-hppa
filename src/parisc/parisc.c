@@ -159,8 +159,7 @@ unsigned int __VISIBLE psw_defaults;
 unsigned long PORT_QEMU_CFG_CTL;
 unsigned int tlb_entries = 256;
 
-#define PARISC_SERIAL_CONSOLE   (LASI_UART_HPA + 0x800)
-unsigned long port_serial_1 = PARISC_SERIAL_CONSOLE;
+unsigned long port_serial_1;
 unsigned long port_serial_2;
 
 extern char pdc_entry;
@@ -242,7 +241,7 @@ int enable_OS64 = OS64_32_DEFAULT;
  * Real time clock emulation
  * Either LASI or Astro will provide access to an emulated RTC clock.
  */
-int *rtc_ptr = (int *) (unsigned long) LASI_RTC_HPA;
+int *rtc_ptr;
 
 void __VISIBLE __noreturn hlt(void)
 {
@@ -407,16 +406,6 @@ struct machine_info *current_machine = &machine_B160L;
 static hppa_device_t *parisc_devices = machine_B160L.device_list;
 
 #define PARISC_KEEP_LIST \
-    DINO_UART_HPA,\
-    /* DINO_SCSI_HPA, */ \
-    LASI_UART_HPA, \
-    LASI_LAN_HPA, \
-    LASI_SCSI_HPA, \
-    LASI_LPT_HPA, \
-    LASI_GFX_HPA,\
-    LASI_PS2KBD_HPA, \
-    LASI_PS2MOU_HPA, \
-    MEMORY_HPA, \
     0
 
 static const char *hpa_name(unsigned long hpa)
@@ -3033,12 +3022,12 @@ static struct pz_device mem_kbd_sti_boot = {
 };
 
 static struct pz_device mem_cons_boot = {
-    .hpa = PARISC_SERIAL_CONSOLE - 0x800,
+    .hpa = 0, /* initialized to first serial port at bootup */
     .cl_class = CL_DUPLEX,
 };
 
 static struct pz_device mem_kbd_boot = {
-    .hpa = PARISC_SERIAL_CONSOLE - 0x800,
+    .hpa = 0, /* initialized to first serial port at bootup */
     .cl_class = CL_KEYBD,
 };
 
@@ -3360,7 +3349,7 @@ void __VISIBLE start_parisc_firmware(void)
     }
 
     /* real-time-clock addr */
-    rtc_ptr = (int *) F_EXTEND(romfile_loadint("/etc/hppa/rtc-addr", (int) LASI_RTC_HPA));
+    rtc_ptr = (int *) F_EXTEND(romfile_loadint("/etc/hppa/rtc-addr", (int) lasi_hpa + 0x9000));
     // dprintf(0, "RTC PTR 0x%p\n", rtc_ptr);
 
     /* use -fw_cfg opt/pdc_debug,string=255 to enable all firmware debug infos */
