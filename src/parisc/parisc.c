@@ -2117,7 +2117,7 @@ static int pdc_system_map(unsigned long *arg)
 
     /* old machines (715 is Snake type) do not support PDC_SYSTEM_MAP */
     if (!is_64bit_PDC() && current_machine != &machine_B160L)
-        return PDC_BAD_OPTION;
+        return PDC_BAD_PROC; // PDC_BAD_OPTION is not sufficient!
 
     switch (option) {
         case PDC_FIND_MODULE:
