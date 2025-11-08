@@ -240,6 +240,7 @@ ncr710_scsi_init_lun(struct ncr_lun_s *nlun, u32 iobase, u8 target, u8 lun)
     memset(nlun, 0, sizeof(*nlun));
     nlun->drive.type = DTYPE_NCR710_SCSI;
     nlun->drive.cntl_id = 0;
+    nlun->drive.max_bytes_transfer = 64*1024;   /* 64 kb */
     nlun->target = target;
     nlun->lun = lun;
     nlun->iobase = iobase;
