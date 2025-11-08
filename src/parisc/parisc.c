@@ -1238,7 +1238,7 @@ int __VISIBLE parisc_iodc_ENTRY_IO(unsigned int *arg)
                 disk_op.command = option == ENTRY_IO_BOOTOUT ? CMD_WRITE : CMD_READ;
 
                 // Make sure we know how many bytes we can read at once!
-                // NOTE: LSI SCSI can not read more than 8191 blocks, esp only 64k
+                // NOTE: LSI SCSI can not read more than 8191 blocks, esp only 64k bytes
                 if (disk_op.drive_fl->max_bytes_transfer == 0) {
                     dprintf(0, "WARNING: Maximum transfer size not set for boot disc.\n");
                     disk_op.drive_fl->max_bytes_transfer = 64*1024;   /* 64kb */
