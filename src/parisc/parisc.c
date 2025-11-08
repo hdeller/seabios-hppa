@@ -1623,7 +1623,7 @@ static int pdc_model(unsigned long *arg, unsigned long narrow_mode)
             return PDC_OK;
         case PDC_MODEL_CPU_ID:
             /* if CPU does not support 64bits, use the B160L CPUID */
-            if (is_64bit_CPU())
+            if (!is_64bit_PDC() || is_64bit_CPU())
                 result[0] = current_machine->pdc_cpuid;
             else
                 result[0] = machine_B160L.pdc_cpuid;
