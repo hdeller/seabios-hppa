@@ -2946,7 +2946,7 @@ again2:
 static int parisc_boot_menu(unsigned long *iplstart, unsigned long *iplend,
         char bootdrive)
 {
-    int ret;
+    int ret, i;
     unsigned int *target = (void *)(PAGE0->mem_free + 32*1024);
     struct disk_op_s disk_op = {
         .buf_fl = target,
@@ -3016,6 +3016,13 @@ static int parisc_boot_menu(unsigned long *iplstart, unsigned long *iplend,
     // IPL_SIZE - Multiple of 2 Kbytes, nonzero, less than or equal to 256 Kbytes.
     // IPL_ENTRY-  Word aligned, less than IPL_SIZE
 
+    /* If we are strict, a 715 may not be able to boot from some ODE CD-ROMS. */
+    if (ipl_size > disk_op.drive_fl->max_bytes_transfer) {
+        printf("ERROR: Cannot load IPL, %d too big for max size of %d bytes.",
+            ipl_size, disk_op.drive_fl->max_bytes_transfer);
+        return 0;
+    }
+
     /* seek to beginning of IPL */
     disk_op.drive_fl = boot_drive;
     disk_op.command = CMD_SEEK;
@@ -3031,9 +3038,16 @@ static int parisc_boot_menu(unsigned long *iplstart, unsigned long *iplend,
     disk_op.count = (ipl_size / disk_op.drive_fl->blksize);
     disk_op.lba = (ipl_addr / disk_op.drive_fl->blksize);
     ret = process_op(&disk_op);
-    // printf("DISK_READ IPL returned %d\n", ret);
+    // printf("DISK_READ IPL returned %d, count %d of %d\n", ret, disk_op.count, ipl_size / disk_op.drive_fl->blksize);
 
     // printf("First word at %p is 0x%x\n", target, target[0]);
+    /* verify IPL checksum */
+    unsigned int sum = 0, *ps = (unsigned int *)ipl_addr;
+    for (i = 0; i < ipl_size / sizeof(int); i++, ++ps)
+        sum += *ps;
+    if (sum != 0) {
+        printf("SeaBIOS: WARNING: IPL checksum is not 0.\n");
+    }
 
     /* execute IPL */
     // TODO: flush D- and I-cache, not needed in emulation ?
