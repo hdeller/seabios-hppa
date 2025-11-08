@@ -1602,7 +1602,8 @@ static int pdc_model(unsigned long *arg, unsigned long narrow_mode)
                     result[0] = current_machine->pdc_version;
                     return PDC_OK;
                 case 1: /* return PDC version */
-                    result[0] = (is_64bit_CPU()) ? 0x20 : 0x011;
+                    /* defaults: 715 has 0x16, B160L has 0x11, C3700 has 0x20 */
+                    result[0] = (is_64bit_CPU()) ? 0x20 : 0x016;
                     return PDC_OK;
                 case 2: /* return PDC PAT(?) version */
                     if (!is_64bit_CPU())
