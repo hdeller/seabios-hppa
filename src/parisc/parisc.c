@@ -3349,8 +3349,10 @@ void __VISIBLE start_parisc_firmware(void)
         mem_kbd_boot.hpa = lasi_hpa + LASI_UART;
         mem_kbd_sti_boot.hpa = lasi_hpa + LASI_PS2;
         mem_boot_boot.hpa = lasi_hpa + LASI_SCSI;
-    } else
-        BUG_ON(1);
+    } else {
+        printf("SeaBIOS: Error: Firmware and CPU do not match!\n");
+        hlt();
+    }
     parisc_devices = current_machine->device_list;
     strtcpy(qemu_machine, str, sizeof(qemu_machine));
 
