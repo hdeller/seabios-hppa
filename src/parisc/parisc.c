@@ -414,6 +414,7 @@ static const char *hpa_name(unsigned long hpa)
 
     /* mask out possible disable flag */
     hpa &= ~HPA_DISABLED_DEVICE;
+    hpa = F_EXTEND(hpa);
 
     #define DO2(y,x)    if (hpa == F_EXTEND(x)) return #y;
     #define DO1(x)      DO2(x,x)
@@ -421,8 +422,8 @@ static const char *hpa_name(unsigned long hpa)
     DO1(DINO_HPA)
     DO1(DINO_UART_HPA)
     DO1(DINO_SCSI_HPA)
-    DO1(CPU_HPA)
-    DO1(MEMORY_HPA)
+    DO2(CPU_HPA, CPU_HPA)
+    DO2(MEMORY_HPA, MEMORY_HPA)
     DO1(SCSI_HPA)
     DO2(LASI_HPA, lasi_hpa)
     DO2(LASI_UART_HPA,  lasi_hpa + LASI_UART)
@@ -800,6 +801,7 @@ static void drop_parisc_device(unsigned long drop_hpa)
         t++;
         p++;
     }
+    parisc_devices[t].hpa = 0;  // mark end of list
 }
 
 
