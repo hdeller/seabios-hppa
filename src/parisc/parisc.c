@@ -408,9 +408,6 @@ struct machine_info *current_machine = &machine_B160L;
 
 static hppa_device_t *parisc_devices = machine_B160L.device_list;
 
-#define PARISC_KEEP_LIST \
-    0
-
 static const char *hpa_name(unsigned long hpa)
 {
     int i;
@@ -788,40 +785,33 @@ static hppa_device_t *find_hpa_device(unsigned long hpa)
     return NULL;
 }
 
-static unsigned long keep_list[24] = { PARISC_KEEP_LIST };
-
-static void remove_from_keep_list(unsigned long hpa)
-{
-    int i = 0;
-
-    while (keep_list[i] && keep_list[i] != hpa)
-        i++;
-    while (keep_list[i]) {
-            keep_list[i] = keep_list[i+1];
-            ++i;
-    }
-}
-
 static int keep_this_hpa(unsigned long hpa)
 {
-    int i = 0;
-
-    while (keep_list[i]) {
-        if (keep_list[i] == hpa)
-            return 1;
-        i++;
-    }
-    return 0;
+    return 1;
 }
+
+/* remove one hpa entry from the inventory table */
+static void drop_parisc_device(unsigned long drop_hpa)
+{
+    unsigned long hpa;
+    int p, t;
+
+    p = t = 0;
+    while ((hpa = parisc_devices[p].hpa) != 0) {
+        if (drop_hpa == hpa)    // skip it
+            p++;
+        if (p != t)
+            parisc_devices[t] = parisc_devices[p];
+        t++;
+        p++;
+    }
+}
+
 
 /* walk all machine devices and add generic ones to the keep_list[] */
 static int keep_add_generic_devices(void)
 {
     hppa_device_t *dev = current_machine->device_list;
-    int i = 0;
-
-    /* search end of list */
-    while (keep_list[i]) i++;
 
     while (dev->hpa) {
         switch (dev->iodc->type & 0x1f) {
@@ -835,12 +825,10 @@ static int keep_add_generic_devices(void)
         case HPHW_BA:           /* Core Bus adapter (LASI) */
         case HPHW_IOA:          /* Runway port */
         case HPHW_BRIDGE:       /* Elroy/Dino PCI bridge */
-             if ((dev->hpa & HPA_DISABLED_DEVICE) == 0)
-                keep_list[i++] = dev->hpa;
+            /* nothing */
 	}
 	dev++;
     }
-    BUG_ON(i >= ARRAY_SIZE(keep_list));
 
     return 0;
 }
@@ -861,21 +849,9 @@ static void remove_parisc_devices(unsigned int num_cpus)
         return;
     uninitialized = 0;
 
-    /* check if qemu emulates LASI chip (LASI_IAR exists) */
-    if (!lasi_hpa) {
-        remove_from_keep_list(lasi_hpa + LASI_UART);
-        remove_from_keep_list(lasi_hpa + LASI_SCSI);
-        remove_from_keep_list(lasi_hpa + LASI_LAN);
-        remove_from_keep_list(lasi_hpa + LASI_LPT);
-        remove_from_keep_list(lasi_hpa + LASI_AUDIO);
-        remove_from_keep_list(lasi_hpa + LASI_PS2);
-        remove_from_keep_list(lasi_hpa + LASI_PS2 + 0x100);
-        remove_from_keep_list(lasi_hpa + LASI_FDC);
-    } else {
-        /* check if qemu emulates LASI i82596 LAN card */
-        if (*(unsigned long *)(lasi_hpa + LASI_LAN + 12) != 0xBEEFBABE)
-            remove_from_keep_list(lasi_hpa + LASI_LAN);
-    }
+    /* check if qemu emulates LASI i82596 LAN card */
+    if (lasi_hpa && *(unsigned long *)(lasi_hpa + LASI_LAN + 12) != 0xBEEFBABE)
+        drop_parisc_device(lasi_hpa + LASI_LAN);
 
     p = t = 0;
     while ((hpa = parisc_devices[p].hpa) != 0) {
@@ -2288,11 +2264,11 @@ static int pdc_lan_station_id(unsigned long *arg)
 
     switch (option) {
         case PDC_LAN_STATION_ID_READ:
-            if (has_astro)
+            if (!lasi_hpa)
                 return PDC_INVALID_ARG;
             if (ARG3 != lasi_hpa + LASI_LAN)
                 return PDC_INVALID_ARG;
-            if (!keep_this_hpa(lasi_hpa + LASI_LAN))
+            if (!find_hpa_device(lasi_hpa + LASI_LAN))
                 return PDC_INVALID_ARG;
             /* Let qemu store the MAC of NIC to address @ARG2 */
             *(unsigned long *)(lasi_hpa + LASI_LAN + 12) = ARG2;
@@ -3479,9 +3455,9 @@ void __VISIBLE start_parisc_firmware(void)
         else
             ps2port_setup();
     } else {
-        remove_from_keep_list(LASI_GFX_HPA);
-        remove_from_keep_list(lasi_hpa + LASI_PS2);
-        remove_from_keep_list(lasi_hpa + LASI_PS2 + 0x100);
+        drop_parisc_device(LASI_GFX_HPA);
+        drop_parisc_device(lasi_hpa + LASI_PS2);
+        drop_parisc_device(lasi_hpa + LASI_PS2 + 0x100);
     }
 
     /* Initialize device list */
