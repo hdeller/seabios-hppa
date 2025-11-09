@@ -785,11 +785,6 @@ static hppa_device_t *find_hpa_device(unsigned long hpa)
     return NULL;
 }
 
-static int keep_this_hpa(unsigned long hpa)
-{
-    return 1;
-}
-
 /* remove one hpa entry from the inventory table */
 static void drop_parisc_device(unsigned long drop_hpa)
 {
@@ -843,28 +838,22 @@ static void remove_parisc_devices(unsigned int num_cpus)
     unsigned long hpa, cpu_offset;
     int i, p, t;
 
-    /* already initialized? */
-    static int uninitialized = 1;
-    if (!uninitialized)
-        return;
-    uninitialized = 0;
-
     /* check if qemu emulates LASI i82596 LAN card */
     if (lasi_hpa && *(unsigned long *)(lasi_hpa + LASI_LAN + 12) != 0xBEEFBABE)
         drop_parisc_device(lasi_hpa + LASI_LAN);
 
     p = t = 0;
     while ((hpa = parisc_devices[p].hpa) != 0) {
-        // hpa = (unsigned int) hpa;
-        // printf("TEST keep hpa %lx %s\n", hpa, hpa_name(hpa));
-        if (keep_this_hpa(hpa)) {
-            // printf("     keep hpa %lx\n", hpa);
+        if (hpa == CPU_HPA || (parisc_devices[p].iodc->type & 0x1f) == HPHW_NPROC)
+            cpu_dev = &parisc_devices[t];
+        if (hpa & HPA_DISABLED_DEVICE)
+            p++;
+        if (p != t)
             parisc_devices[t] = parisc_devices[p];
-            if (hpa == CPU_HPA || (parisc_devices[p].iodc->type & 0x1f) == HPHW_NPROC)
-                cpu_dev = &parisc_devices[t];
-            t++;
-        }
+        if (hpa & HPA_DISABLED_DEVICE)
+            continue;
         p++;
+        t++;
     }
 
     /* Fix monarch CPU */
