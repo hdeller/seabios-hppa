@@ -809,6 +809,8 @@ static int keep_add_generic_devices(void)
     hppa_device_t *dev = current_machine->device_list;
 
     while (dev->hpa) {
+        if (0) printf("DEVICE HPA %lx  name %s  type %d\n",
+                dev->hpa, hpa_name(dev->hpa), dev->iodc->type & 0x1f);
         switch (dev->iodc->type & 0x1f) {
         case HPHW_MEMORY:       /* Memory. Save HPA in PAGE0 entry. */
                                 /* MEMORY_HPA or ASTRO_MEMORY_HPA */
@@ -842,6 +844,11 @@ static void remove_parisc_devices(unsigned int num_cpus)
     if (lasi_hpa && *(unsigned long *)(lasi_hpa + LASI_LAN + 12) != 0xBEEFBABE)
         drop_parisc_device(lasi_hpa + LASI_LAN);
 
+    /* check if qemu emulates LASI SCSI card */
+    if (lasi_hpa && *(unsigned long *)(lasi_hpa + LASI_SCSI) != 0x5000082)
+        drop_parisc_device(lasi_hpa + LASI_SCSI);
+
+    /* remove all devices which are marked as disabled */
     p = t = 0;
     while ((hpa = parisc_devices[p].hpa) != 0) {
         if (hpa == CPU_HPA || (parisc_devices[p].iodc->type & 0x1f) == HPHW_NPROC)
