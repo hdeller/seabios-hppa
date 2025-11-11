@@ -55,9 +55,11 @@ union {
 #if defined(__LP64__)
 # define cpu_bit_width      64
 # define is_64bit_PDC()     1      /* 64-bit PDC */
+# define is_snake           0
 #else
 char cpu_bit_width;
 # define is_64bit_PDC()     0      /* 32-bit PDC */
+bool is_snake;
 #endif
 
 #define is_64bit_CPU()     (cpu_bit_width == 64)  /* 64-bit CPU? */
@@ -144,7 +146,6 @@ int sti_font;
 
 char qemu_version[16] = "unknown version";
 char qemu_machine[16] = "B160L";
-char has_astro;
 #define PCI_HPA         DINO_HPA        /* initial temp. PCI bus */
 unsigned long pci_hpa = PCI_HPA;    /* HPA of Dino or Elroy0 */
 unsigned long hppa_port_pci_cmd  = (PCI_HPA + DINO_PCI_ADDR);
@@ -2127,7 +2128,7 @@ static int pdc_system_map(unsigned long *arg)
     // dprintf(0, "\n\nSeaBIOS: Info: PDC_SYSTEM_MAP function %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
 
     /* old machines (715 is Snake type) do not support PDC_SYSTEM_MAP */
-    if (!is_64bit_PDC() && current_machine != &machine_B160L)
+    if (is_snake)
         return PDC_BAD_PROC; // PDC_BAD_OPTION is not sufficient!
 
     switch (option) {
@@ -2262,7 +2263,7 @@ static int pdc_lan_station_id(unsigned long *arg)
 
     switch (option) {
         case PDC_LAN_STATION_ID_READ:
-            if (!lasi_hpa)
+            if (has_astro || !lasi_hpa)
                 return PDC_INVALID_ARG;
             if (ARG3 != lasi_hpa + LASI_LAN)
                 return PDC_INVALID_ARG;
@@ -3228,8 +3229,6 @@ void __VISIBLE start_parisc_firmware(void)
     char bootdrive = (char)cmdline; // c = hdd, d = CD/DVD
     show_boot_menu = (linux_kernel_entry == 1);
 
-    has_astro = (sizeof(long) != 4); /* 64-bit firmware does not support Dino */
-
     initialize_iodc_entry();
 
 #ifndef __LP64__
@@ -3307,7 +3306,6 @@ void __VISIBLE start_parisc_firmware(void)
     if (!is_64bit_PDC() && !str)
         str = "B160L";  /* default machine */
     if (!is_64bit_PDC() && strcmp(str, "B160L") == 0) {
-        has_astro = 0; /* No Astro */
         current_machine = &machine_B160L;
         pci_hpa = DINO_HPA;
         hppa_port_pci_cmd  = pci_hpa + DINO_PCI_ADDR;
@@ -3321,7 +3319,6 @@ void __VISIBLE start_parisc_firmware(void)
         mem_boot_boot.hpa = lasi_hpa + LASI_SCSI;
     } else
     if (is_64bit_PDC() && strcmp(str, "C3700") == 0) {
-        has_astro = 1;
         current_machine = &machine_C3700;
         pci_hpa = (unsigned long) ELROY0_BASE_HPA;
         hppa_port_pci_cmd  = pci_hpa + 0x040;
@@ -3337,7 +3334,9 @@ void __VISIBLE start_parisc_firmware(void)
         mem_kbd_sti_boot.hpa = 0;
     } else
     if (!is_64bit_PDC() && strcmp(str, "715") == 0) {
-        has_astro = 0; /* No Astro */
+#if !defined(__LP64__)
+        is_snake = 1;
+#endif
         current_machine = &machine_715;
         pci_hpa = 0; /* No PCI bus */
         hppa_port_pci_cmd  = 0;

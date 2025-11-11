@@ -8,6 +8,9 @@
 
 #ifdef __LP64__
 #define CONFIG_64BIT
+#define has_astro 1
+#else
+#define has_astro 0
 #endif
 
 #include "parisc/hppa_hardware.h"
@@ -224,7 +227,6 @@ static inline void builtin_console_out(char c)
 }
 
 
-extern char has_astro; /* false for B160L machine with Dino PCI chip */
 extern unsigned long hppa_port_pci_cmd;
 extern unsigned long hppa_port_pci_data;
 
