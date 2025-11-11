@@ -1634,6 +1634,8 @@ static int pdc_model(unsigned long *arg, unsigned long narrow_mode)
             NO_COMPAT_RETURN_VALUE(ARG2);
             return PDC_OK;
         case PDC_MODEL_CPU_ID:
+            if (is_snake)       /* important, otherwise HP-UX fails to detect snake CPU */
+                return PDC_BAD_OPTION;
             /* if CPU does not support 64bits, use the B160L CPUID */
             if (!is_64bit_PDC() || is_64bit_CPU())
                 result[0] = current_machine->pdc_cpuid;
