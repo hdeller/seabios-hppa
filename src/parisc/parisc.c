@@ -546,6 +546,8 @@ int DEV_is_storage_device(hppa_device_t *dev)
     BUG_ON(!dev);
     if (dev->pci)
         return (dev->pci->class == PCI_CLASS_STORAGE_SCSI);
+    if (lasi_hpa && dev->hpa == lasi_hpa + LASI_SCSI)
+        return true;
     return ((dev->iodc->type & 0x1f) == HPHW_FIO);
 }
 
