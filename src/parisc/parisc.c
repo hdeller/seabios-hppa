@@ -33,7 +33,6 @@
 #include "parisc/pdcpat.h"
 #include "parisc/sticore.h"
 #include "parisc/lasips2.h"
-
 #include "vgabios.h"
 
 /*
@@ -59,7 +58,7 @@ union {
 #else
 char cpu_bit_width;
 # define is_64bit_PDC()     0      /* 32-bit PDC */
-bool is_snake;
+int is_snake;
 #endif
 
 #define is_64bit_CPU()     (cpu_bit_width == 64)  /* 64-bit CPU? */
@@ -547,7 +546,7 @@ int DEV_is_storage_device(hppa_device_t *dev)
     if (dev->pci)
         return (dev->pci->class == PCI_CLASS_STORAGE_SCSI);
     if (lasi_hpa && dev->hpa == lasi_hpa + LASI_SCSI)
-        return true;
+        return 1;
     return ((dev->iodc->type & 0x1f) == HPHW_FIO);
 }
 
