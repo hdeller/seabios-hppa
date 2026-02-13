@@ -2576,6 +2576,12 @@ static int pdc_pat_complex(unsigned long *arg)
 {
     unsigned long option = ARG1;
 
+    /* NOTE: We return PDC_BAD_PROC unconditionally. That way HP-UX reports:
+     * pat_init_pd: will default to single cell
+     */
+    // return PDC_BAD_PROC;
+
+    /* unused: */
     switch (option) {
         case PDC_PAT_COMPLEX_GET_STABLE_PROFILE:
         case PDC_PAT_COMPLEX_GET_ALL_CELL_STATES:

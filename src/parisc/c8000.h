@@ -40,7 +40,6 @@
 	, 0x0001, 0x0000, 0x0000, 0x0001, 0x0001
 
 
-audit: type=2000 audit(1705653084.992:1): state=initialized audit_enabled=0 res=1
 #define HPA_fffffffffe780000_DESCRIPTION "Crestone Peak Mako+ Slow"
 static struct pdc_system_map_mod_info mod_info_hpa_fffffffffe780000 = {
 	.mod_addr = 0x0,
