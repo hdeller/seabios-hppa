@@ -2693,6 +2693,59 @@ static int pdc_pat_pd(unsigned long *arg)
     return PDC_BAD_OPTION;
 }
 
+static int pdc_pat_io(unsigned long *arg)
+{
+    unsigned long option = ARG1;
+    unsigned long *result = (unsigned long *)ARG2;
+    unsigned long cell = ARG3;
+    struct hardware_path path, *ppath;
+    u16 bdf;
+
+    switch (option) {
+        case PDC_PAT_IO_GET_PCI_ROUTING_TABLE_SIZE:
+            if (cell != DEFAULT_CELL_NUM)
+                return PDC_INVALID_ARG;
+            result[0] = irt_table_entries;
+            return PDC_OK;
+        case PDC_PAT_IO_GET_PCI_ROUTING_TABLE:
+            if (cell != DEFAULT_CELL_NUM)
+                return PDC_INVALID_ARG;
+            memcpy(result, irt_table, irt_table_entries * 16);
+            return PDC_OK;
+        case PDC_PAT_IO_PCI_CONFIG_READ:
+            // printf("READ %lx bytes from %lx  len %ld\n", ARG1, ARG2, ARG3);
+            switch (ARG4) {
+              case 1:   result[0] = pci_config_readb(0, ARG3);   break;
+              case 2:   result[0] = pci_config_readw(0, ARG3);   break;
+              case 4:   result[0] = pci_config_readl(0, ARG3);   break;
+              default:  printf("read len huh?\n"); return PDC_INVALID_ARG;
+            }
+            return PDC_OK;
+        case PDC_PAT_IO_PCI_CONFIG_WRITE:
+            // printf("WRITE %lx to %lx  len %ld\n", ARG4, ARG2, ARG3);
+            switch (ARG3) {
+              case 1:   pci_config_writeb(0, ARG2, ARG4);   break;
+              case 2:   pci_config_writew(0, ARG2, ARG4);   break;
+              case 4:   pci_config_writel(0, ARG2, ARG4);   break;
+              default:  printf("write len huh?\n"); return PDC_INVALID_ARG;
+            }
+            return PDC_OK;
+        case PDC_PAT_IO_GET_HW_FROM_PCI_CONFIG:
+            bdf = ARG3 >> 11;
+            ppath = (void *)ARG2;
+            path = (struct hardware_path) { .flags = DEFAULT_CELL_NUM,
+                    .bc = { 0xff, 0xff, 0xff, 0x00, 0x00, pci_bdf_to_dev(bdf) },
+                    .mod = pci_bdf_to_fn(bdf) };
+            *ppath = path;// HELGE
+            printf("HWPATH from 0x%lx ", ARG3);
+            print_hwpath(ppath, true);
+            return PDC_OK;
+    }
+    printf("\n\nSeaBIOS: Unimplemented PDC_PAT_IO function %ld ARG3=%lx ARG4=%lx ARG5=%lx\n", option, ARG3, ARG4, ARG5);
+    return PDC_BAD_OPTION;
+}
+
+
 static int pdc_pat_mem(unsigned long *arg)
 {
     unsigned long option = ARG1;
@@ -2862,6 +2915,11 @@ int __VISIBLE parisc_pdc_entry(unsigned long *arg, unsigned long narrow_mode)
             if (pat_disabled())
                 return PDC_BAD_PROC;
             return pdc_pat_pd(arg);
+
+        case PDC_PAT_IO:
+            if (pat_disabled())
+                return PDC_BAD_PROC;
+            return pdc_pat_io(arg);
 
         case PDC_PAT_MEM:
             if (pat_disabled())
