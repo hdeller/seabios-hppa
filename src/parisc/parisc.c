@@ -384,7 +384,7 @@ static hppa_device_t *find_hpa_device(unsigned long hpa);
 #define CONCAT(a, b) CONCAT2(a, b)
 
 struct machine_info {
-        char			pdc_modelstr[16];
+        char			pdc_modelstr[2][20];
         struct pdc_model 	pdc_model;
         int			pdc_version;
         int			pdc_cpuid;
@@ -445,6 +445,7 @@ static const char *hpa_name(unsigned long hpa)
     DO1(LASI_GFX_HPA)
     DO1(ASTRO_HPA)
     DO1(ASTRO_MEMORY_HPA)
+    DO1(ASTRO_MEMORY_HPA_A400)
     DO1(ELROY0_HPA)
     DO1(ELROY2_HPA)
     DO1(ELROY8_HPA)
@@ -1595,7 +1596,7 @@ static int pdc_pim(unsigned long *arg)
 
 static int pdc_model(unsigned long *arg, unsigned long narrow_mode)
 {
-    const char *model_str = current_machine->pdc_modelstr;
+    const char *model_str = current_machine->pdc_modelstr[0];
     unsigned long option = ARG1;
     unsigned long *result = (unsigned long *)ARG2;
     unsigned int *result_narrow = (unsigned int *)ARG2;
@@ -1631,18 +1632,27 @@ static int pdc_model(unsigned long *arg, unsigned long narrow_mode)
                 case 0: /* return CPU0 version */
                     result[0] = current_machine->pdc_version;
                     return PDC_OK;
-                case 1: /* return PDC version */
-                    /* defaults: 715 has 0x16, B160L has 0x11, C3700 has 0x20 */
-                    result[0] = (is_64bit_CPU()) ? 0x20 : 0x016;
+                case 1: /* return COPRO version or PDC version */
+                    /* 32bit CPUs: 715 has 0x16, B160L has 0x11 */
+                    if (!is_64bit_CPU())
+                            result[0] = SEABIOS_HPPA_VERSION << 4 | 0x00;
+                    else    /* c3000:9, c8000:0, rp3440:0x23 */
+                            result[0] = 9;
                     return PDC_OK;
-                case 2: /* return PDC PAT(?) version */
+                case 2: /* return PDC version */
                     if (!is_64bit_CPU())
                         break;
-                    result[0] = 0x20;
+                    if (pat_disabled())
+                        result[0] = SEABIOS_HPPA_VERSION << 4 | 0x00; // c3700
+                    else
+                        result[0] = SEABIOS_HPPA_VERSION << 6 | 0x00; // c8000+
                     return PDC_OK;
             }
             return -4; // invalid c_index
         case PDC_MODEL_SYSMODEL:
+            model_str = current_machine->pdc_modelstr[ARG3 == OS_ID_MPEXL ? 1 : 0];
+            if (model_str[0] == 0)
+                return PDC_INVALID_ARG;
             result[0] = strlen(model_str);
             strtcpy((char *)ARG4, model_str, result[0] + 1);
             return PDC_OK;

@@ -1,5 +1,9 @@
+#if !defined(PARISC_MODEL_MPE)
+#define PARISC_MODEL_MPE ""
+#endif
+
 static struct machine_info CONCAT(machine_, MACHINE)  = {
-	.pdc_modelstr = PARISC_MODEL,
+	.pdc_modelstr = { PARISC_MODEL, PARISC_MODEL_MPE },
 	.pdc_model = { PARISC_PDC_MODEL },
 	.pdc_version = PARISC_PDC_VERSION,
 	.pdc_cpuid = PARISC_PDC_CPUID,
@@ -11,6 +15,7 @@ static struct machine_info CONCAT(machine_, MACHINE)  = {
 
 #undef MACHINE
 #undef PARISC_MODEL
+#undef PARISC_MODEL_MPE
 #undef PARISC_PDC_MODEL
 #undef PARISC_PDC_VERSION
 #undef PARISC_PDC_CPUID
