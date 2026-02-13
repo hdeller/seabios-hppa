@@ -450,6 +450,15 @@ struct zeropage {
 	unsigned int pad608[126];
 };
 
+#define FIRST_MEM_HPA           0x390
+#define FIRST_MEM_SPA_SIZE      0x398
+#define FIRST_MEM_SIZE          0x39c
+
+#define PGZ_IMC_SPA_SIZE_64BITOS        0x0338
+#define PGZ_IMC_MAX_MEM_64BITOS         0x033c
+#define PGZ_IMC_SPA_SIZE_32BITOS        FIRST_MEM_SPA_SIZE
+#define PGZ_IMC_MAX_MEM_32BITOS         FIRST_MEM_SIZE
+
 struct pdc_chassis_info {       /* for PDC_CHASSIS_INFO */
 	unsigned long actcnt;   /* actual number of bytes returned */
 	unsigned long maxcnt;   /* maximum number of bytes that could be returned */
