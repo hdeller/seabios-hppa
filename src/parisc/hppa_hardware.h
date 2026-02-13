@@ -32,6 +32,7 @@
 #define ELROY8_HPA      0xfed38000
 #define ELROYc_HPA      0xfed3c000
 #define ASTRO_MEMORY_HPA 0xfed10200
+#define ASTRO_MEMORY_HPA_A400 0xfed08000
 
 #define SCSI_HPA        0xf1040000      /* emulated SCSI, needs to be in f region */
 

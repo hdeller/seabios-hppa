@@ -444,6 +444,7 @@ unsigned long elroy_offset(u16 bdf);
 void *elroy_port(unsigned long port, unsigned long offs);
 // pciinit.c
 unsigned long add_lmmio_directed_range(unsigned long size, int rope);
+void generate_pcitable(int view, int pathnum, unsigned long *table);
 
 #endif // !__ASSEMBLY__
 #endif
