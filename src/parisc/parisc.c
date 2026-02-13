@@ -2568,6 +2568,20 @@ Found devices:
     return PDC_BAD_OPTION;
 }
 
+static int pdc_pat_complex(unsigned long *arg)
+{
+    unsigned long option = ARG1;
+
+    switch (option) {
+        case PDC_PAT_COMPLEX_GET_STABLE_PROFILE:
+        case PDC_PAT_COMPLEX_GET_ALL_CELL_STATES:
+            return PDC_BAD_OPTION;      /* we do not support complex */
+    }
+    printf("\n\nSeaBIOS: Unimplemented PDC_PAT_COMPLEX function %lu called with ARG2=%lx ARG3=%lx ARG4=%lx\n",
+            option, ARG2, ARG3, ARG4);
+    return PDC_BAD_OPTION;
+}
+
 static int pdc_pat_cpu(unsigned long *arg)
 {
     unsigned long option = ARG1;
@@ -2822,6 +2836,11 @@ int __VISIBLE parisc_pdc_entry(unsigned long *arg, unsigned long narrow_mode)
                 return PDC_BAD_PROC;
             dprintf(0, "\n\nSeaBIOS: PDC_PAT_CHASSIS_LOG OPTION %lu called with ARG2=%lx ARG3=%lx ARG4=%lx\n", option, ARG2, ARG3, ARG4);
             return PDC_BAD_PROC;
+
+        case PDC_PAT_COMPLEX:
+            if (pat_disabled())
+                return PDC_BAD_PROC;
+            return pdc_pat_complex(arg);
 
         case PDC_PAT_CPU:
             if (pat_disabled())
