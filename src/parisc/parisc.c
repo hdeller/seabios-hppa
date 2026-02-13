@@ -2014,7 +2014,7 @@ static int pdc_proc(unsigned long *arg)
             if (ARG2 != 0)
                 return PDC_BAD_PROC;
             if (pdc_debug & DEBUG_PDC)
-                printf("\nSeaBIOS: CPU%d enters rendenzvous loop.\n",
+                printf("\nSeaBIOS: CPU%d now offline (enters rendenzvous loop).\n",
                         index_of_CPU_HPA(mfctl(CPU_HPA_CR_REG)));
             /* wait until all outstanding timer irqs arrived. */
             msleep(500);
