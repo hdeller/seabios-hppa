@@ -2610,12 +2610,23 @@ static int pdc_pat_event(unsigned long *arg)
 
     switch (option) {
         case PDC_PAT_EVENT_GET_CAPS:
-            result[0] = result[1] = 0x0f;       /* XXX: review caps! */
+            result[0] = result[1] = 0;  /* XXX: review caps! (0x0f) */
             return PDC_OK;
+        case PDC_PAT_EVENT_SET_MODE:
+            if (ARG3 == 0)
+                return PDC_OK;
+            printf("PDC_PAT_EVENT_SET_MODE: events 0x%lx, vector 0x%lx, dest_lid 0x%lx\n", ARG3, ARG4, ARG5);
+            return PDC_INVALID_ARG;
+        case PDC_PAT_EVENT_SCAN:
+            result[0] = result[1] = 0;  /* XXX review */
+            if (ARG3 == 0)
+                return PDC_OK;
+            printf("PDC_PAT_EVENT_SCAN: hide_events 0x%lx\n", ARG3);
+            return PDC_INVALID_ARG;
         default:
             break;
     }
-    dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_PAT_CPU OPTION %lu called with ARG2=%lx ARG3=%lx ARG4=%lx\n", option, ARG2, ARG3, ARG4);
+    printf("\n\nSeaBIOS: Unimplemented PDC_PAT_EVENT OPTION %lu called with ARG2=%lx ARG3=%lx ARG4=%lx\n", option, ARG2, ARG3, ARG4);
     return PDC_BAD_OPTION;
 }
 
