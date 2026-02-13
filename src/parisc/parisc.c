@@ -408,7 +408,11 @@ struct machine_info {
 #define MACHINE	715
 #include "parisc/715_64.h"
 #include "parisc/machine-create.h"
+#define machine_A400 machine_B160L
 #else
+#define MACHINE	A400
+#include "parisc/a400.h"
+#include "parisc/machine-create.h"
 #define machine_715 machine_B160L
 #endif
 
@@ -3606,6 +3610,23 @@ void __VISIBLE start_parisc_firmware(void)
         mem_kbd_boot.hpa = 0;
         mem_kbd_sti_boot.hpa = 0;
     } else
+    if (is_64bit_PDC() && strcmp(str, "A400") == 0) {
+        current_machine = &machine_A400;
+        _pat_disabled = false; /* allow PAT */
+        enable_OS64 &= ~PDC_MODEL_OS32; /* do not allow 32-bit OS */
+        pci_hpa = (unsigned long) ELROY0_BASE_HPA;
+        hppa_port_pci_cmd  = pci_hpa + 0x040;
+        hppa_port_pci_data = pci_hpa + 0x048;
+        // but report back ASTRO_HPA
+        // pci_hpa = (unsigned long) ASTRO_HPA;
+        lasi_hpa = 0;
+        /* no serial port for now, will find later */
+        port_serial_1 = 0;
+        port_serial_2 = 0;
+        mem_cons_boot.hpa = 0;
+        mem_kbd_boot.hpa = 0;
+        mem_kbd_sti_boot.hpa = 0;
+    } else
     if (!is_64bit_PDC() && strcmp(str, "715") == 0) {
 #if !defined(__LP64__)
         is_snake = 1;
@@ -3689,7 +3710,16 @@ void __VISIBLE start_parisc_firmware(void)
 
     if (is_64bit_PDC()) {
         /* HP-UX 11 checks RAM in rminit() from this address */
-        *(unsigned int *) 0x33c = ram_size_low >> 12; /* # of pages */
+        *(unsigned int *) PGZ_IMC_MAX_MEM_64BITOS = ram_size_low >> 12; /* # of pages */
+#ifdef __LP64__
+        /* XXX pat_info_block.cpu_info limits us to 15 CPUs! */
+        pat_info_block.cpu_info = ((1 << (smp_cpus & 0xf)) - 1) |
+                (((unsigned long)smp_cpus) << 48) |
+                (current_machine->pdc_model.hversion << 32);
+        pat_info_block.cpu_speed = CPU_CLOCK_MHZ*(1000000ULL/100);
+        pat_info_block.cell_mem_size = ram_size;
+        // TODO: insert memory DIMM module info.
+#endif
     }
     PAGE0->memc_cont = ram_size_low;
     PAGE0->memc_phsize = ram_size_low;
