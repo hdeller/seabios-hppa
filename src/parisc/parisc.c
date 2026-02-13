@@ -2763,8 +2763,15 @@ int __VISIBLE parisc_pdc_entry(unsigned long *arg, unsigned long narrow_mode)
 {
     unsigned long proc = ARG0;
     unsigned long option = ARG1;
+    bool show_debug = true;
 
-    if (pdc_debug & DEBUG_PDC) {
+    /* skip debug for PCI read/writes */
+    if ((proc == PDC_PAT_IO) &&
+            (option == PDC_PAT_IO_PCI_CONFIG_READ ||
+            (option == PDC_PAT_IO_PCI_CONFIG_WRITE)))
+        show_debug = false;
+
+    if ((pdc_debug & DEBUG_PDC) && show_debug) {
         printf("\nSeaBIOS: Start PDC%d proc %s(%ld) option %ld result=0x%lx ARG3=0x%lx %s ",
                 (!is_64bit_PDC() || is_compat_mode()) ? 32 : 64, pdc_name(ARG0), ARG0, ARG1, ARG2, ARG3,
                 (proc == PDC_IODC)?hpa_name(ARG3):"");
