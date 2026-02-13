@@ -1362,6 +1362,9 @@ int __VISIBLE parisc_iodc_ENTRY_INIT(unsigned int *arg)
                 result[2] = result[3] = 0;
             return PDC_OK;
         case ENTRY_INIT_MOD:    /* 6: INIT */
+            /* work-around for ODE for HP30000 which resets all PCI devices */
+            if (DEV_is_storage_device(dev) && dev->pci)
+                lsi_scsi_setup();       /* re-initialize LSI SCSI */
             result[0] = 0; /* module IO_STATUS */
             return PDC_OK;
     }
