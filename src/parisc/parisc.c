@@ -2421,24 +2421,150 @@ static int pdc_initiator(unsigned long *arg)
     return PDC_BAD_OPTION;
 }
 
+static pdc_pat_cell_info_rtn_block_t pat_info_block = {
+#ifdef __LP64__
+        .pdc_rev = ((unsigned long) SEABIOS_HPPA_VERSION) << 32, // HELGE
+        .capabilities = PDC_PAT_CAPABILITY_BIT_PDC_IODC_32 |
+                        PDC_PAT_CAPABILITY_BIT_PDC_IODC_64 |
+                        PDC_PAT_CAPABILITY_BIT_SIMULTANEOUS_PTLB,
+        .cell_info = 0,        /* ?*/
+        .cell_phys_location = DEFAULT_CELL_LOC,
+        .cpu_info = (1UL << 16), /* initialized below! */
+        .cpu_speed = 0, /* initialized below */
+        .io_chassis_phys_location = DEFAULT_CELL_LOC,
+        .cell_io_information = 1, /* Core IO present */
+        .io_slot_info_size = ARRAY_SIZE(pat_info_block.io_slot),
+        .io_slot = { { .header = 0, }, }, // info0, info1, phys_loc, hw_path;
+        .cell_mem_size = MIN_RAM_SIZE,
+        .cell_dimm_info_size = ARRAY_SIZE(pat_info_block.dimm_info),
+        .dimm_info = { ((10UL << 16) | 1), },
+        .fabric_info_size = 0,
+        .xbc = { { 0, }, },
+#endif
+};
+
 static int pdc_pat_cell(unsigned long *arg)
 {
     unsigned long option = ARG1;
     struct pdc_pat_cell_num *cell_info = (void *)ARG2;
+    unsigned long *result = (unsigned long *)ARG2;
+    struct pdc_pat_cell_mod_maddr_block *mb = (void *)ARG6;
+    unsigned long hpa_index, count, offset;
+    int view;   /* PA_VIEW or IO_VIEW */
+    hppa_device_t *dev;
 
     switch (option) {
         case PDC_PAT_CELL_GET_NUMBER:
-            // cell_info->cell_num = cell_info->cell_loc = 0;
-            memset(cell_info, 0, 32*sizeof(long long));
+            cell_info->cell_num = DEFAULT_CELL_NUM;
+            cell_info->cell_loc = DEFAULT_CELL_LOC;
             return PDC_OK;
         case PDC_PAT_CELL_GET_INFO:
-            return PDC_BAD_OPTION; /* optional on single-cell machines */
+            if (!(ARG6 == DEFAULT_CELL_NUM || (u32)(ARG6) == (u32)-1UL))
+                return PDC_INVALID_ARG;
+            offset = ARG5;
+            if (offset >= sizeof(pat_info_block))
+                return PDC_INVALID_ARG;
+            count = ARG4;
+            if (count > sizeof(pat_info_block))
+                count = sizeof(pat_info_block);
+            if (offset + count >= sizeof(pat_info_block))
+                count = sizeof(pat_info_block) - offset;
+            memcpy((void*)(ARG3), ((unsigned char *)&pat_info_block) + offset, count);
+            result[0] = count;
+            return PDC_OK;
         case PDC_PAT_CELL_MODULE:
-            return PDC_BAD_OPTION;
+            if (ARG3 != DEFAULT_CELL_LOC)
+                return PDC_INVALID_ARG;
+            hpa_index = ARG4;
+            view = ARG5;
+            dev = find_hppa_device_by_index(0, hpa_index, 0); /* root devices */
+            if (!dev)
+                return PDC_NE_MOD; // Module not found
+
+            if (0) {
+                printf("PDC_FIND_MODULE dev=%p hpa=%lx ", dev, dev ? dev->hpa:0UL);
+                print_mod_path(dev->mod_path, 0);
+                if (dev->pci)
+                    printf("PCI %pP ", dev->pci);
+                printf("\n");
+            }
+
+#if 0
+PAT INDEX: 0: cba 0xfffffffffffa0000, mod_info 0x100000000000001, mod_location 0xff01ff11, mod: 0xa0ff0000 0x0
+PAT INDEX: 1: cba 0xfffffffffed08001, mod_info 0x200000000000010, mod_location 0xffffff71, mod: 0x40000000 0x0
+PAT INDEX: 2: cba 0xfffffffffed00001, mod_info 0x32f020000000008, mod_location 0xffffff82, mod: 0x0 0x6 0xc000000000000005
+    0xfffffffffed18000 0xfffffffffed2ffff 0x8000000000000000 0x0 0x3f 0x8000000000000001 0xfffffffff8000000
+    0xfffffffffbffffff 0x40000001a1701
+PAT INDEX: 3: cba 0xfffffffffed30001, mod_info 0x400000000000002, mod_location 0xffff00ff83, mod: 0x0 0x4 ...
+PAT INDEX: 4: cba 0xfffffffffed34001, mod_info 0x400000000000002, mod_location 0xffff02ff83, mod: 0x0 0x4 0x8000000000000000
+PAT INDEX: 5: cba 0xfffffffffed38001, mod_info 0x400000000000002, mod_location 0xffff04ff83, mod: 0x0 0x4 0x8000000000000000
+PAT INDEX: 6: cba 0xfffffffffed3c001, mod_info 0x400000000000002, mod_location 0xffff06ff83, mod: 0x0 0x4 0x8000000000000000
+
+Found devices:
+1. Crescendo DC- 440 [160] at 0xfffffffffffa0000 { type:0, hv:0x5d6, sv:0x4, rev:0x0 }
+2. Memory [8] at 0xfffffffffed08000 { type:1, hv:0x9b, sv:0x9, rev:0x0 }
+3. Astro BC Runway Port [0] at 0xfffffffffed00000 { type:12, hv:0x582, sv:0xb, rev:0x0 }
+4. Elroy PCI Bridge [0:0] at 0xfffffffffed30000 { type:13, hv:0x782, sv:0xa, rev:0x0 }
+5. Elroy PCI Bridge [0:2] at 0xfffffffffed34000 { type:13, hv:0x782, sv:0xa, rev:0x0 }
+6. Elroy PCI Bridge [0:4] at 0xfffffffffed38000 { type:13, hv:0x782, sv:0xa, rev:0x0 }
+7. Elroy PCI Bridge [0:6] at 0xfffffffffed3c000 { type:13, hv:0x782, sv:0xa, rev:0x0 }
+#endif
+
+            result[0] = sizeof(*mb);
+            memset(mb, 0, sizeof(*mb));
+            mb->cba = dev->hpa; //  for PDC_IODC
+	    if ((dev->iodc->type & 0x1f) != HPHW_NPROC) // CPU
+		mb->cba |= 1;	/* endianess bit */
+            mb->mod_path = dev->mod_path->path;
+            switch (dev->iodc->type & 0x1f) {
+            case HPHW_NPROC:        /* CPU */
+                mb->mod_info = (unsigned long) 0x100000000000001UL;
+                mb->mod_location = 0xff01ff11;
+                /* see IOSAPIC encoding in in astro.c in qemu: */
+                #define SWIZZLE_HPA(a) \
+                    ((((a) & 0x0ff00000) >> 4) | (((a) & 0x000ff000) << 12))
+                mb->mod[0] = SWIZZLE_HPA(dev->hpa); // for iommu, only on PAT
+                break;
+            case HPHW_MEMORY:
+                mb->mod_info = (unsigned long) 0x200000000000010UL;
+                mb->mod_location = 0xffffff71;
+                mb->mod[0] = ram_size;
+                mb->mod[1] = 0; /* no ranges */
+                break;
+            case HPHW_IOA: /* Astro BC Runway Port */
+                mb->mod_info = (unsigned long) 0x32f020000000008UL;
+                mb->mod_location = 0xffffff82;
+                mb->mod[0]  = 0x0;       /* unused */
+                mb->mod[1]  = 3;
+                mb->mod[2]  = (unsigned long) 0xc000000000000005UL; /* 1 */
+                mb->mod[3]  = (unsigned long) 0xfffffffffed18000UL;
+                mb->mod[4]  = (unsigned long) 0xfffffffffed2ffffUL;
+                mb->mod[5]  = (unsigned long) 0x8000000000000000UL; /* 2 */
+                mb->mod[6]  = (unsigned long) 0x00UL;
+                mb->mod[7]  = (unsigned long) 0x3fUL;
+                mb->mod[8]  = (unsigned long) 0x8000000000000001UL; /* 3 */
+                mb->mod[9]  = (unsigned long) 0xfffffffff8000000UL;
+                mb->mod[10] = (unsigned long) 0xfffffffffbffffffUL;
+                // TODO: MORE MISSING HERE!!
+                // 0x40000001a1701
+                break;
+            case HPHW_BRIDGE: /* Elroy PCI bridge */
+                mb->mod_info = (unsigned long) 0x400000000000002UL;
+                mb->mod_location = (unsigned long) 0xffff00ff83;
+                mb->mod_location |= dev->mod_path->path.mod << 16;
+                generate_pcitable(view, dev->mod_path->path.mod, mb->mod);
+                break;
+            default:
+                BUG_ON(1);
+                return PDC_INVALID_ARG;
+            }
+            if (0)
+                printf("PDC_FIND_MODULE %lx %ld %ld \n", result[0], result[1],result[2]);
+            return PDC_OK;
         default:
             break;
     }
-    dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_PAT_CELL function %ld ARG3=%lx ARG4=%lx ARG5=%lx\n", option, ARG3, ARG4, ARG5);
+    printf("\n\nSeaBIOS: Unimplemented PDC_PAT_CELL function %ld ARG3=%lx ARG4=%lx ARG5=%lx\n", option, ARG3, ARG4, ARG5);
     return PDC_BAD_OPTION;
 }
 
