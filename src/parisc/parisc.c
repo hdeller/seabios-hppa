@@ -1,6 +1,6 @@
 // Glue code for parisc architecture
 //
-// Copyright (C) 2017-2025 Helge Deller <deller@gmx.de>
+// Copyright (C) 2017-2026 Helge Deller <deller@gmx.de>
 // Copyright (C) 2019 Sven Schnelle <svens@stackframe.org>
 //
 // This file may be distributed under the terms of the GNU LGPLv3 license.
@@ -22,6 +22,7 @@
 #include "hw/pci_ids.h" // PCI IDs
 #include "hw/pci_regs.h" // PCI_BASE_ADDRESS_0
 #include "hw/ata.h"
+#include "hw/lsi-scsi.h"
 #include "hw/usb.h"
 #include "hw/usb-ohci.h"
 #include "hw/blockcmd.h" // scsi_is_ready()
@@ -56,14 +57,17 @@ union {
 # define cpu_bit_width      64
 # define is_64bit_PDC()     1      /* 64-bit PDC */
 # define is_snake           0
+bool _pat_disabled = true;
+#define pat_disabled()      _pat_disabled
 #else
 char cpu_bit_width;
 # define is_64bit_PDC()     0      /* 32-bit PDC */
 bool is_snake;
+#define _pat_disabled       is_snake /* avoids ifdef */
+#define pat_disabled()      1
 #endif
 
 #define is_64bit_CPU()     (cpu_bit_width == 64)  /* 64-bit CPU? */
-#define pat_disabled()     1    // !is_64bit_PDC()
 
 /* running 64-bit PDC, but called from 32-bit app */
 #define is_compat_mode()  (is_64bit_PDC() && ((psw_defaults & PDC_PSW_WIDE_BIT) == 0))
@@ -75,6 +79,9 @@ bool is_snake;
 
 /* Should PDC be very strict in regard to compatibility? */
 #define PDC_VERY_STRICT 0
+
+#define DEFAULT_CELL_NUM        0
+#define DEFAULT_CELL_LOC        0xff01ff11
 
 u8 BiosChecksum;
 
@@ -633,6 +640,12 @@ static const char *hpa_device_name(unsigned long hpa, int output)
                 "SERIAL_1.9600.8.none" : "SERIAL_2.9600.8.none";
 }
 
+static void print_hwpath(struct hardware_path *p, int newline)
+{
+    printf("PATH %d/%d/%d/%d/%d/%d.%d%s", p->bc[0], p->bc[1],
+            p->bc[2],p->bc[3],p->bc[4],p->bc[5],
+            p->mod, newline ? "\n":"");
+}
 static void print_mod_path(struct pdc_module_path *p, int newline)
 {
     printf("PATH %d/%d/%d/%d/%d/%d/%d:%d.%d.%d %s", p->path.bc[0], p->path.bc[1],
@@ -1484,8 +1497,12 @@ static const char *pdc_name(unsigned long num)
         DO(PDC_INITIATOR)
         DO(PDC_PAT_CELL)
         DO(PDC_PAT_CHASSIS_LOG)
+        DO(PDC_PAT_COMPLEX)
         DO(PDC_PAT_CPU)
         DO(PDC_PAT_EVENT)
+        DO(PDC_PAT_IO)
+        DO(PDC_PAT_MEM)
+        DO(PDC_PAT_NVOLATILE)
         DO(PDC_PAT_PD)
         DO(PDC_LINK)
 #undef DO
@@ -2000,7 +2017,7 @@ static int pdc_block_tlb(unsigned long *arg)
     int ret;
 
     /* Block TLB is only supported on 32-bit CPUs */
-    if (is_64bit_CPU())
+    if (is_64bit_PDC() || is_64bit_CPU())
         return PDC_BAD_PROC;
 
     asm(
@@ -2131,8 +2148,8 @@ static int pdc_system_map(unsigned long *arg)
 
     // dprintf(0, "\n\nSeaBIOS: Info: PDC_SYSTEM_MAP function %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
 
-    /* old machines (715 is Snake type) do not support PDC_SYSTEM_MAP */
-    if (is_snake)
+    /* old machines (715 is Snake type) and PAT-boxes (A400) do not support PDC_SYSTEM_MAP */
+    if (is_snake || !pat_disabled())
         return PDC_BAD_PROC; // PDC_BAD_OPTION is not sufficient!
 
     switch (option) {
@@ -2324,7 +2341,7 @@ static void iosapic_table_setup(void)
         *p++ = IOSAPIC_HPA >> 32;
         *p++ = (u32) IOSAPIC_HPA;
         iosapic_intin++;
-        iosapic_intin &= (ELROY_IRQS - 1 );
+        iosapic_intin &= (ELROY_IRQS - 1);
     }
 }
 
@@ -2419,24 +2436,31 @@ static int pdc_pat_cpu(unsigned long *arg)
     unsigned long hpa;
 
     switch (option) {
+        case PDC_PAT_CPU_INFO:
+            hpa = COMPAT_VAL(ARG3);
+            result[0] = 0;      /* CPU is configured */
+            return PDC_OK;
         case PDC_PAT_CPU_GET_NUMBER:
             hpa = COMPAT_VAL(ARG3);
             result[0] = index_of_CPU_HPA(hpa);
-            result[1] = hpa;    /* location */
-            result[2] = 0;      /* num siblings */
+            result[1] = DEFAULT_CELL_LOC;    /* location */
+            result[2] = smp_cpus;        /* num siblings */
             return PDC_OK;
         case PDC_PAT_CPU_GET_HPA:
             if ((unsigned long)ARG3 >= smp_cpus)
                 return PDC_INVALID_ARG;
             hpa = CPU_HPA_IDX(ARG3);
             result[0] = hpa;
-            result[1] = hpa;    /* location */
-            result[2] = 0;      /* num siblings */
+            result[1] = DEFAULT_CELL_LOC;    /* location */
+            result[2] = smp_cpus;        /* num siblings */
             return PDC_OK;
+        case PDC_PAT_CPU_RENDEZVOUS:
+            ARG1 = 1;
+            return pdc_proc(arg);
         default:
             break;
     }
-    dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_PAT_CPU OPTION %lu called with ARG2=%lx ARG3=%lx ARG4=%lx\n", option, ARG2, ARG3, ARG4);
+    printf("\n\nSeaBIOS: Unimplemented PDC_PAT_CPU OPTION %lu called with ARG2=%lx ARG3=%lx ARG4=%lx\n", option, ARG2, ARG3, ARG4);
     return PDC_BAD_OPTION;
 }
 
@@ -3549,7 +3573,7 @@ void __VISIBLE start_parisc_firmware(void)
             "Duplex Console IO Dependent Code (IODC) revision " SEABIOS_HPPA_VERSION_STR "\n"
             "\n", is_64bit_PDC() ? 64 : 32, qemu_version);
     printf("------------------------------------------------------------------------------\n"
-            "  (c) Copyright 2017-2025 Helge Deller <deller@gmx.de> and SeaBIOS developers.\n"
+            "  (c) Copyright 2017-2026 Helge Deller <deller@gmx.de> and SeaBIOS developers.\n"
             "------------------------------------------------------------------------------\n\n");
     printf( "  Processor   Speed            State           Coprocessor State  Cache Size\n"
             "  ---------  --------   ---------------------  -----------------  ----------\n");
@@ -3558,11 +3582,12 @@ void __VISIBLE start_parisc_firmware(void)
                 " MHz    %s                 Functional            0 KB\n",
                 i < 10 ? " ":"", i, i?"Idle  ":"Active");
     printf("\n\n");
-    printf("  Emulated machine:     HP %s (%d-bit %s), %d-bit PDC%s%s\n"
+    printf("  Emulated machine:     HP %s (%d-bit %s), %d-bit %sPDC%s%s\n"
             "  Available memory:     %lu MB\n"
             "  Good memory required: %d MB\n\n",
             qemu_machine, cpu_bit_width, is_64bit_CPU() ? "PA2.0" : "PA1.1",
             is_64bit_PDC() ? 64 : 32,
+            pat_disabled() ? "" : "PAT ",
             enable_OS64 & PDC_MODEL_OS32 ? ", OS32":"",
             enable_OS64 & PDC_MODEL_OS64 ? ", OS64":"",
             ram_size/1024/1024, MIN_RAM_SIZE/1024/1024);
