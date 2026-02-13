@@ -2673,16 +2673,23 @@ static int pdc_pat_pd(unsigned long *arg)
             memcpy(dest, ((char *)&mem_table) + offset, count);
             result[0] = count;
             return PDC_OK;
-
         case PDC_PAT_PD_GET_PDC_INTERF_REV:
-            result[0] = 5;  // legacy_rev
-            result[1] = 6;  // pat_rev
+            result[0] = SEABIOS_HPPA_VERSION;  // legacy_rev
+            result[1] = SEABIOS_HPPA_VERSION << 6 | 0x00;  // pat_rev
             result[2] = PDC_PAT_CAPABILITY_BIT_SIMULTANEOUS_PTLB;  // pat_cap
+            // C3700: 0x05, pat_rev 0x006
+            // A400:  0x24, pat_rev 0x201, pdc_cap 0x32,
+            return PDC_OK;
+        case PDC_PAT_PD_GET_PLATFORM_COUNTER:
+            /* should be implemented in qemu!! */
+            return PDC_BAD_OPTION;
+        case PDC_PAT_PD_GET_ALIVE_CELLS:
+            result[0] = 0x01;  // bitmask
             return PDC_OK;
         default:
             break;
     }
-    dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_PAT_PD function %ld ARG3=%lx ARG4=%lx ARG5=%lx\n", option, ARG3, ARG4, ARG5);
+    printf("\n\nSeaBIOS: Unimplemented PDC_PAT_PD function %ld ARG3=%lx ARG4=%lx ARG5=%lx\n", option, ARG3, ARG4, ARG5);
     return PDC_BAD_OPTION;
 }
 
