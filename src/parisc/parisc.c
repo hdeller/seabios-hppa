@@ -2854,6 +2854,11 @@ int __VISIBLE parisc_pdc_entry(unsigned long *arg, unsigned long narrow_mode)
 	case PDC_MEM_MAP:
             return pdc_mem_map(arg);
 
+        case 27:
+            if (ARG1 == 0)              /* PAT: HP-UX 11iv3 ask for it. */
+                return PDC_BAD_PROC;
+            break;
+
         case 134:
             if (ARG1 == 1 || ARG1 == 513) /* HP-UX 11.11 ask for it. */
                 return PDC_BAD_PROC;
