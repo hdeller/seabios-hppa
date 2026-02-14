@@ -81,7 +81,7 @@ bool is_snake;
 #define PDC_VERY_STRICT 0
 
 #define DEFAULT_CELL_NUM        0
-#define DEFAULT_CELL_LOC        0xff01ff11
+#define DEFAULT_CELL_LOC        0x01    // 0xff01ff11
 
 u8 BiosChecksum;
 
@@ -2694,7 +2694,10 @@ static int pdc_pat_pd(unsigned long *arg)
             /* should be implemented in qemu!! */
             return PDC_BAD_OPTION;
         case PDC_PAT_PD_GET_ALIVE_CELLS:
-            result[0] = 0x01;  // bitmask
+            if (1)
+                return PDC_BAD_OPTION; /* make single CELL for now */
+            else
+                result[0] = 1;  // bitmask
             return PDC_OK;
         default:
             break;
