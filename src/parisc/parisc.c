@@ -2684,7 +2684,10 @@ static int pdc_pat_pd(unsigned long *arg)
             mem_table[1].paddr = RAM_MAP_HIGH;
             mem_table[1].pages = ram_size_high / PAGE_SIZE;
             count -= offset;
-            memcpy(dest, ((char *)&mem_table) + offset, count);
+            /* if ARG3 (dest) is zero the caller just wanted to get
+             * the number of required bytes. Do not overwrite PAGE0! */
+            if (ARG3 >= sizeof(struct zeropage))
+                memcpy(dest, ((char *)&mem_table) + offset, count);
             result[0] = count;
             return PDC_OK;
         case PDC_PAT_PD_GET_PDC_INTERF_REV:
