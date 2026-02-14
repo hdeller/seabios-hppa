@@ -82,6 +82,7 @@ bool is_snake;
 
 #define DEFAULT_CELL_NUM        0
 #define DEFAULT_CELL_LOC        0x01    // 0xff01ff11
+#define DEFAULT_CPU_LOC         (unsigned long) 0xffff0000ffff15
 
 u8 BiosChecksum;
 
@@ -2606,7 +2607,7 @@ static int pdc_pat_cpu(unsigned long *arg)
         case PDC_PAT_CPU_GET_NUMBER:
             hpa = COMPAT_VAL(ARG3);
             result[0] = index_of_CPU_HPA(hpa);
-            result[1] = DEFAULT_CELL_LOC;    /* location */
+            result[1] = DEFAULT_CPU_LOC;    /* location */
             result[2] = smp_cpus;        /* num siblings */
             return PDC_OK;
         case PDC_PAT_CPU_GET_HPA:
@@ -2614,7 +2615,7 @@ static int pdc_pat_cpu(unsigned long *arg)
                 return PDC_INVALID_ARG;
             hpa = CPU_HPA_IDX(ARG3);
             result[0] = hpa;
-            result[1] = DEFAULT_CELL_LOC;    /* location */
+            result[1] = DEFAULT_CPU_LOC;    /* location */
             result[2] = smp_cpus;        /* num siblings */
             return PDC_OK;
         case PDC_PAT_CPU_RENDEZVOUS:
