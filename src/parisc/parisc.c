@@ -2432,7 +2432,7 @@ static pdc_pat_cell_info_rtn_block_t pat_info_block = {
         .capabilities = PDC_PAT_CAPABILITY_BIT_PDC_IODC_32 |
                         PDC_PAT_CAPABILITY_BIT_PDC_IODC_64 |
                         PDC_PAT_CAPABILITY_BIT_SIMULTANEOUS_PTLB,
-        .cell_info = 0,        /* ?*/
+        .cell_info = 1<<8 | 0x1f,   /* cell initialized and ready */
         .cell_phys_location = DEFAULT_CELL_LOC,
         .cpu_info = (1UL << 16), /* initialized below! */
         .cpu_speed = 0, /* initialized below */
@@ -2464,6 +2464,9 @@ static int pdc_pat_cell(unsigned long *arg)
             cell_info->cell_loc = DEFAULT_CELL_LOC;
             return PDC_OK;
         case PDC_PAT_CELL_GET_INFO:
+            if (1)
+                return PDC_BAD_OPTION; /* XXX: only required for multi-cell machines */
+            else
             if (!(ARG6 == DEFAULT_CELL_NUM || (u32)(ARG6) == (u32)-1UL))
                 return PDC_INVALID_ARG;
             offset = ARG5;
