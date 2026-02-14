@@ -2576,6 +2576,51 @@ Found devices:
     return PDC_BAD_OPTION;
 }
 
+static int pdc_pat_chassis_log(unsigned long *arg)
+{
+    unsigned long option = ARG1;
+    unsigned long long *log_ptr = (unsigned long long *)ARG2;
+    struct chassis_log_rec rec;
+    unsigned int status, data0, data1;
+
+    switch (option) {
+        case PDC_PAT_CHASSIS_WRITE_LOG:
+            memcpy(&rec, log_ptr, sizeof(rec));
+            data0 = rec.data[0];
+            data1 = rec.data[1];
+            switch (rec.data_type) {
+            case 11: // timestamp
+                if (pdc_debug & DEBUG_CHASSIS)
+                    printf("\nPDC_PAT_CHASSIS: Timestamp: %02d.%02d.%04d %02d:%02d:%02d\n",
+                        data1 >> 24, (data0 & 0xff) + 1, ((data0 >> 8) & 0xffff) + 1900,
+                        (data1 >> 16) & 0xff, (data1 >> 8) & 0xff, data1 & 0xff);
+                break;
+            // case 20: // major change in system
+            //    break;
+            case 31: // legacy PA HEX chassis code
+                status = (data1 >> 17) & 7;
+                chassis_code = data1 & 0xffff;
+                if (pdc_debug & DEBUG_CHASSIS)
+                    printf("\nPDC_PAT_CHASSIS: %s (%d), CHASSIS  0x%x\n",
+                        systat[status], status, chassis_code);
+                break;
+            default:
+                if (pdc_debug & DEBUG_CHASSIS)
+                    printf("PDC_PAT_CHASSIS: data=%d, source=%d, msg_id=%d, problem=%d, data[1]=0x%x\n",
+                        rec.data_type, rec.source, rec.msg_id, rec.problem_detail, data1);
+            }
+            return PDC_OK;
+        case PDC_PAT_CHASSIS_READ_LOG:
+            printf("SeaBIOS: CHASSIS READ LOG NOT IMPLEMENTED\n");
+            return PDC_BAD_OPTION;
+            // return PDC_OK;
+        default:
+            dprintf(0, "\n\nSeaBIOS: PDC_PAT_CHASSIS_LOG OPTION %lu called with ARG2=%lx\n",
+                    option, ARG2);
+            return PDC_BAD_OPTION;
+    }
+}
+
 static int pdc_pat_complex(unsigned long *arg)
 {
     unsigned long option = ARG1;
@@ -2919,8 +2964,7 @@ int __VISIBLE parisc_pdc_entry(unsigned long *arg, unsigned long narrow_mode)
         case PDC_PAT_CHASSIS_LOG:
             if (pat_disabled())
                 return PDC_BAD_PROC;
-            dprintf(0, "\n\nSeaBIOS: PDC_PAT_CHASSIS_LOG OPTION %lu called with ARG2=%lx ARG3=%lx ARG4=%lx\n", option, ARG2, ARG3, ARG4);
-            return PDC_BAD_PROC;
+            return pdc_pat_chassis_log(arg);
 
         case PDC_PAT_COMPLEX:
             if (pat_disabled())

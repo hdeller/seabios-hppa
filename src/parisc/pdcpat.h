@@ -372,6 +372,51 @@ struct pdc_pat_cell_mod_maddr_block {	/* PDC_PAT_CELL_MODULE */
 
 typedef struct pdc_pat_cell_mod_maddr_block pdc_pat_cell_mod_maddr_block_t;
 
+typedef struct chassis_log_rec {
+   unsigned int     data_type             :5;
+   unsigned int     reserved              :3;
+   unsigned int     reporting_entity_type :4;
+   unsigned int     reporting_entity_id   :8;
+   unsigned int     eom                   :1;
+   unsigned int     msg_id                :3;
+   unsigned int     alert_level           :4;
+   unsigned int     problem_detail        :4;
+   unsigned int     source                :4;
+   unsigned int     source_detail         :4;
+   unsigned int     source_id             :8;
+   unsigned int     caller_activity       :4;
+   unsigned int     caller_subactivity    :8;
+   unsigned int     activity_status       :4;
+   unsigned int    data[2];
+}  chassis_log_t;
+
+typedef struct pat_chassis_rec
+{
+   struct chassis_log_rec chassis_log;
+   unsigned int     pdc_raddr[64];
+} pat_chassis_rec_t;
+
+/* pdc_iodc return information */
+
+typedef struct iodc_data {
+   unsigned int      hw_model : 16;
+   unsigned int      io       : 1;
+   unsigned int      resvd1   : 2;
+   unsigned int      spa_shft : 5;
+   unsigned int      more     : 1;
+   unsigned int      word     : 1;
+   unsigned int      resvd2   : 1;
+   unsigned int      mod_type : 5;
+   unsigned int      sw_model : 32;
+   unsigned int      iodc_rev : 8;
+   unsigned int      iodc_dep : 8;
+   unsigned int      resvd3   : 16;
+   unsigned int      iodc_chk : 16;
+   unsigned int      iodc_len : 16;
+} iodc_data_t;
+
+#define iodc_data_size (sizeof(iodc_data_t))
+
 extern int pdc_pat_get_PDC_entrypoint(unsigned long *pdc_entry);
 extern int pdc_pat_chassis_send_log(unsigned long status, unsigned long data);
 extern int pdc_pat_cell_get_number(struct pdc_pat_cell_num *cell_info);
