@@ -2126,12 +2126,14 @@ static int pdc_mem(unsigned long *arg)
 #ifdef __LP64__
         case PDC_MEM_TABLE:     /* old method on Sprockets, e.g. C3700 machine */
         {
-            struct pdc_memory_table_raddr *raddr = (void *)ARG2;
+            struct pdc_memory_table_raddr temp_raddr;
+            struct pdc_memory_table_raddr *raddr;
             struct pdc_memory_table *table = (void *)ARG3;
             unsigned long entries = (unsigned long)ARG4;
 
             if (entries < 1)
                 return PDC_INVALID_ARG;
+            raddr = ARG2 ? (void *)ARG2 : &temp_raddr;
             raddr->entries_returned = 1;
             raddr->entries_total = ram_size_high ? 2 : 1;
             table->paddr = 0;
@@ -2844,8 +2846,16 @@ static int pdc_pat_io(unsigned long *arg)
 static int pdc_pat_mem(unsigned long *arg)
 {
     unsigned long option = ARG1;
+    unsigned long *result = (unsigned long *)ARG2;
 
     switch (option) {
+        case PDC_MEM_GET_MEMORY_SYSTEM_TABLES_SIZE:
+            result[0] = 2;
+            return PDC_OK;
+        case PDC_MEM_GET_MEMORY_SYSTEM_TABLES:
+            ARG1 = PDC_MEM_TABLE;
+            ARG4 = 2;
+            return pdc_mem(arg);
         default:
             break;
     }
