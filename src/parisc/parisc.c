@@ -2559,7 +2559,7 @@ Found devices:
                 /* see IOSAPIC encoding in in astro.c in qemu: */
                 #define SWIZZLE_HPA(a) \
                     ((((a) & 0x0ff00000) >> 4) | (((a) & 0x000ff000) << 12))
-                mb->mod[0] = SWIZZLE_HPA(dev->hpa); // for iommu, only on PAT
+                mb->mod[0] = SWIZZLE_HPA(dev->hpa); // id_eid: for iommu, only on PAT
                 break;
             case HPHW_MEMORY:
                 mb->mod_info = (unsigned long) 0x200000000000010UL;
