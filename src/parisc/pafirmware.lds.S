@@ -17,6 +17,8 @@ SECTIONS
 	. = FIRMWARE_START;
 #endif
 
+	_firmware_start = .;
+
 	/* align on next page boundary */
 	. = ALIGN(4096);
 	.text :	{
@@ -85,6 +87,8 @@ SECTIONS
 		*(COMMON)
 		_ebss = .;
 	}
+
+	_firmware_end = .;
 
 	/* STABS_DEBUG */
 	.note 0 : { *(.note) }

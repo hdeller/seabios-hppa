@@ -2427,6 +2427,33 @@ static int pdc_pci_index(unsigned long *arg)
     return PDC_BAD_OPTION;
 }
 
+static int pdc_relocate(unsigned long *arg)
+{
+    unsigned long option = ARG1;
+    unsigned long *result = (unsigned long *)ARG2;
+    extern char _firmware_start[], _firmware_end[];
+
+    /* do not allow relocation - if we support one option we need to support all */
+    return PDC_BAD_PROC;
+
+    switch (option) {
+        case PDC_RELOCATE_GET_RELOCINFO:
+            result[0] = (unsigned long)&_firmware_end - (unsigned long)&_firmware_start; // size of image
+            result[0] = ALIGN(result[0], 1024*1024); // round to MB
+            result[1] = 1024*1024; // alignment of PDC image
+            result[2] = (unsigned long) &_firmware_start; // current start of PDC
+            return PDC_OK;
+        case PDC_RELOCATE_CHECKSUM:
+            /* perform checksum of PDC image at ARG2 */
+            return PDC_OK;
+        case PDC_RELOCATE_RELOCATE:
+            /* relocate PDC image to ARG2 */
+            return PDC_BAD_OPTION;
+    }
+    dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_RELOCATE function %ld ARG3=%lx ARG4=%lx ARG5=%lx\n", option, ARG3, ARG4, ARG5);
+    return PDC_BAD_OPTION;
+}
+
 static int pdc_initiator(unsigned long *arg)
 {
     unsigned long option = ARG1;
@@ -2992,8 +3019,7 @@ int __VISIBLE parisc_pdc_entry(unsigned long *arg, unsigned long narrow_mode)
             return pdc_pci_index(arg);
 
         case PDC_RELOCATE:
-            /* We don't want to relocate any firmware. */
-            return PDC_BAD_PROC;
+            return pdc_relocate(arg);
 
         case PDC_INITIATOR:
             return pdc_initiator(arg);
