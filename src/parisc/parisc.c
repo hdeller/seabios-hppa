@@ -1984,6 +1984,27 @@ static int pdc_nvolatile(unsigned long *arg)
     return PDC_BAD_OPTION;
 }
 
+static int pdc_nvm(unsigned long *arg)
+{
+    unsigned long option = ARG1;
+    unsigned long nvaddr = ARG2;
+    int *memaddr = (void *)ARG3;
+
+    /* not supported on 32-bit PDC */
+    if (!is_64bit_PDC())
+        return PDC_BAD_PROC;
+
+    switch (option) {
+        case PDC_NVM_READ_WORD:
+            /* XXX: mapper2 reads from 0xfffffff000000000 to 0xfffffff00000002c and
+             * from 0x0 to 0x34 to determine the installed DIMM memory sizes */
+            memcpy(memaddr, &nvolatile_storage[nvaddr & (NVOLATILE_STORAGE_SIZE-1)], sizeof(int));
+            return PDC_OK;
+    }
+    dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_NVM function %ld ARG3=%lx ARG4=%lx ARG5=%lx ARG6=%lx\n", option, ARG3, ARG4, ARG5, ARG6);
+    return PDC_BAD_OPTION;
+}
+
 static int pdc_add_valid(unsigned long *arg)
 {
     unsigned long option = ARG1;
@@ -2931,6 +2952,9 @@ int __VISIBLE parisc_pdc_entry(unsigned long *arg, unsigned long narrow_mode)
             if (ARG1 == 0)              /* PAT: HP-UX 11iv3 ask for it. */
                 return PDC_BAD_PROC;
             break;
+
+	case PDC_NVM:
+            return pdc_nvm(arg);
 
         case 134:
             if (ARG1 == 1 || ARG1 == 513) /* HP-UX 11.11 ask for it. */
