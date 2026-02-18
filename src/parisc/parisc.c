@@ -681,7 +681,7 @@ static struct pdc_module_path mod_path_hpa_fed3c000 = { // SCSI
         .path = { .flags = 0x0, .bc = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xa }, .mod = 0x6  },
         .layers = { 0x0, 0x0, 0x0, 0x0, 0x0, 0x0 }
 #endif
-        p->path.bc[3] = has_astro ? ASTRO_BUS_MODULE : 0x08; /* astro or dino */
+        p->path.bc[3] = has_astro ? (pat_disabled()? ASTRO_BUS_MODULE:0) : 0x08; /* astro or dino */
         p->path.bc[4] = 0; // elroy index (0,1,4,6) == PCI Bus number (0,1,2,3)
         p->path.bc[5] = pci->bdf >> 3;  /* slot */
         p->path.mod = pci->bdf & 0x07; /* function */
