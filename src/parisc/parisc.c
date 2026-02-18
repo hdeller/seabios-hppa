@@ -650,9 +650,9 @@ static const char *hpa_device_name(unsigned long hpa, int output)
                 "SERIAL_1.9600.8.none" : "SERIAL_2.9600.8.none";
 }
 
-static void print_hwpath(struct hardware_path *p, int newline)
+static __attribute__((__unused__)) void print_hwpath(struct hardware_path *p, int newline)
 {
-    printf("PATH %d/%d/%d/%d/%d/%d.%d%s", p->bc[0], p->bc[1],
+    printf("PATH %d/%d/%d/%d/%d/%d/%d%s", p->bc[0], p->bc[1],
             p->bc[2],p->bc[3],p->bc[4],p->bc[5],
             p->mod, newline ? "\n":"");
 }
@@ -777,11 +777,12 @@ static void hppa_pci_build_devices_list(void)
         pdev->pci = pci;
         pdev->hpa_parent = F_EXTEND(pci_hpa);
         pdev->index     = curr_pci_devices;
-        dprintf(1, "PCI device #%d %pP bdf 0x%x at pfa 0x%lx\n", curr_pci_devices, pci, pci->bdf, pfa);
 
         make_iodc_from_pcidev(pci, pdev->iodc);
         make_modinfo_from_pcidev(pci, pdev->mod_info, pfa);
         make_module_path_from_pcidev(pci, pdev->mod_path);
+        dprintf(1, "PCI device #%d %pP bdf 0x%x at pfa 0x%lx hwpath=", curr_pci_devices, pci, pci->bdf, pfa);
+        // print_hwpath(&pdev->mod_path->path, true);
 
         curr_pci_devices++;
         BUG_ON(curr_pci_devices >= MAX_PCI_DEVICES);
@@ -2204,7 +2205,7 @@ static int pdc_system_map(unsigned long *arg)
 
             if (0) {
                 dprintf(1, "PDC_FIND_MODULE dev=%p hpa=%lx ", dev, dev ? dev->hpa:0UL);
-                print_mod_path(dev->mod_path, 0);
+                print_hwpath(&dev->mod_path->path, 0);
                 if (dev->pci)
                     dprintf(1, "PCI %pP ", dev->pci);
                 dprintf(1, "\n");
@@ -2515,8 +2516,8 @@ static int pdc_pat_cell(unsigned long *arg)
                 return PDC_NE_MOD; // Module not found
 
             if (0) {
-                printf("PDC_FIND_MODULE dev=%p hpa=%lx ", dev, dev ? dev->hpa:0UL);
-                print_mod_path(dev->mod_path, 0);
+                printf("PDC_FIND_MODULE dev=%p hpa=%lx %s ", dev, dev ? dev->hpa:0UL, hpa_name(dev->hpa));
+                print_hwpath(&dev->mod_path->path, 0);
                 if (dev->pci)
                     printf("PCI %pP ", dev->pci);
                 printf("\n");
