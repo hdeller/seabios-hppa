@@ -429,15 +429,17 @@ static const char *hpa_name(unsigned long hpa)
     hpa &= ~HPA_DISABLED_DEVICE;
     hpa = F_EXTEND(hpa);
 
-    #define DO2(y,x)    if (hpa == F_EXTEND(x)) return #y;
-    #define DO1(x)      DO2(x,x)
+    #define DO3(y,x)    if (hpa == F_EXTEND(x)) return y;
+    #define DO2(y,x)    DO3(#y,x) // if (hpa == F_EXTEND(x)) return #y;
+    #define DO1(x)      DO3(#x,x)
+    DO2(CPU_HPA, CPU_HPA)
+    DO2(MEMORY_HPA, MEMORY_HPA)
+    DO1(SCSI_HPA)
+#if !defined(__LP64__)
     DO1(GSC_HPA)
     DO1(DINO_HPA)
     DO1(DINO_UART_HPA)
     DO1(DINO_SCSI_HPA)
-    DO2(CPU_HPA, CPU_HPA)
-    DO2(MEMORY_HPA, MEMORY_HPA)
-    DO1(SCSI_HPA)
     DO2(LASI_HPA, lasi_hpa)
     DO2(LASI_UART_HPA,  lasi_hpa + LASI_UART)
     DO2(LASI_SCSI_HPA,  lasi_hpa + LASI_SCSI)
@@ -448,9 +450,11 @@ static const char *hpa_name(unsigned long hpa)
     DO2(LASI_PS2MOU_HPA,lasi_hpa + LASI_PS2 + 0x100)
     DO2(LASI_FDC,       lasi_hpa + LASI_FDC)
     DO1(LASI_GFX_HPA)
+#else
+    DO1(ASTRO_MEMORY_HPA_A400)
+#endif
     DO1(ASTRO_HPA)
     DO1(ASTRO_MEMORY_HPA)
-    DO1(ASTRO_MEMORY_HPA_A400)
     DO1(ELROY0_HPA)
     DO1(ELROY2_HPA)
     DO1(ELROY8_HPA)
