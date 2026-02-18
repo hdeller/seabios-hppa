@@ -2769,6 +2769,7 @@ static int pdc_pat_io(unsigned long *arg)
     unsigned long cell = ARG3;
     struct hardware_path path, *ppath;
     u16 bdf;
+    u8 offs;
 
     switch (option) {
         case PDC_PAT_IO_GET_PCI_ROUTING_TABLE_SIZE:
@@ -2782,32 +2783,35 @@ static int pdc_pat_io(unsigned long *arg)
             memcpy(result, irt_table, irt_table_entries * 16);
             return PDC_OK;
         case PDC_PAT_IO_PCI_CONFIG_READ:
+            bdf = ARG3 >> 8; /* each fn has 256 bytes config space */
+            offs = ARG3 & 0xff;
             // printf("READ %lx bytes from %lx  len %ld\n", ARG1, ARG2, ARG3);
             switch (ARG4) {
-              case 1:   result[0] = pci_config_readb(0, ARG3);   break;
-              case 2:   result[0] = pci_config_readw(0, ARG3);   break;
-              case 4:   result[0] = pci_config_readl(0, ARG3);   break;
+              case 1:   result[0] = pci_config_readb(bdf, offs);   break;
+              case 2:   result[0] = pci_config_readw(bdf, offs);   break;
+              case 4:   result[0] = pci_config_readl(bdf, offs);   break;
               default:  printf("read len huh?\n"); return PDC_INVALID_ARG;
             }
             return PDC_OK;
         case PDC_PAT_IO_PCI_CONFIG_WRITE:
+            bdf = ARG2 >> 8; /* each fn has 256 bytes config space */
+            offs = ARG2 & 0xff;
             // printf("WRITE %lx to %lx  len %ld\n", ARG4, ARG2, ARG3);
             switch (ARG3) {
-              case 1:   pci_config_writeb(0, ARG2, ARG4);   break;
-              case 2:   pci_config_writew(0, ARG2, ARG4);   break;
-              case 4:   pci_config_writel(0, ARG2, ARG4);   break;
+              case 1:   pci_config_writeb(bdf, offs, ARG4);   break;
+              case 2:   pci_config_writew(bdf, offs, ARG4);   break;
+              case 4:   pci_config_writel(bdf, offs, ARG4);   break;
               default:  printf("write len huh?\n"); return PDC_INVALID_ARG;
             }
             return PDC_OK;
         case PDC_PAT_IO_GET_HW_FROM_PCI_CONFIG:
-            bdf = ARG3 >> 11;
+            bdf = ARG3 >> 8; /* each fn has 256 bytes config space */
             ppath = (void *)ARG2;
             path = (struct hardware_path) { .flags = DEFAULT_CELL_NUM,
-                    .bc = { 0xff, 0xff, 0xff, 0x00, 0x00, pci_bdf_to_dev(bdf) },
+                    .bc = { 0xff, 0xff, 0xff, 0x00, 2*pci_bdf_to_bus(bdf), pci_bdf_to_dev(bdf) },
                     .mod = pci_bdf_to_fn(bdf) };
-            *ppath = path;// HELGE
-            printf("HWPATH from 0x%lx ", ARG3);
-            print_hwpath(ppath, true);
+            *ppath = path;
+            // printf("HWPATH from 0x%lx ", ARG3); print_hwpath(ppath, true);
             return PDC_OK;
     }
     printf("\n\nSeaBIOS: Unimplemented PDC_PAT_IO function %ld ARG3=%lx ARG4=%lx ARG5=%lx\n", option, ARG3, ARG4, ARG5);
