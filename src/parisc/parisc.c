@@ -59,12 +59,15 @@ union {
 # define is_snake           0
 bool _pat_disabled = true;
 #define pat_disabled()      _pat_disabled
+bool _pat_only = false;
+#define pat_only()          _pat_only
 #else
 char cpu_bit_width;
 # define is_64bit_PDC()     0      /* 32-bit PDC */
 bool is_snake;
-#define _pat_disabled       is_snake /* avoids ifdef */
+#define _pat_disabled       1
 #define pat_disabled()      1
+#define pat_only()          0
 #endif
 
 #define is_64bit_CPU()     (cpu_bit_width == 64)  /* 64-bit CPU? */
@@ -1483,6 +1486,7 @@ static const char *pdc_name(unsigned long num)
         DO(PDC_STABLE)
         DO(PDC_NVOLATILE)
         DO(PDC_ADD_VALID)
+        DO(PDC_DEBUG)
         DO(PDC_INSTR)
         DO(PDC_PROC)
         DO(PDC_BLOCK_TLB)
@@ -2195,6 +2199,8 @@ static int pdc_system_map(unsigned long *arg)
     // dprintf(0, "\n\nSeaBIOS: Info: PDC_SYSTEM_MAP function %ld ARG3=%x ARG4=%x ARG5=%x\n", option, ARG3, ARG4, ARG5);
 
     /* old machines (715 is Snake type) and PAT-boxes (A400) do not support PDC_SYSTEM_MAP */
+    if (pat_only())
+        return PDC_BAD_PROC;
     if (is_snake || !pat_disabled())
         return PDC_BAD_PROC; // PDC_BAD_OPTION is not sufficient!
 
@@ -2434,7 +2440,8 @@ static int pdc_relocate(unsigned long *arg)
     extern char _firmware_start[], _firmware_end[];
 
     /* do not allow relocation - if we support one option we need to support all */
-    return PDC_BAD_PROC;
+    if (true || pat_only())
+        return PDC_BAD_PROC;
 
     switch (option) {
         case PDC_RELOCATE_GET_RELOCINFO:
@@ -2915,6 +2922,8 @@ int __VISIBLE parisc_pdc_entry(unsigned long *arg, unsigned long narrow_mode)
             break;
 
         case PDC_CHASSIS: /* chassis functions */
+            if (pat_only())
+                return PDC_BAD_PROC;
             return pdc_chassis(arg);
 
         case PDC_PIM:
@@ -2927,6 +2936,8 @@ int __VISIBLE parisc_pdc_entry(unsigned long *arg, unsigned long narrow_mode)
             return pdc_cache(arg);
 
         case PDC_HPA:
+            if (pat_only())
+                return PDC_BAD_PROC;
             return pdc_hpa(arg);
 
         case PDC_COPROC:
@@ -2939,6 +2950,8 @@ int __VISIBLE parisc_pdc_entry(unsigned long *arg, unsigned long narrow_mode)
             return pdc_tod(arg);
 
         case PDC_STABLE:
+            if (pat_only())
+                return PDC_BAD_PROC;
             return pdc_stable(arg);
 
         case PDC_NVOLATILE:
@@ -2951,6 +2964,8 @@ int __VISIBLE parisc_pdc_entry(unsigned long *arg, unsigned long narrow_mode)
             return PDC_BAD_PROC;
 
         case PDC_PROC:
+            if (pat_only())
+                return PDC_BAD_PROC;
             return pdc_proc(arg);
 
         case PDC_CONFIG:	/* Obsolete */
@@ -2963,6 +2978,8 @@ int __VISIBLE parisc_pdc_entry(unsigned long *arg, unsigned long narrow_mode)
             return pdc_tlb(arg);
 
         case PDC_MEM:
+            if (pat_only())
+                return PDC_BAD_PROC;
             return pdc_mem(arg);
 
         case PDC_PSW:	/* Get/Set default System Mask  */
@@ -2971,7 +2988,9 @@ int __VISIBLE parisc_pdc_entry(unsigned long *arg, unsigned long narrow_mode)
         case PDC_SYSTEM_MAP:
             return pdc_system_map(arg);
 
-        case PDC_SOFT_POWER: // don't have a soft-power switch
+        case PDC_SOFT_POWER:
+            if (pat_only())
+                return PDC_BAD_PROC;
             return pdc_soft_power(arg);
 
         case PDC_CRASH_PREP:
@@ -3008,9 +3027,13 @@ int __VISIBLE parisc_pdc_entry(unsigned long *arg, unsigned long narrow_mode)
             return PDC_OK;
 
         case PDC_LAN_STATION_ID:
+            if (pat_only())
+                return PDC_BAD_PROC;
             return pdc_lan_station_id(arg);
 
         case PDC_SYSTEM_INFO:
+            if (pat_only())
+                return PDC_BAD_PROC;
             if (ARG1 == PDC_SYSINFO_RETURN_INFO_SIZE)
                 return PDC_BAD_PROC;
             break;
@@ -3741,7 +3764,10 @@ void __VISIBLE start_parisc_firmware(void)
     } else
     if (is_64bit_PDC() && strcmp(str, "A400") == 0) {
         current_machine = &machine_A400;
+#if defined(__LP64__)
         _pat_disabled = false; /* allow PAT */
+        _pat_only = true; /* never support non-PAT functions */
+#endif
         enable_OS64 &= ~PDC_MODEL_OS32; /* do not allow 32-bit OS */
         pci_hpa = (unsigned long) ELROY0_BASE_HPA;
         hppa_port_pci_cmd  = pci_hpa + 0x040;
