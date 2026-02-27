@@ -4085,7 +4085,7 @@ void __VISIBLE start_parisc_firmware(void)
         PAGE0->mem_boot.dp.layers[1] = boot_drive->lun;
 
         printf("\nBooting...\n"
-                "Boot IO Dependent Code (IODC) revision 153\n\n"
+                "Boot IO Dependent Code (IODC) revision " SEABIOS_HPPA_VERSION_STR "\n\n"
                 "%s Booted.\n", PAGE0->imm_soft_boot ? "SOFT":"HARD");
         /* actually: start_ipl(interact_ipl, iplend); */
         start_kernel(interact_ipl, iplend, 0, 0, iplstart);
