@@ -2234,8 +2234,6 @@ static int pdc_system_map(unsigned long *arg)
                 dprintf(1, "\n");
             }
 
-            memset(result, 0, 32*sizeof(long));
-
             mod_path = (struct pdc_module_path *)ARG3;
             if (mod_path)
                 *mod_path = *dev->mod_path;
