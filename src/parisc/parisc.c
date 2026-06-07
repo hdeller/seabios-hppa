@@ -1767,7 +1767,7 @@ static int pdc_cache(unsigned long *arg)
             machine_cache_info->dc_conf = (struct pdc_cache_cf) {
                 .cc_alias = is_64bit_CPU() ? 11:4, /* 11 = 4M , 4 = 32k */
                 .cc_block = 1,/* 16k * 16 bytes => 256k */
-                .cc_line  = 4, /* 4*4 => 16 bytes */
+                .cc_line  = 2, /* 4^2 => 16 bytes, needs to be 2 for *bsd */
                 .cc_wt    = 1, /* 0 = WB-cache, 1 = WT-cache */
                 .cc_sh    = 3, /* 0 = separate I/D-cache, 3=either fdc/fic */
                 .cc_cst   = 1, /* 0 = incoherent cache, 1=coherent cache */
