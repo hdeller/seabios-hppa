@@ -33,6 +33,7 @@ struct cdbres_read_capacity {
 } PACKED;
 
 #define CDB_CMD_TEST_UNIT_READY  0x00
+#define CDB_CMD_REZERO_UNIT      0x01 /* TAPE rewind */
 #define CDB_CMD_INQUIRY          0x12
 #define CDB_CMD_REQUEST_SENSE    0x03
 
@@ -58,6 +59,7 @@ struct cdbres_request_sense {
 } PACKED;
 
 #define SCSI_TYPE_DISK  0x00
+#define SCSI_TYPE_TAPE  0x01
 #define SCSI_TYPE_CDROM 0x05
 
 struct cdbres_inquiry {

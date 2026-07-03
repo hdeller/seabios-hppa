@@ -52,7 +52,8 @@ struct drive_s {
     u64 sectors;        // Total sectors count
     u32 cntl_id;        // Unique id for a given driver type.
     u32 max_bytes_transfer; // maximum number of bytes which can bet transferred at once
-    u8 removable;       // Is media removable (currently unused)
+    u8 removable:1;     // Is media removable (currently unused)
+    u8 sequential:1;    // Media needs to be accessed sequential (e.g. tape drive)
 
     // Info for EDD calls
     u8 translation;     // type of translation
@@ -63,6 +64,7 @@ struct drive_s {
 };
 
 #define DISK_SECTOR_SIZE  512
+#define TAPE_SECTOR_SIZE  512
 #define CDROM_SECTOR_SIZE 2048
 
 #define DTYPE_NONE         0x00
