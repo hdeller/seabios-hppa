@@ -24,6 +24,7 @@ struct drive_s;
 void boot_add_floppy(struct drive_s *drive_g, const char *desc, int prio);
 void boot_add_hd(struct drive_s *drive_g, const char *desc, int prio);
 void boot_add_cd(struct drive_s *drive_g, const char *desc, int prio);
+void boot_add_tape(struct drive_s *drive_g, const char *desc, int prio);
 void boot_add_cbfs(void *data, const char *desc, int prio);
 void interactive_bootmenu(void);
 void bcv_prepboot(void);

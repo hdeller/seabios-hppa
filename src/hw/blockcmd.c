@@ -99,6 +99,20 @@ cdb_mode_sense_geom(struct disk_op_s *op, struct cdbres_mode_sense_geom *data)
     return process_op(op);
 }
 
+static int
+cdb_rewind_tape(struct disk_op_s *op)
+{
+    struct cdb_request_sense cmd;
+    memset(&cmd, 0, sizeof(cmd));
+    cmd.command = CDB_CMD_REZERO_UNIT;
+    op->command = CMD_SCSI;
+    op->count = 0;
+    op->buf_fl = NULL;
+    op->cdbcmd = &cmd;
+    op->blocksize = 0;
+    return process_op(op);
+}
+
 
 /****************************************************************
  * Main SCSI commands
@@ -316,9 +330,21 @@ scsi_drive_setup(struct drive_s *drive, const char *s, int prio, u8 target, u8 l
         drive->blksize = CDROM_SECTOR_SIZE;
         drive->sectors = (u64)-1;
 
-        char *desc = znprintf(MAXDESCSIZE, "DVD/CD [%s Drive %s %s %s]"
+        char *desc = znprintf(MAXDESCSIZE, "DVD/CD [%s %s %s %s]"
                               , s, vendor, product, rev);
         boot_add_cd(drive, desc, prio);
+        return 0;
+    }
+
+    if (pdt == SCSI_TYPE_TAPE) {
+        cdb_rewind_tape(&dop);
+        drive->blksize = TAPE_SECTOR_SIZE;
+        drive->sectors = (u64)-1;
+        drive->sequential = 1; // a tape is a sequential drive
+
+        char *desc = znprintf(MAXDESCSIZE, "TAPE [%s %s %s %s]"
+                              , s, vendor, product, rev);
+        boot_add_tape(drive, desc, prio);
         return 0;
     }
 
@@ -374,7 +400,7 @@ scsi_drive_setup(struct drive_s *drive, const char *s, int prio, u8 target, u8 l
         }
     }
 
-    char *desc = znprintf(MAXDESCSIZE, "%s Drive %s %s %s"
+    char *desc = znprintf(MAXDESCSIZE, "DISK [%s %s %s %s]"
                           , s, vendor, product, rev);
     boot_add_hd(drive, desc, prio);
     return 0;

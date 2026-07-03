@@ -520,6 +520,7 @@ static struct hlist_head BootList VARVERIFY32INIT;
 #define IPL_TYPE_FLOPPY      0x01
 #define IPL_TYPE_HARDDISK    0x02
 #define IPL_TYPE_CDROM       0x03
+#define IPL_TYPE_TAPE        0x04
 #define IPL_TYPE_CBFS        0x20
 #define IPL_TYPE_BEV         0x80
 #define IPL_TYPE_BCV         0x81
@@ -554,7 +555,7 @@ bootentry_add(int type, int prio, void *data, const char *desc)
             break;
         if (be->type > pos->type)
             continue;
-        if (be->type <= IPL_TYPE_CDROM
+        if (be->type <= IPL_TYPE_TAPE
             && (be->drive->type < pos->drive->type
                 || (be->drive->type == pos->drive->type
                     && be->drive->cntl_id < pos->drive->cntl_id)))
@@ -616,6 +617,12 @@ boot_add_cd(struct drive_s *drive, const char *desc, int prio)
     }
     bootentry_add(IPL_TYPE_CDROM, defPrio(prio, DefaultCDPrio)
                   , drive, desc);
+}
+
+void
+boot_add_tape(struct drive_s *drive, const char *desc, int prio)
+{
+    bootentry_add(IPL_TYPE_TAPE, defPrio(prio, DEFAULT_PRIO), drive, desc);
 }
 
 // Add a CBFS payload entry
@@ -853,6 +860,7 @@ struct drive_s *select_parisc_boot_drive(char bootdrive)
     /* if none found, choose first bootable device */
     hlist_for_each_entry(pos, &BootList, node) {
 	if ((pos->type == IPL_TYPE_CDROM) ||
+	    (pos->type == IPL_TYPE_TAPE)  ||
 	    (pos->type == IPL_TYPE_HARDDISK)) {
                 // printf("\nAuto-Booting from %s\n",pos->description);
 		return pos->drive;
