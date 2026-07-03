@@ -3500,13 +3500,33 @@ static int parisc_boot_menu(unsigned long *iplstart, unsigned long *iplend,
         disk_op.drive_fl->max_bytes_transfer -= disk_op.drive_fl->blksize;
     }
 
-    /* seek to beginning of IPL */
-    disk_op.drive_fl = boot_drive;
-    disk_op.command = CMD_SEEK;
-    disk_op.count = 0;
-    disk_op.lba = (ipl_addr / disk_op.drive_fl->blksize);
-    ret = process_op(&disk_op);
-    // printf("DISK_SEEK to IPL returned %d\n", ret);
+    /* seek to beginning of IPL, either via SEEK, or sequential on tape drives */
+    if (boot_drive->sequential) {
+        unsigned long current_pos = FW_BLOCKSIZE;
+        while (current_pos < ipl_addr) {
+            disk_op.drive_fl = boot_drive;
+            disk_op.buf_fl = target;
+            disk_op.command = CMD_READ;
+            disk_op.lba = (current_pos / disk_op.drive_fl->blksize);
+            disk_op.count = 1;
+            ret = process_op(&disk_op);
+            if (ret != 0)
+                break;
+            current_pos += disk_op.drive_fl->blksize;
+        }
+        if (current_pos != ipl_addr) {
+            printf("SeaBIOS: Could not find IPL, ret %d.\n", ret);
+            return 0;
+        }
+        printf("READ POSITION FOR IPL reached %ld\n", current_pos);
+    } else { /* seek with SEEK command */
+        disk_op.drive_fl = boot_drive;
+        disk_op.command = CMD_SEEK;
+        disk_op.count = 0;
+        disk_op.lba = (ipl_addr / disk_op.drive_fl->blksize);
+        ret = process_op(&disk_op);
+        // printf("DISK_SEEK to IPL returned %d\n", ret);
+    }
 
     /* read IPL */
     disk_op.drive_fl = boot_drive;
