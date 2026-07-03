@@ -1642,7 +1642,10 @@ static int pdc_model(unsigned long *arg, unsigned long narrow_mode)
 
             /* make sure to only copy the necessary bytes. */
             NO_COMPAT_RETURN_VALUE(ARG2);
-            for (i = 0; i < sizeof(machine_B160L.pdc_model)/sizeof(unsigned long); i++) {
+            i = sizeof(struct pdc_model) / sizeof(unsigned long);
+            if (!is_64bit_PDC() || !is_64bit_CPU())
+                i -= 1; /* skip last entry which is default of PSW_W bit */
+            while (i--) {
                 if (is_64bit_PDC() && narrow_mode) {
                     *result_narrow = *source;
                     result_narrow++;
