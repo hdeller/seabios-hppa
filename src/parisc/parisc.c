@@ -569,10 +569,19 @@ int DEV_is_storage_device(hppa_device_t *dev)
 {
     BUG_ON(!dev);
     if (dev->pci)
-        return (dev->pci->class == PCI_CLASS_STORAGE_SCSI);
+        return (dev->pci->class == PCI_CLASS_STORAGE_SCSI
+             || dev->pci->class == PCI_CLASS_STORAGE_IDE);
     if (lasi_hpa && dev->hpa == lasi_hpa + LASI_SCSI)
         return true;
     return ((dev->iodc->type & 0x1f) == HPHW_FIO);
+}
+
+int PCI_is_HPPA_SUPERIO(struct pci_device *pci)
+{
+    return  pci &&
+            pci->class == PCI_CLASS_BRIDGE_OTHER &&
+            pci->vendor == PCI_VENDOR_ID_NS &&
+            pci->device == PCI_DEVICE_ID_NS_87560_LIO;
 }
 
 int DEV_is_serial_device(hppa_device_t *dev)
@@ -580,7 +589,8 @@ int DEV_is_serial_device(hppa_device_t *dev)
     BUG_ON(!dev);
     if (dev->pci)
         return (dev->pci->class == PCI_CLASS_COMMUNICATION_SERIAL ||
-                dev->pci->class == PCI_CLASS_COMMUNICATION_MULTISERIAL);
+                dev->pci->class == PCI_CLASS_COMMUNICATION_MULTISERIAL ||
+                PCI_is_HPPA_SUPERIO(dev->pci));
     return ((dev->iodc->type & 0x1f) == HPHW_FIO); // HPHW_CIO ??
 }
 
@@ -3649,27 +3659,38 @@ static void find_serial_pci_card(void)
         return;
 
     pci = pci_find_class(PCI_CLASS_COMMUNICATION_SERIAL);
+    if (!pci) {
+        pci = pci_find_class(PCI_CLASS_BRIDGE_OTHER);
+        if (!PCI_is_HPPA_SUPERIO(pci))
+            return;
+    }
+
     if (!pci)
         return;
 
     dprintf(1, "PCI: Enabling %pP for primary SERIAL PORT\n", pci);
     pci_config_maskw(pci->bdf, PCI_COMMAND, 0,
                      PCI_COMMAND_IO | PCI_COMMAND_MEMORY);
-    /* prefer memory-mapped I/O. Required for GSP for 64-bit HP-UX 11 */
-    mm_mapped = 1;
-    pmem = 0;
-    if (!pmem && !(pci_config_readl(pci->bdf, PCI_BASE_ADDRESS_0) & PCI_BASE_ADDRESS_SPACE_IO)
-        && (pci_config_readl(pci->bdf, PCI_BASE_ADDRESS_0) & PCI_BASE_ADDRESS_MEM_MASK))
-        pmem = (uintptr_t) pci_enable_membar(pci, PCI_BASE_ADDRESS_0);
-    if (!pmem && !(pci_config_readl(pci->bdf, PCI_BASE_ADDRESS_1) & PCI_BASE_ADDRESS_SPACE_IO)
-        && (pci_config_readl(pci->bdf, PCI_BASE_ADDRESS_1) & PCI_BASE_ADDRESS_MEM_MASK))
-        pmem = (uintptr_t) pci_enable_membar(pci, PCI_BASE_ADDRESS_1);
-    if (!pmem) {
+    if (PCI_is_HPPA_SUPERIO(pci)) {
         mm_mapped = 0;
-        if (pci_config_readl(pci->bdf, PCI_BASE_ADDRESS_0) & PCI_BASE_ADDRESS_SPACE_IO)
-            pmem = pci_enable_iobar(pci, PCI_BASE_ADDRESS_0);
-        else
-            pmem = pci_enable_iobar(pci, PCI_BASE_ADDRESS_1);
+        pmem = pci_config_readl(pci->bdf, 0x94) & ~0x7UL;
+    } else {
+    /* prefer memory-mapped I/O. Required for GSP for 64-bit HP-UX 11 */
+        mm_mapped = 1;
+        pmem = 0;
+        if (!pmem && !(pci_config_readl(pci->bdf, PCI_BASE_ADDRESS_0) & PCI_BASE_ADDRESS_SPACE_IO)
+            && (pci_config_readl(pci->bdf, PCI_BASE_ADDRESS_0) & PCI_BASE_ADDRESS_MEM_MASK))
+            pmem = (uintptr_t) pci_enable_membar(pci, PCI_BASE_ADDRESS_0);
+        if (!pmem && !(pci_config_readl(pci->bdf, PCI_BASE_ADDRESS_1) & PCI_BASE_ADDRESS_SPACE_IO)
+            && (pci_config_readl(pci->bdf, PCI_BASE_ADDRESS_1) & PCI_BASE_ADDRESS_MEM_MASK))
+            pmem = (uintptr_t) pci_enable_membar(pci, PCI_BASE_ADDRESS_1);
+        if (!pmem) {
+            mm_mapped = 0;
+            if (pci_config_readl(pci->bdf, PCI_BASE_ADDRESS_0) & PCI_BASE_ADDRESS_SPACE_IO)
+                pmem = pci_enable_iobar(pci, PCI_BASE_ADDRESS_0);
+            else
+                pmem = pci_enable_iobar(pci, PCI_BASE_ADDRESS_1);
+        }
     }
     dprintf(1, "PCI: Enabling %pP for primary SERIAL PORT %s %lx\n",
         pci, mm_mapped ? "mem":"i/o", pmem);
@@ -3681,6 +3702,7 @@ static void find_serial_pci_card(void)
     while (pdev->pci != pci)
         pdev++;
     pdev->pci_addr = pmem;
+
     mem_cons_boot.hpa = pdev->hpa;
     mem_kbd_boot.hpa = pdev->hpa;
     mem_kbd_sti_boot.hpa = pdev->hpa;
