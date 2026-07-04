@@ -760,7 +760,7 @@ static void hppa_pci_build_devices_list(void)
 
     curr_pci_devices = 0;
 
-    dprintf(1, "\n PCI DEVICE LIST PFA TABLE\n");
+    printf("\n PCI DEVICE LIST PFA TABLE\n");
     foreachpci(pci) {
         unsigned long pfa, offs;
         hppa_device_t *pdev = &hppa_pci_devices[curr_pci_devices];
@@ -801,8 +801,8 @@ static void hppa_pci_build_devices_list(void)
         make_iodc_from_pcidev(pci, pdev->iodc);
         make_modinfo_from_pcidev(pci, pdev->mod_info, pfa);
         make_module_path_from_pcidev(pci, pdev->mod_path);
-        dprintf(1, "PCI device #%d %pP bdf 0x%x at pfa 0x%lx hwpath=", curr_pci_devices, pci, pci->bdf, pfa);
-        // print_hwpath(&pdev->mod_path->path, true);
+        printf("PCI device #%d %pP bdf 0x%x at pfa 0x%lx hwpath=", curr_pci_devices, pci, pci->bdf, pfa);
+        print_hwpath(&pdev->mod_path->path, true);
 
         curr_pci_devices++;
         BUG_ON(curr_pci_devices >= MAX_PCI_DEVICES);
@@ -2440,14 +2440,39 @@ static int pdc_pci_index(unsigned long *arg)
 {
     unsigned long option = ARG1;
     unsigned long *result = (unsigned long *)ARG2;
+    int bdf, offs;
     /* machines with Dino don't provide this info */
 
-    // dprintf(0, "\n\nSeaBIOS: PDC_PCI_INDEX(%lu) called with ARG2=%x ARG3=%x ARG4=%x\n", option, ARG2, ARG3, ARG4);
+    printf("\n\nSeaBIOS: PDC_PCI_INDEX(%lu) called with ARG2=%lx ARG3=%lx ARG4=%lx\n", option, ARG2, ARG3, ARG4);
     switch (option) {
         case PDC_PCI_INTERFACE_INFO:
             memset(result, 0, 32 * sizeof(unsigned long));
             // BUG_ON(1);
             result[0] = 2;  /* XXX physical hardware returns those ?!? */
+            return PDC_OK;
+        case PDC_PCI_READ_CONFIG:
+#if 1
+            bdf = ARG3 >> 8; /* each fn has 256 bytes config space */
+            offs = ARG3 & 0xff;
+            // ARG3=0x0  ARG4=0x5a ARG5=0x2
+            switch (ARG5) {
+            case 2:     result[0] = pci_config_readw(bdf, offs + ARG4);
+                        break;
+            case 8884:     result[0] = pci_config_readl(ARG4, ARG3);
+                        break;
+            default:    dprintf(0, "\nWrong size in PDC_PCI_READ_CONFIG\n");
+                        return PDC_INVALID_ARG;
+            }
+#else
+            switch (ARG5) {
+            case 2:     result[0] = pci_config_readw(ARG4, ARG3);
+                        break;
+            case 4:     result[0] = pci_config_readl(ARG4, ARG3);
+                        break;
+            default:    dprintf(0, "\nWrong size in PDC_PCI_READ_CONFIG\n");
+                        return PDC_INVALID_ARG;
+            }
+#endif
             return PDC_OK;
         case PDC_PCI_GET_INT_TBL_SIZE:
             if (!has_astro)
