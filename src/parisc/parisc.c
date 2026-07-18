@@ -1117,6 +1117,16 @@ static unsigned long parisc_serial_in(char *c, unsigned long maxchars)
     return count;
 }
 
+/* A guest OS may transiently unmap or resize the console UART's PCI BAR
+ * (e.g. the standard 0xffffffff BAR-sizing probe issued via PDC_PAT_IO).
+ * The console MMIO address cached in dev->pci_addr is not re-read, so a
+ * print in that window polls an unbacked address: reads return 0, the
+ * "(lsr & 0x60) == 0x60" test below can never pass, and an unbounded
+ * loop would spin forever INSIDE the PDC call -- the guest never runs
+ * again to restore the BAR.  Bound the poll: a transiently-unmapped
+ * console costs a few dropped characters instead of a machine hang. */
+#define SERIAL_OUT_POLL_LIMIT 10000
+
 static void parisc_serial_out(char c)
 {
     portaddr_t addr = PAGE0->mem_cons.hpa;
@@ -1148,6 +1158,7 @@ static void parisc_serial_out(char c)
     if (c == '\n')
         parisc_serial_out('\r');
 
+    unsigned int poll_count = 0;
     for (;;) {
         u8 lsr = inb(F_EXTEND(addr+SEROFF_LSR));
         if ((lsr & 0x60) == 0x60) {
@@ -1155,6 +1166,8 @@ static void parisc_serial_out(char c)
             outb(c, F_EXTEND(addr+SEROFF_DATA));
             break;
         }
+        if (++poll_count >= SERIAL_OUT_POLL_LIMIT)
+            break;      /* transiently unmapped BAR: drop char, don't hang */
     }
 }
 
