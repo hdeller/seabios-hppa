@@ -604,6 +604,16 @@ int HPA_is_serial_device(unsigned long hpa)
     return DEV_is_serial_device(dev);
 }
 
+int HPA_is_pci_serial_device(unsigned long hpa)
+{
+    hppa_device_t *dev;
+
+    dev = find_hpa_device(hpa);
+    if (!dev || !dev->pci)
+        return 0;
+    return DEV_is_serial_device(dev);
+}
+
 int DEV_is_network_device(hppa_device_t *dev)
 {
     BUG_ON(!dev);
@@ -665,6 +675,7 @@ static const char *hpa_device_name(unsigned long hpa, int output)
     return HPA_is_LASI_graphics(hpa) ? "GRAPHICS(1)" :
             HPA_is_graphics_device(hpa) ? "VGA" :
             HPA_is_LASI_keyboard(hpa) ? "PS2" :
+            HPA_is_pci_serial_device(hpa) ? "PCI_SERIAL_1" :
             ((hpa + 0x800) == port_serial_1) ?
                 "SERIAL_1.9600.8.none" : "SERIAL_2.9600.8.none";
 }
