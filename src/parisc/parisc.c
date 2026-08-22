@@ -1850,9 +1850,19 @@ static int pdc_coproc(unsigned long *arg)
     unsigned long mask;
     switch (option) {
         case PDC_COPROC_CFG:
-            memset(result, 0, 32 * sizeof(unsigned long));
             mask = 3UL << 6;    /* bit for FPU available/functional */
             mtctl(mask, 10);    /* initialize cr10 */
+            if (is_compat_mode()) {
+                unsigned int *result32 = (unsigned int *)ARG2;
+                memset(result32, 0, 32 * sizeof(result32[0]));
+                result32[0] = mask;   /* ccr_enable */
+                result32[1] = mask;   /* ccr_present */
+                result32[17] = 1;     /* FPU revision */
+                result32[18] = current_machine->pdc_cpuid >> 5; /* FPU model */
+                NO_COMPAT_RETURN_VALUE(ARG2);
+                return PDC_OK;
+            }
+            memset(result, 0, 32 * sizeof(result[0]));
             result[0] = mask;   /* ccr_enable */
             result[1] = mask;   /* ccr_present */
             result[17] = 1;     /* FPU revision */
