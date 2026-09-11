@@ -125,7 +125,7 @@ ncr710_scsi_process_op(struct disk_op_s *op)
 
     DBG(printf("SeaBIOS: ncr710: Script started, DSP=0x%08x\n", dsp));
 
-    int poll_count = 0;
+    int poll_count __attribute__((__unused__)) = 0;
     for (;;) {
         poll_count++;
         u8 istat = NCR_READ_REG(iobase, NCR_REG_ISTAT);
