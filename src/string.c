@@ -115,7 +115,7 @@ memset16_far(u16 d_seg, void *d_far, u16 c, size_t len)
 #endif
 }
 
-void *
+void * __VISIBLE
 memset(void *s, int c, size_t n)
 {
     while (n)
