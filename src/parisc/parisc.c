@@ -1030,7 +1030,7 @@ static hppa_device_t *add_index_all_devices(void)
 static hppa_device_t *find_hppa_device_by_hpa(unsigned long hpa)
 {
     hppa_device_t *dev;
-    int i, nr = 0;
+    int i;
 
     for (i = 0; i < (MAX_DEVICES-1); i++) {
         dev = parisc_devices + i;
@@ -1038,7 +1038,6 @@ static hppa_device_t *find_hppa_device_by_hpa(unsigned long hpa)
             // found it.
             return dev;
         }
-        nr++;
     }
 
     /* search PCI devices */
@@ -1048,7 +1047,6 @@ static hppa_device_t *find_hppa_device_by_hpa(unsigned long hpa)
             // found it.
             return dev;
         }
-        nr++;
     }
 
     return NULL;
