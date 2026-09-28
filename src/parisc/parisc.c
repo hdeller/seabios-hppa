@@ -1251,6 +1251,61 @@ void iodc_log_call(unsigned int *arg, const char *func)
     }
 }
 
+/*
+ * Boot from tape.  The tape is read in variable-block mode, one record
+ * per READ(6), so records of any length up to TAPE_RECORD_MAX can be
+ * booted and the drive's mode parameters are left as they are.  The
+ * boot medium is the concatenation of the records.  The record read
+ * last is kept, so that a read can start or end within a record.
+ */
+#define TAPE_RECORD_MAX (64 * 1024)
+static u8 tape_record[TAPE_RECORD_MAX] __aligned(8);
+static unsigned long tape_record_addr; /* medium address of tape_record[0] */
+static u32 tape_record_len;            /* bytes in tape_record */
+
+static void tape_rewind(struct drive_s *drive)
+{
+    struct disk_op_s op = { .drive_fl = drive };
+
+    cdb_rewind_tape(&op);
+    tape_record_addr = 0;
+    tape_record_len = 0;
+}
+
+/* read len bytes at medium address addr, return the number of bytes read */
+static unsigned long tape_read(struct drive_s *drive, void *buf,
+                               unsigned long addr, unsigned long len)
+{
+    unsigned long done = 0;
+
+    if (addr < tape_record_addr)
+        tape_rewind(drive);
+
+    while (done < len) {
+        unsigned long pos = addr + done;
+        struct disk_op_s op = { .drive_fl = drive };
+        u32 reclen;
+
+        if (pos < tape_record_addr + tape_record_len) {
+            unsigned long off = pos - tape_record_addr;
+            unsigned long n = MIN(tape_record_len - off, len - done);
+            memcpy((u8 *)buf + done, tape_record + off, n);
+            done += n;
+            continue;
+        }
+        if (cdb_read_tape_record(&op, tape_record, sizeof(tape_record),
+                                 &reclen)) {
+            /* position unknown: rewind before the next read */
+            tape_record_addr = -1UL;
+            tape_record_len = 0;
+            break;
+        }
+        tape_record_addr += tape_record_len;
+        tape_record_len = reclen;
+    }
+    return done;
+}
+
 int __VISIBLE parisc_iodc_ENTRY_IO(unsigned int *arg)
 {
     unsigned long hpa = COMPAT_VAL(ARG0);
@@ -1318,6 +1373,15 @@ int __VISIBLE parisc_iodc_ENTRY_IO(unsigned int *arg)
 
                 unsigned long bytes_requested = ARG7;
                 unsigned long current_lba = ARG5 / disk_op.drive_fl->blksize;
+
+                /* a tape has no LBA, read it at the medium address ARG5 */
+                if (boot_drive->sequential && option == ENTRY_IO_BOOTIN) {
+                    if ((ARG5 | bytes_requested) & (FW_BLOCKSIZE-1))
+                        return PDC_INVALID_ARG;
+                    result[0] = tape_read(boot_drive, (void *)ARG6, ARG5,
+                                          bytes_requested);
+                    return result[0] == bytes_requested ? PDC_OK : PDC_ERROR;
+                }
 
                 if (option == ENTRY_IO_BBLOCK_IN) { /* in 2k blocks */
                     unsigned long maxcount;
@@ -3612,15 +3676,23 @@ static int parisc_boot_menu(unsigned long *iplstart, unsigned long *iplend,
     }
     // printf("DISK_READY returned %d\n", ret);
 
-    /* read boot sector of disc/CD */
-    disk_op.drive_fl = boot_drive;
-    disk_op.buf_fl = target;
-    disk_op.command = CMD_READ;
-    disk_op.count = (FW_BLOCKSIZE / disk_op.drive_fl->blksize);
-    disk_op.lba = 0;
-    // printf("blocksize is %d, count is %d\n", disk_op.drive_fl->blksize, disk_op.count);
-    ret = process_op(&disk_op);
-    // printf("DISK_READ(count=%d) = %d\n", disk_op.count, ret);
+    /* read boot sector of disc/CD, or the start of the tape */
+    if (boot_drive->sequential) {
+        tape_rewind(boot_drive);
+        ret = tape_read(boot_drive, target, 0, FW_BLOCKSIZE) != FW_BLOCKSIZE;
+        if (ret)
+            printf("SeaBIOS: Could not read the tape (a record may be at"
+                   " most %d bytes long).\n", TAPE_RECORD_MAX);
+    } else {
+        disk_op.drive_fl = boot_drive;
+        disk_op.buf_fl = target;
+        disk_op.command = CMD_READ;
+        disk_op.count = (FW_BLOCKSIZE / disk_op.drive_fl->blksize);
+        disk_op.lba = 0;
+        // printf("blocksize is %d, count is %d\n", disk_op.drive_fl->blksize, disk_op.count);
+        ret = process_op(&disk_op);
+        // printf("DISK_READ(count=%d) = %d\n", disk_op.count, ret);
+    }
     if (ret)
         return 0;
 
@@ -3647,33 +3719,23 @@ static int parisc_boot_menu(unsigned long *iplstart, unsigned long *iplend,
         disk_op.drive_fl->max_bytes_transfer -= disk_op.drive_fl->blksize;
     }
 
-    /* seek to beginning of IPL, either via SEEK, or sequential on tape drives */
+    /* read the IPL from a tape: tape_read() moves forward to it */
     if (boot_drive->sequential) {
-        unsigned long current_pos = FW_BLOCKSIZE;
-        while (current_pos < ipl_addr) {
-            disk_op.drive_fl = boot_drive;
-            disk_op.buf_fl = target;
-            disk_op.command = CMD_READ;
-            disk_op.lba = (current_pos / disk_op.drive_fl->blksize);
-            disk_op.count = 1;
-            ret = process_op(&disk_op);
-            if (ret != 0)
-                break;
-            current_pos += disk_op.drive_fl->blksize;
-        }
-        if (current_pos != ipl_addr) {
-            printf("SeaBIOS: Could not find IPL, ret %d.\n", ret);
+        if (tape_read(boot_drive, target, ipl_addr, ipl_size) != ipl_size) {
+            printf("SeaBIOS: Could not read the IPL from the tape (a record"
+                   " may be at most %d bytes long).\n", TAPE_RECORD_MAX);
             return 0;
         }
-        printf("READ POSITION FOR IPL reached %ld\n", current_pos);
-    } else { /* seek with SEEK command */
-        disk_op.drive_fl = boot_drive;
-        disk_op.command = CMD_SEEK;
-        disk_op.count = 0;
-        disk_op.lba = (ipl_addr / disk_op.drive_fl->blksize);
-        ret = process_op(&disk_op);
-        // printf("DISK_SEEK to IPL returned %d\n", ret);
+        goto ipl_loaded;
     }
+
+    /* seek to beginning of IPL */
+    disk_op.drive_fl = boot_drive;
+    disk_op.command = CMD_SEEK;
+    disk_op.count = 0;
+    disk_op.lba = (ipl_addr / disk_op.drive_fl->blksize);
+    ret = process_op(&disk_op);
+    // printf("DISK_SEEK to IPL returned %d\n", ret);
 
     /* read IPL */
     disk_op.drive_fl = boot_drive;
@@ -3698,6 +3760,7 @@ static int parisc_boot_menu(unsigned long *iplstart, unsigned long *iplend,
         allsize -= len;
     } while (allsize != 0);
 
+ipl_loaded:
     // printf("First word at %p is 0x%x\n", target, target[0]);
     /* verify IPL checksum */
     unsigned int sum = 0, *ps = (unsigned int *)target;
