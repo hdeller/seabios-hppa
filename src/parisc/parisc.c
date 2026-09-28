@@ -428,6 +428,12 @@ struct machine_info {
 
 struct machine_info *current_machine = &machine_B160L;
 
+/* The A400 differs from the other Astro based machines in some details. */
+int is_a400_machine(void)
+{
+    return is_64bit_PDC() && current_machine == &machine_A400;
+}
+
 static hppa_device_t *parisc_devices = machine_B160L.device_list;
 
 static const char *hpa_name(unsigned long hpa)
@@ -2544,6 +2550,9 @@ static void iosapic_table_setup(void)
         bus_id = 0;
         /* Elroy routes the interrupts of a PCI slot to IOSAPIC input 'slot' */
         iosapic_intin = slot & (ELROY_IRQS - 1);
+        /* On the A400 INTB..INTD are rotated to the following inputs. */
+        if (is_a400_machine() && pci->irq)
+            iosapic_intin = (slot + pci->irq - 1) & (ELROY_IRQS - 1);
         *p++ = (irq_devno << 24) | (bus_id << 16) | (0 << 8) | (iosapic_intin << 0);
         *p++ = IOSAPIC_HPA >> 32;
         *p++ = (u32) IOSAPIC_HPA;
