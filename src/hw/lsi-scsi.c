@@ -28,6 +28,7 @@
 #include "util.h" // usleep
 
 #define LSI_REG_DSTAT     0x0c
+#define LSI_REG_SSTAT1    0x0e
 #define LSI_REG_ISTAT0    0x14
 #define LSI_REG_DSP0      0x2c
 #define LSI_REG_DSP1      0x2d
@@ -44,6 +45,13 @@
 #define LSI_ISTAT0_SIGP   0x20
 #define LSI_ISTAT0_SRST   0x40
 #define LSI_ISTAT0_ABRT   0x80
+
+#define LSI_SIST0_MA      0x80  // phase mismatch
+#define LSI_SSTAT1_PHASE  0x07  // latched SCSI phase (MSG, C/D, I/O)
+#define LSI_PHASE_STATUS  0x03
+
+/* index of the "status" instruction in the script below */
+#define LSI_SCRIPT_STATUS 16
 
 struct lsi_lun_s {
     struct drive_s drive;
@@ -130,7 +138,7 @@ lsi_scsi_process_op(struct disk_op_s *op)
         /* dma data, get status, raise irq */
         dma,                        // dma data
         (u32)op->buf_fl,
-        0x03000001,                 // status
+        0x03000001,                 // status (LSI_SCRIPT_STATUS)
         (u32)MAKE_FLATPTR(GET_SEG(SS), &status),
         0x07000001,                 // msgin
         (u32)MAKE_FLATPTR(GET_SEG(SS), &msgin),
@@ -147,10 +155,30 @@ lsi_scsi_process_op(struct disk_op_s *op)
     outb((dsp >> 16) & 0xff, iobase + LSI_REG_DSP2);
     outb((dsp >> 24) & 0xff, iobase + LSI_REG_DSP3);
 
+    int restarted = 0;
     for (;;) {
         u8 dstat = inb(iobase + LSI_REG_DSTAT);
         u8 sist0 = inb(iobase + LSI_REG_SIST0);
         u8 sist1 = inb(iobase + LSI_REG_SIST1);
+        if (sist0 == LSI_SIST0_MA && !sist1 && !restarted &&
+            (inb(iobase + LSI_REG_SSTAT1) & LSI_SSTAT1_PHASE)
+            == LSI_PHASE_STATUS) {
+            /*
+             * The target went to the status phase before all data was
+             * transferred, e.g. a tape record shorter than the buffer,
+             * or a command which ends in CHECK CONDITION.  Continue at
+             * the status instruction, so that the command completes and
+             * the bus is released.  The caller learns the residue from
+             * the sense data, if it needs it.
+             */
+            u32 st = dsp + LSI_SCRIPT_STATUS * sizeof(u32);
+            restarted = 1;
+            outb(st         & 0xff, iobase + LSI_REG_DSP0);
+            outb((st >>  8) & 0xff, iobase + LSI_REG_DSP1);
+            outb((st >> 16) & 0xff, iobase + LSI_REG_DSP2);
+            outb((st >> 24) & 0xff, iobase + LSI_REG_DSP3);
+            continue;
+        }
         if (sist0 || sist1) {
             goto fail;
         }
