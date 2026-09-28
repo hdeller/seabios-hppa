@@ -1639,12 +1639,18 @@ static int pdc_pim(unsigned long *arg)
 
     switch (option) {
         case PDC_PIM_HPMC:
-            break;
+        case PDC_PIM_LPMC:
+            /*
+             * Machine checks are not emulated, so there is never valid
+             * HPMC or LPMC data. Report "invalid PIM contents" as the
+             * architecture requires, instead of a missing option.
+             */
+            result[0] = 0;      /* actcnt */
+            return PDC_NE_MOD;
         case PDC_PIM_RETURN_SIZE:
             *result = default_size;
             // B160 returns only "2". Why?
             return PDC_OK;
-        case PDC_PIM_LPMC:
         case PDC_PIM_SOFT_BOOT:
             break;
         case PDC_PIM_TOC:
