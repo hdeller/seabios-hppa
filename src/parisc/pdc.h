@@ -166,7 +166,7 @@
 #define PDC_PSW_MASK		0	/* Return mask                  */
 #define PDC_PSW_GET_DEFAULTS	1	/* Return defaults              */
 #define PDC_PSW_SET_DEFAULTS	2	/* Set default                  */
-#define PDC_PSW_ENDIAN_BIT	1	/* set for big endian           */
+#define PDC_PSW_ENDIAN_BIT	1	/* set for little endian        */
 #define PDC_PSW_WIDE_BIT	2	/* set for wide mode            */
 
 #define PDC_SYSTEM_MAP	22		/* find system modules		*/
