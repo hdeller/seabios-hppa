@@ -664,6 +664,9 @@ static const char elroy_rope_nr[ELROY_NUM] = {
 int pathnum_to_pcibus(int pathnum) /* e.g. 6 from [10:6] */
 {
     int i;
+    /* on the A400 the second Elroy is on rope 2 */
+    if (is_a400_machine() && pathnum == 2)
+        return 1;
     for (i = 0; i < ELROY_NUM; i++)
         if (elroy_rope_nr[i] == pathnum)
             return i;
