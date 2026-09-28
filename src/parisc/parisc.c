@@ -950,7 +950,9 @@ static void remove_parisc_devices(unsigned int num_cpus)
     /* Fix monarch CPU */
     BUG_ON(!cpu_dev);
     cpu_dev->mod_info->mod_addr = F_EXTEND(CPU_HPA);
-    if (has_astro)
+    if (is_a400_machine())
+        cpu_offset = CPU_HPA - 160 * 0x1000;    /* CPUs at [160], [162] ... */
+    else if (has_astro)
         cpu_offset = CPU_HPA - 32 * 0x1000;
     else if (pci_hpa)
         cpu_offset = pci_hpa;   /* B160L */
