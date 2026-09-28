@@ -243,6 +243,9 @@ static unsigned long mem_table_size; /* = 1, 2 or 3 */
 
 static unsigned int chassis_code = 0;
 
+/* CPU clock in MHz, may be overridden by QEMU via /etc/hppa/cpu-mhz */
+static unsigned int cpu_clock_mhz = CPU_CLOCK_MHZ;
+
 /*
  * Emulate the power switch button flag in head section of firmware.
  * Bit 31 (the lowest bit) is the status of the power switch.
@@ -1996,6 +1999,20 @@ static int pdc_iodc(unsigned long *arg, unsigned long narrow_mode)
     return PDC_BAD_OPTION;
 }
 
+/*
+ * IEEE 754 double precision representation of a positive integer, built
+ * with integer operations, since the 32-bit firmware is not linked with
+ * floating point support.
+ */
+static u64 u32_to_double_bits(u32 v)
+{
+    int e = 31;
+
+    while (!(v & (1U << e)))
+        e--;
+    return ((u64)(1023 + e) << 52) | (((u64)v << (52 - e)) & ((1ULL << 52) - 1));
+}
+
 static int pdc_tod(unsigned long *arg, unsigned long narrow_mode)
 {
     unsigned long option = ARG1;
@@ -2029,10 +2046,8 @@ static int pdc_tod(unsigned long *arg, unsigned long narrow_mode)
              * calib_0 holds the upper and calib_1 the lower 32 bits of it,
              * each in the low order bits of its own return parameter.
              */
-            double calib = (double)CPU_CLOCK_MHZ;
-            u64 bits;
+            u64 bits = u32_to_double_bits(cpu_clock_mhz);
 
-            memcpy(&bits, &calib, sizeof(bits));
             result[0] = (u32)(bits >> 32);      /* calib_0 */
             result[1] = (u32)bits;              /* calib_1 */
             /* unsigned 64-bit integers representing  clock accuracy in parts per billion: */
@@ -4065,6 +4080,18 @@ void __VISIBLE start_parisc_firmware(void)
     }
     BUG_ON(memsplit_addr < ram_size_low);
 
+    /*
+     * CPU clock rate in MHz. Older QEMU versions do not provide it.
+     * Limit it to 4000 MHz, so that the rate in Hz fits into 32 bits.
+     */
+    u64 mhz = romfile_loadint("/etc/hppa/cpu-mhz", CPU_CLOCK_MHZ);
+    if (mhz >= 1 && mhz <= 4000)
+        cpu_clock_mhz = mhz;
+    else
+        printf("SeaBIOS: Invalid CPU clock %lu MHz ignored.\n",
+                (unsigned long)mhz);
+    dprintf(0, "fw_cfg: CPU clock %d MHz\n", cpu_clock_mhz);
+
     tlb_entries = romfile_loadint("/etc/cpu/tlb_entries", 256);
     dprintf(0, "fw_cfg: TLB entries %d\n", tlb_entries);
 
@@ -4132,7 +4159,7 @@ void __VISIBLE start_parisc_firmware(void)
         pat_info_block.cpu_info = ((1 << (smp_cpus & 0xf)) - 1) |
                 (((unsigned long)smp_cpus) << 48) |
                 (current_machine->pdc_model.hversion << 32);
-        pat_info_block.cpu_speed = CPU_CLOCK_MHZ*(1000000ULL/100);
+        pat_info_block.cpu_speed = cpu_clock_mhz*(1000000ULL/100);
         pat_info_block.cell_mem_size = ram_size;
         // TODO: insert memory DIMM module info.
 #endif
@@ -4144,7 +4171,7 @@ void __VISIBLE start_parisc_firmware(void)
     PAGE0->mem_free = 0x6000; // min PAGE_SIZE
     PAGE0->mem_hpa = CPU_HPA; // HPA of boot-CPU
     PAGE0->mem_pdc = MEM_PDC_ENTRY;
-    PAGE0->mem_10msec = CPU_CLOCK_MHZ*(1000000ULL/100);
+    PAGE0->mem_10msec = cpu_clock_mhz*(1000000ULL/100);
 
     BUG_ON(PAGE0->mem_free <= MEM_PDC_ENTRY);
     BUG_ON(smp_cpus < 1 || smp_cpus > HPPA_MAX_CPUS);
@@ -4269,9 +4296,9 @@ void __VISIBLE start_parisc_firmware(void)
     printf( "  Processor   Speed            State           Coprocessor State  Cache Size\n"
             "  ---------  --------   ---------------------  -----------------  ----------\n");
     for (i = 0; i < smp_cpus; i++)
-        printf("     %s%d      " __stringify(CPU_CLOCK_MHZ)
+        printf("     %s%d      %d"
                 " MHz    %s                 Functional            0 KB\n",
-                i < 10 ? " ":"", i, i?"Idle  ":"Active");
+                i < 10 ? " ":"", i, cpu_clock_mhz, i?"Idle  ":"Active");
     printf("\n\n");
     printf("  Emulated machine:     HP %s (%d-bit %s), %d-bit %sPDC%s%s\n"
             "  Available memory:     %lu MB\n"
