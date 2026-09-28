@@ -3595,7 +3595,7 @@ static int parisc_boot_menu(unsigned long *iplstart, unsigned long *iplend,
 
     // printf("First word at %p is 0x%x\n", target, target[0]);
     /* verify IPL checksum */
-    unsigned int sum = 0, *ps = (unsigned int *)ipl_addr;
+    unsigned int sum = 0, *ps = (unsigned int *)target;
     for (i = 0; i < ipl_size / sizeof(int); i++, ++ps)
         sum += *ps;
     if (sum != 0) {
