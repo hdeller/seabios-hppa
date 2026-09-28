@@ -3247,6 +3247,18 @@ static int pdc_pat_mem(unsigned long *arg)
             ARG1 = PDC_MEM_TABLE;
             ARG4 = 2;
             return pdc_mem(arg);
+        case PDC_PAT_MEM_CELL_INFO:
+        {
+            /* emulated memory has no errors, so the PDT is empty */
+            struct pdc_pat_mem_cell_pdt_retinfo *pdt = (void *)ARG2;
+            memset(pdt, 0, sizeof(*pdt));
+            pdt->good_mem = GoldenMemory;
+            pdt->first_dbe_loc = (unsigned long)-1ULL;
+            return PDC_OK;
+        }
+        case PDC_PAT_MEM_SETGM:
+            /* optional, all emulated memory is good */
+            return PDC_OK;
         default:
             break;
     }
