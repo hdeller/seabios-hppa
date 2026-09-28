@@ -1708,6 +1708,16 @@ static int pdc_check_raddr(unsigned long raddr, unsigned long narrow_mode)
     return (raddr & (narrow_mode ? 3 : 7)) ? PDC_INVALID_ARG : PDC_OK;
 }
 
+/*
+ * Clear the return buffer (32 doublewords for wide callers), so that
+ * return values which are not set by the procedure read as zero.
+ */
+static void pdc_clear_result(unsigned long *result, unsigned long narrow_mode)
+{
+    if (!narrow_mode)
+        memset(result, 0, 32 * sizeof(*result));
+}
+
 static int pdc_pim(unsigned long *arg)
 {
     unsigned long option = ARG1;
@@ -2747,7 +2757,7 @@ static pdc_pat_cell_info_rtn_block_t pat_info_block = {
 #endif
 };
 
-static int pdc_pat_cell(unsigned long *arg)
+static int pdc_pat_cell(unsigned long *arg, unsigned long narrow_mode)
 {
     unsigned long option = ARG1;
     struct pdc_pat_cell_num *cell_info = (void *)ARG2;
@@ -2759,6 +2769,9 @@ static int pdc_pat_cell(unsigned long *arg)
 
     switch (option) {
         case PDC_PAT_CELL_GET_NUMBER:
+            if (pdc_check_raddr(ARG2, narrow_mode) != PDC_OK)
+                return PDC_INVALID_ARG;
+            pdc_clear_result(result, narrow_mode);
             cell_info->cell_num = DEFAULT_CELL_NUM;
             cell_info->cell_loc = DEFAULT_CELL_LOC;
             return PDC_OK;
@@ -2780,6 +2793,9 @@ static int pdc_pat_cell(unsigned long *arg)
             result[0] = count;
             return PDC_OK;
         case PDC_PAT_CELL_MODULE:
+            if (pdc_check_raddr(ARG2, narrow_mode) != PDC_OK)
+                return PDC_INVALID_ARG;
+            pdc_clear_result(result, narrow_mode);
             if (ARG3 != DEFAULT_CELL_LOC)
                 return PDC_INVALID_ARG;
             hpa_index = ARG4;
@@ -2982,11 +2998,12 @@ static int pdc_pat_complex(unsigned long *arg)
     return PDC_BAD_OPTION;
 }
 
-static int pdc_pat_cpu(unsigned long *arg)
+static int pdc_pat_cpu(unsigned long *arg, unsigned long narrow_mode)
 {
     unsigned long option = ARG1;
     unsigned long *result = (unsigned long *)ARG2;
     unsigned long hpa, i;
+    int cpu;
 
     switch (option) {
         case PDC_PAT_CPU_INFO:
@@ -2998,7 +3015,13 @@ static int pdc_pat_cpu(unsigned long *arg)
                 hpa = mfctl(CPU_HPA_CR_REG); /* get CPU HPA from cr7 */
             else
                 hpa = COMPAT_VAL(ARG3);
-            result[0] = index_of_CPU_HPA(hpa);
+            if (pdc_check_raddr(ARG2, narrow_mode) != PDC_OK)
+                return PDC_INVALID_ARG;
+            cpu = index_of_CPU_HPA(hpa);
+            if (cpu < 0)        /* not the HPA of a CPU */
+                return PDC_INVALID_ARG;
+            pdc_clear_result(result, narrow_mode);
+            result[0] = cpu;
             result[1] = DEFAULT_CPU_LOC;    /* location */
             result[2] = smp_cpus;       /* num siblings */
             for (i = 0; i < smp_cpus; i++)
@@ -3027,13 +3050,16 @@ static int pdc_pat_cpu(unsigned long *arg)
     return PDC_BAD_OPTION;
 }
 
-static int pdc_pat_event(unsigned long *arg)
+static int pdc_pat_event(unsigned long *arg, unsigned long narrow_mode)
 {
     unsigned long option = ARG1;
     unsigned long *result = (unsigned long *)ARG2;
 
     switch (option) {
         case PDC_PAT_EVENT_GET_CAPS:
+            if (pdc_check_raddr(ARG2, narrow_mode) != PDC_OK)
+                return PDC_INVALID_ARG;
+            pdc_clear_result(result, narrow_mode);
             result[0] = result[1] = 0;  /* XXX: review caps! (0x0f) */
             return PDC_OK;
         case PDC_PAT_EVENT_SET_MODE:
@@ -3042,6 +3068,9 @@ static int pdc_pat_event(unsigned long *arg)
             printf("PDC_PAT_EVENT_SET_MODE: events 0x%lx, vector 0x%lx, dest_lid 0x%lx\n", ARG3, ARG4, ARG5);
             return PDC_INVALID_ARG;
         case PDC_PAT_EVENT_SCAN:
+            if (pdc_check_raddr(ARG2, narrow_mode) != PDC_OK)
+                return PDC_INVALID_ARG;
+            pdc_clear_result(result, narrow_mode);
             result[0] = result[1] = 0;  /* XXX review */
             if (ARG3 == 0)
                 return PDC_OK;
@@ -3054,7 +3083,7 @@ static int pdc_pat_event(unsigned long *arg)
     return PDC_BAD_OPTION;
 }
 
-static int pdc_pat_pd(unsigned long *arg)
+static int pdc_pat_pd(unsigned long *arg, unsigned long narrow_mode)
 {
     unsigned long option = ARG1;
     unsigned long *result = (unsigned long *)ARG2;
@@ -3073,6 +3102,10 @@ static int pdc_pat_pd(unsigned long *arg)
 
     switch (option) {
         case PDC_PAT_PD_GET_ADDR_MAP:
+            if (pdc_check_raddr(ARG2, narrow_mode) != PDC_OK ||
+                (ARG3 & 7))     /* the address map is doubleword aligned */
+                return PDC_INVALID_ARG;
+            pdc_clear_result(result, narrow_mode);
             if (count > table_size)
                 count = table_size;
             if (offset > count)
@@ -3344,7 +3377,7 @@ int __VISIBLE parisc_pdc_entry(unsigned long *arg, unsigned long narrow_mode)
         case PDC_PAT_CELL:
             if (pat_disabled())
                 return PDC_BAD_PROC;
-            return pdc_pat_cell(arg);
+            return pdc_pat_cell(arg, narrow_mode);
 
         case PDC_PAT_CHASSIS_LOG:
             if (pat_disabled())
@@ -3359,12 +3392,12 @@ int __VISIBLE parisc_pdc_entry(unsigned long *arg, unsigned long narrow_mode)
         case PDC_PAT_CPU:
             if (pat_disabled())
                 return PDC_BAD_PROC;
-            return pdc_pat_cpu(arg);
+            return pdc_pat_cpu(arg, narrow_mode);
 
         case PDC_PAT_EVENT:
             if (pat_disabled())
                 return PDC_BAD_PROC;
-            return pdc_pat_event(arg);
+            return pdc_pat_event(arg, narrow_mode);
 
         case PDC_PAT_NVOLATILE:
             // Unimplemented PDC proc UNKNOWN!(73) option 3 result=0 ARG3=0 ARG4=0 ARG5=0 ARG6=0 ARG7=dfb078
@@ -3375,7 +3408,7 @@ int __VISIBLE parisc_pdc_entry(unsigned long *arg, unsigned long narrow_mode)
         case PDC_PAT_PD:
             if (pat_disabled())
                 return PDC_BAD_PROC;
-            return pdc_pat_pd(arg);
+            return pdc_pat_pd(arg, narrow_mode);
 
         case PDC_PAT_IO:
             if (pat_disabled())
