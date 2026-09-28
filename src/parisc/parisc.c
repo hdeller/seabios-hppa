@@ -2134,6 +2134,15 @@ static int pdc_add_valid(unsigned long *arg)
     // if (arg2 < PAGE_SIZE) return PDC_ERROR;
     if (arg2 < ram_size_low)
         return PDC_OK;
+#ifdef __LP64__
+    /* RAM which is mapped above the low memory region */
+    if (ram_size_mid && arg2 >= RAM_MAP_HIGH2 &&
+        arg2 < RAM_MAP_HIGH2 + ram_size_mid)
+        return PDC_OK;
+    if (ram_size_high && arg2 >= RAM_MAP_HIGH1 &&
+        arg2 < RAM_MAP_HIGH1 + ram_size_high)
+        return PDC_OK;
+#endif
     if (arg2 >= (unsigned long)_sti_rom_start &&
         arg2 <= (unsigned long)_sti_rom_end)
         return PDC_OK;
