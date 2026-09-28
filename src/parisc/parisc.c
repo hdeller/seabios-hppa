@@ -4235,7 +4235,7 @@ void __VISIBLE start_parisc_firmware(void)
     memcpy(&stable_storage[0x80], &stable_storage[0], 0x20);
     if (parisc_boot_cdrom) {
         stable_storage[0x80 + 11] = parisc_boot_cdrom->target;
-        stable_storage[0x80 + 12] = parisc_boot_cdrom->lun;
+        stable_storage[0x80 + 15] = parisc_boot_cdrom->lun;
     }
     // currently booted path == CD in PAGE0->mem_boot
     if (boot_drive) {
