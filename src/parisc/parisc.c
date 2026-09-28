@@ -1244,8 +1244,10 @@ int __VISIBLE parisc_iodc_ENTRY_IO(unsigned int *arg)
 
     dev = find_hpa_device(hpa);
     if (!dev) {
-
-        BUG_ON(1);
+        /* e.g. a stale HPA from an OS probe: fail the call, do not halt */
+        if (pdc_debug & DEBUG_IODC)
+            printf("SeaBIOS: ENTRY_IO unknown HPA 0x%lx option=%lu\n",
+                    hpa, option);
         return PDC_INVALID_ARG;
     }
 
@@ -2609,7 +2611,7 @@ static int pdc_pat_cell(unsigned long *arg)
             if (!dev)
                 return PDC_NE_MOD; // Module not found
 
-            if (0) {
+            if (pdc_debug & DEBUG_PDC) {
                 printf("PDC_FIND_MODULE dev=%p hpa=%lx %s ", dev, dev ? dev->hpa:0UL, hpa_name(dev->hpa));
                 print_hwpath(&dev->mod_path->path, 0);
                 if (dev->pci)
@@ -2772,7 +2774,8 @@ static int pdc_pat_chassis_log(unsigned long *arg)
             }
             return PDC_OK;
         case PDC_PAT_CHASSIS_READ_LOG:
-            printf("SeaBIOS: CHASSIS READ LOG NOT IMPLEMENTED\n");
+            if (pdc_debug & DEBUG_CHASSIS)
+                printf("SeaBIOS: CHASSIS READ LOG NOT IMPLEMENTED\n");
             return PDC_BAD_OPTION;
             // return PDC_OK;
         default:
