@@ -4222,21 +4222,21 @@ void __VISIBLE start_parisc_firmware(void)
     parisc_devices = current_machine->device_list;
     strtcpy(qemu_machine, str, sizeof(qemu_machine));
 
+    /* Memory split into various regions on PA2.0 machines */
+    memsplit_addr = romfile_loadint("/etc/hppa/memsplit-addr", 0);
+
     ram_size_low = ram_size;
     /* on C3700 and other machines, the memtable stops at 3.75 GB */
     if (ram_size_low >= FIRMWARE_START)
         ram_size_low = FIRMWARE_START;
-    /* The A400 and other PAT only machines split low memory at 1GB. */
+    /* PAT only machines split low memory where QEMU does, default 1GB. */
     if (pat_only())
-        ram_size_low = MIN(1 * GiB, ram_size_low);
+        ram_size_low = MIN(memsplit_addr ? memsplit_addr : 1 * GiB, ram_size_low);
     /* split all memory into low (0-3.75 GB), mid (0.25 - 3 GB) and high (all other) */
     ram_size_high = ram_size - ram_size_low;
     ram_size_mid  = MIN(ram_size_high, 4 * GiB - ram_size_low);
     ram_size_high -= ram_size_mid;
     mem_table_size = (ram_size_high ? 3 : ram_size_mid ? 2 : 1);
-
-    /* Memory split into various regions on PA2.0 machines */
-    memsplit_addr = romfile_loadint("/etc/hppa/memsplit-addr", 0);
     if (memsplit_addr == 0 && ram_size_high != 0) {
         printf("\nSeaBIOS firmware and this QEMU version are incompatible.\n"
                "Reduce guest memory to < 1GB or update.\n");
