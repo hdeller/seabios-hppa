@@ -48,6 +48,9 @@ unsigned long elroy_offset(u16 bdf)
     int bus = pci_bdf_to_bus(bdf);
     if (bus >= ELROY_MAX_BUSSES)
         return -1UL;
+    /* on the A400 the second Elroy is on rope 2 */
+    if (bus == 1 && is_a400_machine())
+        return ELROY4_HPA - ELROY0_HPA;
     return elroy_hpa_offsets[bus] - elroy_hpa_offsets[0];
 }
 

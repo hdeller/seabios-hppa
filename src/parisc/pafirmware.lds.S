@@ -90,6 +90,15 @@ SECTIONS
 
 	_firmware_end = .;
 
+	/* The firmware must fit into the FIRMWARE_START..FIRMWARE_END window. */
+#if BITS == 64
+	ASSERT(_firmware_end <= (((FIRMWARE_HIGH & 0x301ffff0) << 32) + FIRMWARE_END),
+	       "firmware image exceeds FIRMWARE_END")
+#else
+	ASSERT(_firmware_end <= FIRMWARE_END,
+	       "firmware image exceeds FIRMWARE_END")
+#endif
+
 	/* STABS_DEBUG */
 	.note 0 : { *(.note) }
 

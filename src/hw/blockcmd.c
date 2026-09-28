@@ -99,7 +99,7 @@ cdb_mode_sense_geom(struct disk_op_s *op, struct cdbres_mode_sense_geom *data)
     return process_op(op);
 }
 
-static int
+int
 cdb_rewind_tape(struct disk_op_s *op)
 {
     struct cdb_request_sense cmd;
@@ -111,6 +111,59 @@ cdb_rewind_tape(struct disk_op_s *op)
     op->cdbcmd = &cmd;
     op->blocksize = 0;
     return process_op(op);
+}
+
+// Read the next record of a sequential-access device into buf, which
+// holds maxlen bytes.  READ(6) with the FIXED bit clear transfers one
+// variable-length record, whatever block length the drive is set to,
+// and the drive's mode parameters are not changed.  With SILI clear, a
+// record of another length ends in CHECK CONDITION with ILI set and the
+// INFORMATION field holding the requested minus the actual length
+// (SCSI-2, 10.2.4), which gives the length of a short record.
+// maxlen must be a multiple of 512.
+// Returns 0 and the record length in *len, or -1 at a filemark, at the
+// end of the recorded data, on an error, or if the record is longer
+// than maxlen.
+int
+cdb_read_tape_record(struct disk_op_s *op, void *buf, u32 maxlen, u32 *len)
+{
+    struct cdb_rwdata_6 cmd;
+    memset(&cmd, 0, sizeof(cmd));
+    cmd.command = CDB_CMD_READ_6;
+    cmd.length[0] = maxlen >> 16;
+    cmd.length[1] = maxlen >> 8;
+    cmd.length[2] = maxlen;
+    op->command = CMD_SCSI;
+    // the transfer size is count * blocksize, and blocksize is 16 bits
+    op->count = maxlen / 512;
+    op->blocksize = 512;
+    op->buf_fl = buf;
+    op->cdbcmd = &cmd;
+    *len = 0;
+    if (!process_op(op)) {
+        *len = maxlen;
+        return 0;
+    }
+
+    struct cdbres_request_sense sense;
+    if (cdb_get_sense(op, &sense))
+        return -1;
+    u8 key = sense.flags & 0x0f;
+    if ((sense.errcode & 0x7e) != 0x70 || !(sense.errcode & 0x80)
+        || (sense.flags & (SENSE_FILEMARK | SENSE_EOM))
+        || !(sense.flags & SENSE_ILI)
+        || (key != SENSE_KEY_NO_SENSE && key != SENSE_KEY_RECOVERED)) {
+        dprintf(1, "tape read: sense %02x/%02x/%02x flags 0x%02x\n",
+                key, sense.asc, sense.ascq, sense.flags);
+        return -1;
+    }
+    s32 residue = be32_to_cpu(sense.info);
+    if (residue <= 0 || residue >= maxlen) {
+        dprintf(1, "tape read: record longer than %u bytes\n", maxlen);
+        return -1;
+    }
+    *len = maxlen - residue;
+    return 0;
 }
 
 

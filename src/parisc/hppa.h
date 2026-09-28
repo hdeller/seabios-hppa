@@ -3,8 +3,8 @@
 /* this file is included by x86.h */
 
 /* version number of this SeaBIOS firmware */
-#define SEABIOS_HPPA_VERSION 25
-#define SEABIOS_HPPA_VERSION_STR  "25"
+#define SEABIOS_HPPA_VERSION 26
+#define SEABIOS_HPPA_VERSION_STR  "26"
 
 #ifdef __LP64__
 #define CONFIG_64BIT
@@ -443,6 +443,8 @@ static inline void wrmsr(u32 index, u64 val)
 // x86.c
 void cpuid(u32 index, u32 *eax, u32 *ebx, u32 *ecx, u32 *edx);
 
+// parisc.c
+int is_a400_machine(void);
 // pci.c
 unsigned long elroy_offset(u16 bdf);
 void *elroy_port(unsigned long port, unsigned long offs);

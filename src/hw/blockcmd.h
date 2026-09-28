@@ -58,6 +58,24 @@ struct cdbres_request_sense {
     u32 reserved_0e;
 } PACKED;
 
+// cdbres_request_sense.flags
+#define SENSE_FILEMARK          0x80
+#define SENSE_EOM               0x40
+#define SENSE_ILI               0x20
+#define SENSE_KEY_NO_SENSE      0x00
+#define SENSE_KEY_RECOVERED     0x01
+
+// 6-byte READ, as used for sequential-access (tape) devices
+#define CDB_CMD_READ_6          0x08
+
+struct cdb_rwdata_6 {
+    u8 command;
+    u8 flags;
+    u8 length[3];               // transfer length, MSB first
+    u8 control;
+    u8 pad[10];
+} PACKED;
+
 #define SCSI_TYPE_DISK  0x00
 #define SCSI_TYPE_TAPE  0x01
 #define SCSI_TYPE_CDROM 0x05
@@ -106,6 +124,9 @@ struct disk_op_s;
 int scsi_fill_cmd(struct disk_op_s *op, void *cdbcmd, int maxcdb);
 int scsi_is_read(struct disk_op_s *op);
 int scsi_is_ready(struct disk_op_s *op);
+int cdb_rewind_tape(struct disk_op_s *op);
+int cdb_read_tape_record(struct disk_op_s *op, void *buf, u32 maxlen,
+                         u32 *len);
 struct drive_s;
 int scsi_drive_setup(struct drive_s *drive, const char *s, int prio, u8 target, u8 lun);
 typedef int (*scsi_add_lun)(u32 lun, struct drive_s *tmpl_drv);

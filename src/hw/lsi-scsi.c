@@ -19,6 +19,7 @@
 #include "malloc.h" // free
 #include "output.h" // dprintf
 #include "pcidevice.h" // foreachpci
+#include "pci.h" // pci_config_readl
 #include "pci_ids.h" // PCI_DEVICE_ID_VIRTIO_BLK
 #include "pci_regs.h" // PCI_VENDOR_ID
 #include "stacks.h" // run_thread
@@ -27,6 +28,7 @@
 #include "util.h" // usleep
 
 #define LSI_REG_DSTAT     0x0c
+#define LSI_REG_SSTAT1    0x0e
 #define LSI_REG_ISTAT0    0x14
 #define LSI_REG_DSP0      0x2c
 #define LSI_REG_DSP1      0x2d
@@ -44,6 +46,13 @@
 #define LSI_ISTAT0_SRST   0x40
 #define LSI_ISTAT0_ABRT   0x80
 
+#define LSI_SIST0_MA      0x80  // phase mismatch
+#define LSI_SSTAT1_PHASE  0x07  // latched SCSI phase (MSG, C/D, I/O)
+#define LSI_PHASE_STATUS  0x03
+
+/* index of the "status" instruction in the script below */
+#define LSI_SCRIPT_STATUS 16
+
 struct lsi_lun_s {
     struct drive_s drive;
     struct pci_device *pci;
@@ -51,6 +60,36 @@ struct lsi_lun_s {
     u8 target;
     u8 lun;
 };
+
+/*
+ * The OS may re-size and re-assign the PCI BARs of the controller, or
+ * temporarily switch off I/O decoding, and afterwards call the firmware
+ * for boot I/O again (e.g. offline diagnostics via IODC ENTRY_IO).  Do
+ * not trust the cached I/O base: re-read BAR0 and make sure that I/O
+ * space and bus mastering are enabled before touching the chip.
+ */
+static u32
+lsi_scsi_revalidate_iobase(struct lsi_lun_s *llun_gf, u32 iobase)
+{
+    u16 bdf = GET_GLOBALFLAT(llun_gf->drive.cntl_id);
+    u32 bar = pci_config_readl(bdf, PCI_BASE_ADDRESS_0);
+
+    if (!(bar & PCI_BASE_ADDRESS_SPACE_IO))
+        return iobase;
+    bar &= PCI_BASE_ADDRESS_IO_MASK;
+    if (!bar || bar > 0xffff)
+        return iobase;
+
+    u16 cmd = pci_config_readw(bdf, PCI_COMMAND);
+    u16 want = PCI_COMMAND_IO | PCI_COMMAND_MASTER;
+    if ((cmd & want) != want) {
+        dprintf(3, "lsi: PCI command 0x%x, re-enabling I/O and master\n", cmd);
+        pci_config_maskw(bdf, PCI_COMMAND, 0, want);
+    }
+    if (bar != iobase)
+        dprintf(3, "lsi: I/O BAR moved from 0x%x to 0x%x\n", iobase, bar);
+    return bar;
+}
 
 int
 lsi_scsi_process_op(struct disk_op_s *op)
@@ -66,6 +105,7 @@ lsi_scsi_process_op(struct disk_op_s *op)
     if (blocksize < 0)
         return default_process_op(op);
     u32 iobase = GET_GLOBALFLAT(llun_gf->iobase);
+    iobase = lsi_scsi_revalidate_iobase(llun_gf, iobase);
     u32 dma = ((scsi_is_read(op) ? 0x01000000 : 0x00000000) |
                (op->count * blocksize));
     u8 msgout[] = {
@@ -98,7 +138,7 @@ lsi_scsi_process_op(struct disk_op_s *op)
         /* dma data, get status, raise irq */
         dma,                        // dma data
         (u32)op->buf_fl,
-        0x03000001,                 // status
+        0x03000001,                 // status (LSI_SCRIPT_STATUS)
         (u32)MAKE_FLATPTR(GET_SEG(SS), &status),
         0x07000001,                 // msgin
         (u32)MAKE_FLATPTR(GET_SEG(SS), &msgin),
@@ -115,10 +155,30 @@ lsi_scsi_process_op(struct disk_op_s *op)
     outb((dsp >> 16) & 0xff, iobase + LSI_REG_DSP2);
     outb((dsp >> 24) & 0xff, iobase + LSI_REG_DSP3);
 
+    int restarted = 0;
     for (;;) {
         u8 dstat = inb(iobase + LSI_REG_DSTAT);
         u8 sist0 = inb(iobase + LSI_REG_SIST0);
         u8 sist1 = inb(iobase + LSI_REG_SIST1);
+        if (sist0 == LSI_SIST0_MA && !sist1 && !restarted &&
+            (inb(iobase + LSI_REG_SSTAT1) & LSI_SSTAT1_PHASE)
+            == LSI_PHASE_STATUS) {
+            /*
+             * The target went to the status phase before all data was
+             * transferred, e.g. a tape record shorter than the buffer,
+             * or a command which ends in CHECK CONDITION.  Continue at
+             * the status instruction, so that the command completes and
+             * the bus is released.  The caller learns the residue from
+             * the sense data, if it needs it.
+             */
+            u32 st = dsp + LSI_SCRIPT_STATUS * sizeof(u32);
+            restarted = 1;
+            outb(st         & 0xff, iobase + LSI_REG_DSP0);
+            outb((st >>  8) & 0xff, iobase + LSI_REG_DSP1);
+            outb((st >> 16) & 0xff, iobase + LSI_REG_DSP2);
+            outb((st >> 24) & 0xff, iobase + LSI_REG_DSP3);
+            continue;
+        }
         if (sist0 || sist1) {
             goto fail;
         }
@@ -209,6 +269,20 @@ init_lsi_scsi(void *data)
         lsi_scsi_scan_target(pci, iobase, i);
 }
 
+static int
+lsi_scsi_pci_match(struct pci_device *pci)
+{
+    if (pci->vendor != PCI_VENDOR_ID_LSI_LOGIC)
+        return 0;
+    switch (pci->device) {
+    case PCI_DEVICE_ID_LSI_53C895A:
+    case PCI_DEVICE_ID_NCR_53C810:
+        return 1;
+    default:
+        return 0;
+    }
+}
+
 void
 lsi_scsi_setup(void)
 {
@@ -216,12 +290,11 @@ lsi_scsi_setup(void)
     if (!CONFIG_LSI_SCSI || !runningOnQEMU())
         return;
 
-    dprintf(3, "init lsi53c895a\n");
+    dprintf(3, "init lsi53c8xx\n");
 
     struct pci_device *pci;
     foreachpci(pci) {
-        if (pci->vendor != PCI_VENDOR_ID_LSI_LOGIC
-            || pci->device != PCI_DEVICE_ID_LSI_53C895A)
+        if (!lsi_scsi_pci_match(pci))
             continue;
         run_thread(init_lsi_scsi, pci);
     }
