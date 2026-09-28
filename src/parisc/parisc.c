@@ -1471,7 +1471,9 @@ int __VISIBLE parisc_iodc_ENTRY_INIT(unsigned int *arg)
     unsigned long hpa = COMPAT_VAL(ARG0);
     unsigned long option = ARG1;
     unsigned long *result = (unsigned long *)ARG4;
+    unsigned int id_layers[ARRAY_SIZE(mod_path_emulated_drives.layers)];
     hppa_device_t *dev;
+    unsigned int cl;
 
     iodc_log_call(arg, __FUNCTION__);
 
@@ -1482,14 +1484,23 @@ int __VISIBLE parisc_iodc_ENTRY_INIT(unsigned int *arg)
         return PDC_INVALID_ARG;
     // dprintf(1, "HPA2 %lx  DEV %p\n", hpa, dev);
 
+    /* storage: report the class of the drive we booted from, e.g. tape */
+    cl = DEV_is_serial_device(dev) ? CL_DUPLEX : CL_RANDOM;
+    if (DEV_is_storage_device(dev) && boot_drive && boot_drive->sequential)
+        cl = CL_SEQU;
+
     switch (option) {
         case ENTRY_INIT_SRCH_FRST: /* 2: Search first */
             if (DEV_is_network_device(dev))
                 return PDC_NE_BOOTDEV; /* No further boot devices */
-            memcpy((void *)ARG3, &mod_path_emulated_drives.layers,
-                sizeof(mod_path_emulated_drives.layers)); /* fill ID_addr */
+            memcpy(id_layers, &mod_path_emulated_drives.layers, sizeof(id_layers));
+            if (boot_drive && boot_drive->sequential) {
+                id_layers[0] = boot_drive->target;
+                id_layers[1] = boot_drive->lun;
+            }
+            memcpy((void *)ARG3, id_layers, sizeof(id_layers)); /* fill ID_addr */
             result[0] = 0;
-            result[1] = DEV_is_serial_device(dev) ? CL_DUPLEX : CL_RANDOM;
+            result[1] = cl;
             result[2] = result[3] = 0; /* No network card, so no MAC. */
             return PDC_OK;
 	case ENTRY_INIT_SRCH_NEXT: /* 3: Search next */
@@ -1497,7 +1508,7 @@ int __VISIBLE parisc_iodc_ENTRY_INIT(unsigned int *arg)
         case ENTRY_INIT_MOD_DEV: /* 4: Init & test mod & dev */
         case ENTRY_INIT_DEV:     /* 5: Init & test dev */
             result[0] = 0; /* module IO_STATUS */
-            result[1] = DEV_is_serial_device(dev) ? CL_DUPLEX: CL_RANDOM;
+            result[1] = cl;
             if (DEV_is_network_device(dev))
                 result[2] = result[3] = 0x11221133; /* TODO?: MAC of network card. */
             else
@@ -4443,6 +4454,7 @@ void __VISIBLE start_parisc_firmware(void)
     if (parisc_boot_menu(&iplstart, &iplend, bootdrive)) {
         PAGE0->mem_boot.dp.layers[0] = boot_drive->target;
         PAGE0->mem_boot.dp.layers[1] = boot_drive->lun;
+        PAGE0->mem_boot.cl_class = boot_drive->sequential ? CL_SEQU : CL_RANDOM;
 
         printf("\nBooting...\n"
                 "Boot IO Dependent Code (IODC) revision " SEABIOS_HPPA_VERSION_STR "\n\n"
