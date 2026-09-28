@@ -19,6 +19,7 @@
 #include "malloc.h" // free
 #include "output.h" // dprintf
 #include "pcidevice.h" // foreachpci
+#include "pci.h" // pci_config_readl
 #include "pci_ids.h" // PCI_DEVICE_ID_VIRTIO_BLK
 #include "pci_regs.h" // PCI_VENDOR_ID
 #include "stacks.h" // run_thread
@@ -52,6 +53,36 @@ struct lsi_lun_s {
     u8 lun;
 };
 
+/*
+ * The OS may re-size and re-assign the PCI BARs of the controller, or
+ * temporarily switch off I/O decoding, and afterwards call the firmware
+ * for boot I/O again (e.g. offline diagnostics via IODC ENTRY_IO).  Do
+ * not trust the cached I/O base: re-read BAR0 and make sure that I/O
+ * space and bus mastering are enabled before touching the chip.
+ */
+static u32
+lsi_scsi_revalidate_iobase(struct lsi_lun_s *llun_gf, u32 iobase)
+{
+    u16 bdf = GET_GLOBALFLAT(llun_gf->drive.cntl_id);
+    u32 bar = pci_config_readl(bdf, PCI_BASE_ADDRESS_0);
+
+    if (!(bar & PCI_BASE_ADDRESS_SPACE_IO))
+        return iobase;
+    bar &= PCI_BASE_ADDRESS_IO_MASK;
+    if (!bar || bar > 0xffff)
+        return iobase;
+
+    u16 cmd = pci_config_readw(bdf, PCI_COMMAND);
+    u16 want = PCI_COMMAND_IO | PCI_COMMAND_MASTER;
+    if ((cmd & want) != want) {
+        dprintf(3, "lsi: PCI command 0x%x, re-enabling I/O and master\n", cmd);
+        pci_config_maskw(bdf, PCI_COMMAND, 0, want);
+    }
+    if (bar != iobase)
+        dprintf(3, "lsi: I/O BAR moved from 0x%x to 0x%x\n", iobase, bar);
+    return bar;
+}
+
 int
 lsi_scsi_process_op(struct disk_op_s *op)
 {
@@ -66,6 +97,7 @@ lsi_scsi_process_op(struct disk_op_s *op)
     if (blocksize < 0)
         return default_process_op(op);
     u32 iobase = GET_GLOBALFLAT(llun_gf->iobase);
+    iobase = lsi_scsi_revalidate_iobase(llun_gf, iobase);
     u32 dma = ((scsi_is_read(op) ? 0x01000000 : 0x00000000) |
                (op->count * blocksize));
     u8 msgout[] = {
