@@ -3357,6 +3357,9 @@ int __VISIBLE parisc_pdc_entry(unsigned long *arg, unsigned long narrow_mode)
             return pdc_psw(arg);
 
         case PDC_SYSTEM_MAP:
+            /* obsolete on PAT platforms, use PDC_PAT_CELL instead */
+            if (pat_only())
+                return PDC_BAD_PROC;
             return pdc_system_map(arg);
 
         case PDC_SOFT_POWER:
