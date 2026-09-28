@@ -3144,6 +3144,20 @@ static int pdc_pat_pd(unsigned long *arg, unsigned long narrow_mode)
     return PDC_BAD_OPTION;
 }
 
+/* 32-bit PCI config read at a not 32-bit aligned offset, byte by byte */
+static u32 pci_config_readl_unaligned(u16 bdf, unsigned int offs)
+{
+    u32 val = 0;
+    unsigned int i;
+
+    for (i = 0; i < 4; i++) {
+        unsigned int a = offs + i;
+        u8 b = (a > 0xff) ? 0xff : pci_config_readb(bdf, a);
+        val |= ((u32)b) << (8 * i);
+    }
+    return val;
+}
+
 static int pdc_pat_io(unsigned long *arg)
 {
     unsigned long option = ARG1;
@@ -3171,7 +3185,10 @@ static int pdc_pat_io(unsigned long *arg)
             switch (ARG4) {
               case 1:   result[0] = pci_config_readb(bdf, offs);   break;
               case 2:   result[0] = pci_config_readw(bdf, offs);   break;
-              case 4:   result[0] = pci_config_readl(bdf, offs);   break;
+              case 4:   result[0] = (offs & 3) ?
+                                pci_config_readl_unaligned(bdf, offs) :
+                                pci_config_readl(bdf, offs);
+                        break;
               default:  printf("read len huh?\n"); return PDC_INVALID_ARG;
             }
             return PDC_OK;
@@ -3186,6 +3203,22 @@ static int pdc_pat_io(unsigned long *arg)
               default:  printf("write len huh?\n"); return PDC_INVALID_ARG;
             }
             return PDC_OK;
+        case PDC_PAT_IO_GET_PCI_CONFIG_FROM_HW:
+        {
+            /* inverse of PDC_PAT_IO_GET_HW_FROM_PCI_CONFIG below */
+            struct hardware_path *hp = (struct hardware_path *)&ARG3;
+            int i;
+
+            bdf = pci_to_bdf((u8)hp->bc[4] / 2, (u8)hp->bc[5], (u8)hp->mod);
+            for (i = 0; i < curr_pci_devices; i++) {
+                if (hppa_pci_devices[i].pci &&
+                    hppa_pci_devices[i].pci->bdf == bdf) {
+                    result[0] = (unsigned long)bdf << 8; /* PCI config address */
+                    return PDC_OK;
+                }
+            }
+            return PDC_INVALID_ARG;
+        }
         case PDC_PAT_IO_GET_HW_FROM_PCI_CONFIG:
             bdf = ARG3 >> 8; /* each fn has 256 bytes config space */
             ppath = (void *)ARG2;
