@@ -241,6 +241,20 @@ init_lsi_scsi(void *data)
         lsi_scsi_scan_target(pci, iobase, i);
 }
 
+static int
+lsi_scsi_pci_match(struct pci_device *pci)
+{
+    if (pci->vendor != PCI_VENDOR_ID_LSI_LOGIC)
+        return 0;
+    switch (pci->device) {
+    case PCI_DEVICE_ID_LSI_53C895A:
+    case PCI_DEVICE_ID_NCR_53C810:
+        return 1;
+    default:
+        return 0;
+    }
+}
+
 void
 lsi_scsi_setup(void)
 {
@@ -248,12 +262,11 @@ lsi_scsi_setup(void)
     if (!CONFIG_LSI_SCSI || !runningOnQEMU())
         return;
 
-    dprintf(3, "init lsi53c895a\n");
+    dprintf(3, "init lsi53c8xx\n");
 
     struct pci_device *pci;
     foreachpci(pci) {
-        if (pci->vendor != PCI_VENDOR_ID_LSI_LOGIC
-            || pci->device != PCI_DEVICE_ID_LSI_53C895A)
+        if (!lsi_scsi_pci_match(pci))
             continue;
         run_thread(init_lsi_scsi, pci);
     }
