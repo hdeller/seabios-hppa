@@ -2023,12 +2023,23 @@ static int pdc_tod(unsigned long *arg, unsigned long narrow_mode)
             NO_COMPAT_RETURN_VALUE(ARG2);
             return PDC_OK;
         case 2: /* PDC_TOD_CALIBRATE_TIMERS */
-            /* double-precision floating-point with frequency of Interval Timer in megahertz: */
-            *(double*)&result[0] = (double)CPU_CLOCK_MHZ;
+        {
+            /*
+             * Frequency of the Interval Timer in megahertz, as IEEE double.
+             * calib_0 holds the upper and calib_1 the lower 32 bits of it,
+             * each in the low order bits of its own return parameter.
+             */
+            double calib = (double)CPU_CLOCK_MHZ;
+            u64 bits;
+
+            memcpy(&bits, &calib, sizeof(bits));
+            result[0] = (u32)(bits >> 32);      /* calib_0 */
+            result[1] = (u32)bits;              /* calib_1 */
             /* unsigned 64-bit integers representing  clock accuracy in parts per billion: */
             result[2] = 1000000000; /* TOD_acc */
             result[3] = 0x5a6c; /* CR_acc (interval timer) */
             return PDC_OK;
+        }
     }
     dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_TOD function %ld ARG2=%lx ARG3=%lx ARG4=%lx\n", option, ARG2, ARG3, ARG4);
     return PDC_BAD_OPTION;
