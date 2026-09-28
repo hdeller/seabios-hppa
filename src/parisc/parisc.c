@@ -2522,7 +2522,7 @@ static void iosapic_table_setup(void)
 {
     struct pci_device *pci;
     u32 *p;
-    u8 slot = 0, iosapic_intin = 0, irq_devno, bus_id;
+    u8 slot = 0, iosapic_intin, irq_devno, bus_id;
 
     irt_table_entries = 0;
     memset(irt_table, 0, sizeof(irt_table));
@@ -2542,11 +2542,11 @@ static void iosapic_table_setup(void)
         /* irq_devno = (slot << 2) | (intr_pin-1); */
         irq_devno = (slot << 2) | (pci->irq - 1);
         bus_id = 0;
+        /* Elroy routes the interrupts of a PCI slot to IOSAPIC input 'slot' */
+        iosapic_intin = slot & (ELROY_IRQS - 1);
         *p++ = (irq_devno << 24) | (bus_id << 16) | (0 << 8) | (iosapic_intin << 0);
         *p++ = IOSAPIC_HPA >> 32;
         *p++ = (u32) IOSAPIC_HPA;
-        iosapic_intin++;
-        iosapic_intin &= (ELROY_IRQS - 1);
     }
 }
 
