@@ -820,6 +820,16 @@ static void hppa_pci_build_devices_list(void)
     }
 }
 
+/*
+ * HPAs live in the 32-bit I/O space.  Table entries and lookup arguments
+ * do not agree on whether the upper 32 bits are sign-extended (F_EXTEND)
+ * or zero, so compare the low 32 bits only.
+ */
+static inline int hpa_equal(unsigned long a, unsigned long b)
+{
+    return (u32)a == (u32)b;
+}
+
 static hppa_device_t *find_hpa_device(unsigned long hpa)
 {
     int i;
@@ -829,7 +839,7 @@ static hppa_device_t *find_hpa_device(unsigned long hpa)
     /* search classical HPPA devices */
     if (hpa) {
         for (i = 0; i < (MAX_DEVICES-1); i++) {
-            if (hpa == parisc_devices[i].hpa)
+            if (hpa_equal(hpa, parisc_devices[i].hpa))
                 return &parisc_devices[i];
             if (!parisc_devices[i].hpa)
                 break;
@@ -838,7 +848,7 @@ static hppa_device_t *find_hpa_device(unsigned long hpa)
 
     /* search PCI devices */
     for (i = 0; i < curr_pci_devices; i++) {
-        if (hpa == hppa_pci_devices[i].hpa)
+        if (hpa_equal(hppa_pci_devices[i].hpa, hpa))
             return &hppa_pci_devices[i];
     }
     return NULL;
@@ -1034,7 +1044,7 @@ static hppa_device_t *find_hppa_device_by_hpa(unsigned long hpa)
 
     for (i = 0; i < (MAX_DEVICES-1); i++) {
         dev = parisc_devices + i;
-        if (dev && dev->hpa == hpa) {
+        if (dev && hpa_equal(dev->hpa, hpa)) {
             // found it.
             return dev;
         }
@@ -1043,7 +1053,7 @@ static hppa_device_t *find_hppa_device_by_hpa(unsigned long hpa)
     /* search PCI devices */
     for (i = 0; i < curr_pci_devices; i++) {
         dev = hppa_pci_devices + i;
-        if (dev && dev->hpa == hpa) {
+        if (dev && hpa_equal(dev->hpa, hpa)) {
             // found it.
             return dev;
         }
