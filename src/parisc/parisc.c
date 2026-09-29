@@ -2241,6 +2241,27 @@ static int pdc_nvm(unsigned long *arg)
     return PDC_BAD_OPTION;
 }
 
+static int pdc_eeprom(unsigned long *arg)
+{
+    unsigned long option = ARG1;
+    unsigned long src_addr = ARG2;
+    int *memaddr = (void *)ARG3;
+
+    /* not supported on 32-bit PDC */
+    if (!is_64bit_PDC())
+        return PDC_BAD_PROC;
+
+    switch (option) {
+        case PDC_EEPROM_READ_WORD:
+            /* XXX: ODE mapper tries to read eeprom on C3700 to detect memory. */
+            /* check src_addr to avoid compiler warning and return failure for now. */
+            *memaddr = src_addr ? 0 : 0;
+            return PDC_INVALID_ARG;
+    }
+    dprintf(0, "\n\nSeaBIOS: Unimplemented PDC_EEPROM function %ld ARG3=%lx ARG4=%lx ARG5=%lx ARG6=%lx\n", option, ARG3, ARG4, ARG5, ARG6);
+    return PDC_BAD_OPTION;
+}
+
 static int pdc_add_valid(unsigned long *arg)
 {
     unsigned long option = ARG1;
@@ -3391,6 +3412,9 @@ int __VISIBLE parisc_pdc_entry(unsigned long *arg, unsigned long narrow_mode)
             if (ARG1 == 0)              /* PAT: HP-UX 11iv3 ask for it. */
                 return PDC_BAD_PROC;
             break;
+
+        case PDC_EEPROM:
+            return pdc_eeprom(arg);
 
 	case PDC_NVM:
             return pdc_nvm(arg);
