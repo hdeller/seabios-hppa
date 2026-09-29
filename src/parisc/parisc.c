@@ -1992,16 +1992,18 @@ static int pdc_hpa(unsigned long *arg, unsigned long narrow_mode)
     return PDC_BAD_OPTION;
 }
 
-static int pdc_coproc(unsigned long *arg)
+static int pdc_coproc(unsigned long *arg, unsigned long narrow_mode)
 {
     unsigned long option = ARG1;
     unsigned long *result = (unsigned long *)ARG2;
     unsigned long mask;
     switch (option) {
         case PDC_COPROC_CFG:
+            if (pdc_check_raddr(ARG2, narrow_mode) != PDC_OK)
+                return PDC_INVALID_ARG;
             mask = 3UL << 6;    /* bit for FPU available/functional */
             mtctl(mask, 10);    /* initialize cr10 */
-            if (is_compat_mode()) {
+            if (narrow_mode) {
                 unsigned int *result32 = (unsigned int *)ARG2;
                 memset(result32, 0, 32 * sizeof(result32[0]));
                 result32[0] = mask;   /* ccr_enable */
@@ -3316,7 +3318,7 @@ int __VISIBLE parisc_pdc_entry(unsigned long *arg, unsigned long narrow_mode)
             return pdc_hpa(arg, narrow_mode);
 
         case PDC_COPROC:
-            return pdc_coproc(arg);
+            return pdc_coproc(arg, narrow_mode);
 
         case PDC_IODC: /* Call IODC functions */
             return pdc_iodc(arg, narrow_mode);
