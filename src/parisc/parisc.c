@@ -2365,9 +2365,13 @@ static int pdc_mem(unsigned long *arg)
             NO_COMPAT_RETURN_VALUE(ARG2);
             return PDC_OK;
         case PDC_MEM_GET_MEMORY_SYSTEM_TABLES_SIZE:
+            /* ODE reports to expect 0x1c8 as result on C3700 */
+            result[0] = MIN(0x1c8, ARG4);
+            return PDC_OK;
         case PDC_MEM_GET_MEMORY_SYSTEM_TABLES:
-            /* not yet implemented for 64-bit */
-            return PDC_BAD_PROC;
+            ARG1 = PDC_MEM_TABLE;
+            ARG4 = 2;
+            /* fall through */
 #ifdef __LP64__
         case PDC_MEM_TABLE:     /* old method on Sprockets, e.g. C3700 machine */
         {
