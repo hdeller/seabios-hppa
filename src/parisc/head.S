@@ -629,8 +629,8 @@ c64_32_return:
 
 	cmpb,=,n %r0,%arg2,5f   /* skip copy results if target buffer is NULL */
 	cmpb,<   %ret0,%r0,5f	/* skip copy results if return value was negative (=error) */
-	ldi MEM_PDC_ENTRY,%r1
-	cmpb,>=,n %arg2,%r1,convert_ret64_buffer  /* copy results if target buffer >= MEM_PDC_ENTRY */
+	ldi 4096,%r1
+	cmpb,>=,n %arg2,%r1,convert_ret64_buffer  /* copy results if target buffer >= PAGE_SIZE */
 	b,n .
 	.word 0xfffdead0	/* immediately halt the emulator */
 
