@@ -198,8 +198,10 @@ $startup_just_rebooted:
 	/* Get current CPU HPA. It was stored there at initial bootup. */
 	mfctl   CPU_HPA_CR_REG, %r5
 
+	/* monarch cpu, but cpu0_hpa has not been set yet */
 	/* branch if this is the monarch cpu */
-	load32_sign_extend CPU_HPA, %r1
+	load32_firmware	BOOTADDR(cpu0_hpa),%r1
+	LDREG 0(%r1),%r1
 	comb,=,n %r5,%r1,$is_monarch_cpu_reboot
 
 	b,n	enter_smp_idle_loop
@@ -213,10 +215,17 @@ $startup_fresh_booted:
 #endif
 	mtctl   %r5, CPU_HPA_CR_REG /* store CPU HPA */
 
+	/* check if this is a potential monarch cpu */
+	extru %r5,31,16,%r1
+	cmpib,<>,n 0,%r1,enter_smp_idle_loop
+
+	load32_firmware	BOOTADDR(cpu0_hpa),%r1
+	LDREG 0(%r1),%r10
+	/* monarch cpu, but cpu0_hpa has not been set yet */
+	comb,=,n %r10,%r0,$is_monarch_cpu
+
 	/* branch if this is the monarch cpu */
-	load32_sign_extend CPU_HPA,%r1
-	comb,= %r5,%r1,$is_monarch_cpu
-	nop
+	comb,=,n %r10,%r5,$is_monarch_cpu
 
 ENTRY(enter_smp_idle_loop)
 	/* IDLE LOOP for SMP CPUs - wait for rendenzvous. */
@@ -270,6 +279,8 @@ $smp_exit_loop:
 	bv,n	0(%r3)
 
 $is_monarch_cpu:
+	STREG	%r5,0(%r1)	/* store CPU0 HPA in cpu0_hpa */
+
 	/* Save boot_args in PAGE0->pad608[]. Only monarch CPU does this once. */
         load32          BOOTADDR(0x608),%r1
         STREGM          %r26,WORD_LEN(%r1)

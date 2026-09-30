@@ -168,6 +168,8 @@ unsigned long pci_hpa = PCI_HPA;    /* HPA of Dino or Elroy0 */
 unsigned long hppa_port_pci_cmd  = (PCI_HPA + DINO_PCI_ADDR);
 unsigned long hppa_port_pci_data = (PCI_HPA + DINO_CONFIG_DATA);
 
+/* cpu0_hpa is the HPA of monarch CPU. Store it in data section to avoid clearing of BSS */
+unsigned long __VISIBLE cpu0_hpa __attribute((__section__("data")));
 unsigned long lasi_hpa; /* HPA of Lasi, different on B160L and 715 */
 
 /* Want PDC boot menu? Enable via qemu "-boot menu=on" option. */
@@ -225,15 +227,12 @@ extern long sr_hashing_enabled(void);
 #define HPHW_MC	       15
 #define HPHW_FAULTY    31
 
-#define CPU_HPA_IDX(i)  (F_EXTEND(CPU_HPA) + (i)*0x1000) /* CPU_HPA of CPU#i */
+#define CPU_HPA_IDX(i)  (cpu0_hpa + (i) * 0x1000) /* CPU_HPA of CPU#i */
 
 static int index_of_CPU_HPA(unsigned long hpa) {
-    int i;
-    for (i = 0; i < smp_cpus; i++) {
-        if (hpa == CPU_HPA_IDX(i))
-            return i;
-    }
-    return -1;
+    hpa -= cpu0_hpa;
+    unsigned int i = ((unsigned int) hpa) / 0x1000;
+    return (i < smp_cpus) ? i : -1;
 }
 
 static unsigned long GoldenMemory = MIN_RAM_SIZE;
@@ -447,7 +446,6 @@ static const char *hpa_name(unsigned long hpa)
     #define DO3(y,x)    if (hpa == F_EXTEND(x)) return y;
     #define DO2(y,x)    DO3(#y,x) // if (hpa == F_EXTEND(x)) return #y;
     #define DO1(x)      DO3(#x,x)
-    DO2(CPU_HPA, CPU_HPA)
     DO2(MEMORY_HPA, MEMORY_HPA)
     DO1(SCSI_HPA)
 #if !defined(__LP64__)
@@ -478,7 +476,7 @@ static const char *hpa_name(unsigned long hpa)
     #undef DO2
 
     /* could be one of the SMP CPUs */
-    for (i = 1; i < smp_cpus; i++) {
+    for (i = 0; i < smp_cpus; i++) {
         static char CPU_TXT[] = "CPU_HPA_0";
         if (hpa == CPU_HPA_IDX(i)) {
             CPU_TXT[8] = i < 10 ? '0' + i : 'A' - 10 + i;
@@ -918,8 +916,8 @@ static int keep_add_generic_devices(void)
  * PARISC_KEEP_LIST. Generate num_cpus CPUs. */
 static void remove_parisc_devices(unsigned int num_cpus)
 {
-    static struct pdc_system_map_mod_info modinfo[HPPA_MAX_CPUS] = { {1,}, };
-    static struct pdc_module_path modpath[HPPA_MAX_CPUS] = { {{1,}} };
+    static struct pdc_system_map_mod_info *mip, modinfo[HPPA_MAX_CPUS] = { {1,}, };
+    static struct pdc_module_path *mp, modpath[HPPA_MAX_CPUS] = { {{1,}} };
     hppa_device_t *cpu_dev = NULL;
     unsigned long hpa, cpu_offset;
     int i, p, t;
@@ -935,8 +933,9 @@ static void remove_parisc_devices(unsigned int num_cpus)
     /* remove all devices which are marked as disabled */
     p = t = 0;
     while ((hpa = parisc_devices[p].hpa) != 0) {
-        if (hpa == CPU_HPA || (parisc_devices[p].iodc->type & 0x1f) == HPHW_NPROC)
+        if (hpa == cpu0_hpa || (parisc_devices[p].iodc->type & 0x1f) == HPHW_NPROC) {
             cpu_dev = &parisc_devices[t];
+        }
         if (hpa & HPA_DISABLED_DEVICE)
             p++;
         if (p != t)
@@ -949,31 +948,37 @@ static void remove_parisc_devices(unsigned int num_cpus)
 
     /* Fix monarch CPU */
     BUG_ON(!cpu_dev);
-    cpu_dev->mod_info->mod_addr = F_EXTEND(CPU_HPA);
+    /* adjust CPU HPA in case QEMU used another CPU_HPA value */
+    cpu_dev->hpa = cpu0_hpa;
+    if (!is_snake)
+        cpu_dev->mod_info->mod_addr = cpu0_hpa;
     if (is_a400_machine())
-        cpu_offset = CPU_HPA - 160 * 0x1000;    /* CPUs at [160], [162] ... */
+        cpu_offset = cpu0_hpa - 160 * 0x1000;    /* CPUs at [160], [162] ... */
     else if (has_astro)
-        cpu_offset = CPU_HPA - 32 * 0x1000;
+        cpu_offset = cpu0_hpa - 32 * 0x1000;
     else if (pci_hpa)
         cpu_offset = pci_hpa;   /* B160L */
     else
-        cpu_offset = CPU_HPA - 8 * 0x1000; /* 715 */
-    cpu_dev->mod_path->path.mod = (CPU_HPA - cpu_offset) / 0x1000;
+        cpu_offset = cpu0_hpa - 8 * 0x1000; /* 715 */
+    cpu_dev->mod_path->path.mod = (cpu0_hpa - cpu_offset) / 0x1000;
 
     /* Generate other CPU devices */
     for (i = 1; i < num_cpus; i++) {
-        unsigned long hpa = CPU_HPA_IDX(i);
+        hpa = CPU_HPA_IDX(i);
 
         parisc_devices[t] = *cpu_dev;
         parisc_devices[t].hpa = hpa;
 
-        modinfo[i] = *cpu_dev->mod_info;
-        modinfo[i].mod_addr = hpa;
-        parisc_devices[t].mod_info = &modinfo[i];
+        mip = &modinfo[i - 1];
+        *mip = *cpu_dev->mod_info;
+        if (!is_snake)
+            mip->mod_addr = hpa;
+        parisc_devices[t].mod_info = mip;
 
-        modpath[i] = *cpu_dev->mod_path;
-        modpath[i].path.mod = (hpa - cpu_offset) / 0x1000;
-        parisc_devices[t].mod_path = &modpath[i];
+        mp = &modpath[i - 1];
+        *mp = *cpu_dev->mod_path;
+        mp->path.mod = (hpa - cpu_offset) / 0x1000;
+        parisc_devices[t].mod_path = mp;
 
         t++;
     }
@@ -4170,7 +4175,7 @@ void __VISIBLE start_parisc_firmware(void)
     /* Initialize boot structures. Needs working fw_cfg for bootprio option. */
     boot_init();
 
-    DebugOutputPort = romfile_loadint("/etc/hppa/DebugOutputPort", CPU_HPA + 24);
+    DebugOutputPort = romfile_loadint("/etc/hppa/DebugOutputPort", cpu0_hpa + 24);
     DebugOutputPort = F_EXTEND(DebugOutputPort);
 
     i = romfile_loadint("/etc/firmware-min-version", 0);
@@ -4365,7 +4370,7 @@ void __VISIBLE start_parisc_firmware(void)
     PAGE0->memc_adsize = ram_size_low;
     PAGE0->mem_pdc_hi = (MEM_PDC_ENTRY + 0ULL) >> 32;
     PAGE0->mem_free = 0x6000; // min PAGE_SIZE
-    PAGE0->mem_hpa = CPU_HPA; // HPA of boot-CPU
+    PAGE0->mem_hpa = cpu0_hpa; // HPA of boot-CPU
     PAGE0->mem_pdc = MEM_PDC_ENTRY;
     PAGE0->mem_10msec = cpu_clock_mhz*(1000000ULL/100);
 
