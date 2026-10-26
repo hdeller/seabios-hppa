@@ -144,6 +144,10 @@ ENTRY(startup)
 	rsm	PSW_I, %r0	/* disable local irqs */
 	ssm	PSW_Q, %r0	/* enable PSW_Q flag */
 
+	/* enable FPU as long as we still need libgcc.a with FPU instructions */
+	ldi	0xc0, %r1
+	mtctl	%r1, %cr10
+
 #ifdef CONFIG_64BIT
 	/* check if we really run on 64-bit CPU */
 	ldo	-1(%r0), %r1
