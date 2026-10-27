@@ -195,7 +195,7 @@ ENTRY(startup)
 	/* If CPU HPA is already set in CPU_HPA_CR_REG then the
 	 * CPU is already initialized and the machine was only reset */
 	mfctl   CPU_HPA_CR_REG, %r1
-	comib,= 0,%r1,$startup_fresh_booted
+	comib,= 0,%r1,$startup_cold_boot
 	nop
 
 $startup_just_rebooted:
@@ -210,7 +210,7 @@ $startup_just_rebooted:
 
 	b,n	enter_smp_idle_loop
 
-$startup_fresh_booted:
+$startup_cold_boot:
 	/* Here the machine was booted from scratch: */
 
 	/* Save CPU HPA in cr7, hopefully HP-UX will not use that register. */
@@ -220,8 +220,9 @@ $startup_fresh_booted:
 	mtctl   %r5, CPU_HPA_CR_REG /* store CPU HPA */
 
 	/* check if this is a potential monarch cpu */
-	extru %r5,31,16,%r1
-	cmpib,<>,n 0,%r1,enter_smp_idle_loop
+	/* only the monarch CPU has registers 19 and 21 pre-set by qemu */
+	cmpib,=,n 0,%r19,enter_smp_idle_loop	/* FW_CFG_IO_BASE is zero */
+	cmpib,=,n 0,%r21,enter_smp_idle_loop	/* smp_cpus is zero */
 
 	load32_firmware	BOOTADDR(cpu0_hpa),%r1
 	LDREG 0(%r1),%r10
