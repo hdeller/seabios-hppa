@@ -534,6 +534,11 @@ static void dino_mem_addr_setup(struct pci_device *dev, void *arg)
 
     /* Setup DINO PCI I/O and mem window */
 
+    int cpu_hpa = mfctl(CPU_HPA_CR_REG); /* CPU_HPA */
+    *(int*)(DINO_HPA + 0x04) = cpu_hpa + 3;     /* DINO_IAR0 */
+    *(int*)(DINO_HPA + 0x10) = cpu_hpa + 3;     /* DINO_IAR1 */
+    *(int*)(DINO_HPA + 0x20) = cpu_hpa + 0x30;  /* DINO_TOC_ADDR <- IO_COMMAND of CPU */
+
     outl(DINO_HPA | 1, 0xfffc0020); /* Set Dino Flex (Address) */
     outl(0x00000080, DINO_HPA + 0x038); /* IO_CONTROL - enable DINO PCI */
     // outl(0x00000000, DINO_HPA + 0x804); /* Set PAMR */
