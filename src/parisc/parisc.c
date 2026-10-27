@@ -4262,6 +4262,10 @@ void __VISIBLE start_parisc_firmware(void)
     /* Memory split into various regions on PA2.0 machines */
     memsplit_addr = romfile_loadint("/etc/hppa/memsplit-addr", 0);
 
+    /* initialize LASI IAR register */
+    if (lasi_hpa)
+        *(int*)(lasi_hpa + 0x10) = mfctl(CPU_HPA_CR_REG) + 3; /* CPU_HPA */
+
     ram_size_low = ram_size;
     /* on C3700 and other machines, the memtable stops at 3.75 GB */
     if (ram_size_low >= FIRMWARE_START)
