@@ -3,8 +3,8 @@
 /* this file is included by x86.h */
 
 /* version number of this SeaBIOS firmware */
-#define SEABIOS_HPPA_VERSION 26
-#define SEABIOS_HPPA_VERSION_STR  "26"
+#define SEABIOS_HPPA_VERSION 27
+#define SEABIOS_HPPA_VERSION_STR  "27"
 
 #ifdef __LP64__
 #define CONFIG_64BIT
