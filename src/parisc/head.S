@@ -270,7 +270,45 @@ $smp_exit_loop:
 	/* provide PDCE_PROC entry in arg0 (required on 64-bit) */
 	load32	MEM_PDC_ENTRY, %arg0
 
-	/* jump to rendevouz */
+	/*
+	 * HP-UX 9.x SMP rendezvous check.
+	 *
+	 * When the Monarch calls PDC_PROC/PDC_PROC_RENDEZ, pdc_proc() in
+	 * parisc.c writes a rendezvous block into this CPU's HPA MMIO area
+	 * (the HPA is stored in cr7 / CPU_HPA_CR_REG):
+	 *
+	 *   HPA + HPUX_RENDEZ_VALID_OFF  (0x3C) : non-zero when filled
+	 *   HPA + HPUX_RENDEZ_ENTRY_OFF  (0x30) : OS entry address (-> r22)
+	 *   HPA + HPUX_RENDEZ_ARG_OFF    (0x34) : OS r26 arg     (-> r26)
+	 *
+	 * Check the valid flag first.  If set, load entry/arg and jump.
+	 * Otherwise fall through to the Linux vec_rendz path.
+	 *
+	 * r25 holds our own HPA throughout (from enter_smp_idle_loop entry).
+	 * Re-read it from cr7 in case it was clobbered.
+	 */
+	mfctl	CPU_HPA_CR_REG, %r25	/* r25 = own HPA */
+
+	/* Check HP-UX rendez_valid word at HPA + 0x3C */
+	ldw	HPUX_RENDEZ_VALID_OFF(%r25), %r1	/* r1 = rendez_valid */
+	cmpib,=,n 0, %r1, $hpux_rendez_skip
+
+	/* HP-UX rendez block is valid: load entry and arg, then jump. */
+	ldw	HPUX_RENDEZ_ENTRY_OFF(%r25), %r22	/* r22 = os_entry */
+	ldw	HPUX_RENDEZ_ARG_OFF(%r25), %r26		/* r26 = os_arg (target HPA) */
+
+	/*
+	 * Clear the valid flag so a machine reset does not re-fire.
+	 * The kernel entry will overwrite our registers, so do this first.
+	 */
+	stw	%r0, HPUX_RENDEZ_VALID_OFF(%r25)
+
+	/* Load return pointer to firmware startup in case the OS returns. */
+	load32_firmware	startup, %rp
+	bv,n	%r0(%r22)		/* jump to OS */
+
+$hpux_rendez_skip:
+	/* jump to rendevouz (Linux-style: MEM_RENDEZ in PAGE0) */
 	ldw	0x10(%r0),%r3	/* MEM_RENDEZ */
 #ifdef CONFIG_64BIT
 	addb,*>,n %r0,%r0,1f	/* branch if narrow addressing */

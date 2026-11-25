@@ -127,6 +127,9 @@
 #define PDC_INSTR	15		/* get instr to invoke PDCE_CHECK() */
 
 #define PDC_PROC	16		/* (sprockets)			*/
+#define PDC_PROC_STOP		0	/* Stop calling CPU, return to PDC loop */
+#define PDC_PROC_RENDEZ		1	/* Wake secondary CPU at OS entry addr  */
+#define PDC_PROC_INFO		2	/* Return processor hversion/sversion   */
 
 #define PDC_CONFIG	17		/* (sprockets)			*/
 #define PDC_CONFIG_DECONFIG	0
@@ -742,6 +745,8 @@ struct pdc_firm_test_get_rtn_block {   /* PDC_MODEL/PDC_FIRM_TEST_GET */
         unsigned long default_tests;   /* u_R_addr Raddr_ints[2]  */
 };
 
+#endif /* !defined(__ASSEMBLY__) */
+
 #define TORNADO_CPU_ID 		 0xB
 #define PCXL_CPU_ID              0xD
 #define PCXU_CPU_ID              0xE	/* U and U+ for all but C-class with bug */
@@ -752,6 +757,31 @@ struct pdc_firm_test_get_rtn_block {   /* PDC_MODEL/PDC_FIRM_TEST_GET */
 #define PIRANHA_CPU_ID          0x13
 #define MAKO_CPU_ID             0x14
 
-#endif /* !defined(__ASSEMBLY__) */
+/*
+ * Per-CPU rendezvous block (PDC_PROC_RENDEZ) embedded in each CPU's HPA MMIO space.
+ * PCM_find_other_HPAs writes the rendezvous ptr to HPA+0x30.
+ * We store a 16-byte block there that the secondary CPU reads on wake-up.
+ *
+ *   HPA + 0x30 : os_entry   (kernel physical entry address)
+ *   HPA + 0x34 : os_arg_r26 (placed in r26 on target; usually = target HPA)
+ *   HPA + 0x38 : (reserved)
+ *   HPA + 0x3C : rendez_valid (non-zero when filled by pdc_proc_rendez)
+ */
+#define HPUX_RENDEZ_ENTRY_OFF     0x30
+#define HPUX_RENDEZ_ARG_OFF       0x34
+#define HPUX_RENDEZ_VALID_OFF     0x3c
+
+/*
+ * HP-UX 9.x SMP firmware data locations (physical addresses).
+ *
+ * HP-UX mpmonarch_config() reads num_processors from physical 0x0180:
+ *   ldi  384, r31          ; r31 = 0x0180
+ *   ldw  0(r31), r25       ; r25 = num_processors
+ *
+ * SeaBIOS must write smp_cpus to HPUX_PDC_PROC_COUNT_ADDR before the
+ * kernel runs.  Optionally write CPU HPAs at +4, +8, … for HP-UX 10.x.
+ */
+#define HPUX_PDC_PROC_COUNT_ADDR  0x0180   /* phys: num_processors word    */
+#define HPUX_PDC_PROC_HPA_BASE    0x0184   /* phys: array of CPU HPAs      */
 
 #endif /* _UAPI_PARISC_PDC_H */

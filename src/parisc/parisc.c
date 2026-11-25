@@ -2305,27 +2305,137 @@ static int pdc_add_valid(unsigned long *arg)
     return PDC_REQ_ERR_0; /* Operation completed with a requestor bus error. */
 }
 
+/*
+ * pdc_proc - Handle PDC_PROC calls (class 16 / 0x10).
+ *
+ * Sub-functions:
+ *   PDC_PROC_STOP   (0): Stop calling CPU - put it back in the SeaBIOS idle
+ *                        loop.  This is what Linux calls to park secondaries
+ *                        during CPU-hotplug remove.
+ *
+ *   PDC_PROC_RENDEZ (1): Wake a secondary CPU at a specified OS entry address.
+ *                        This is the HP-UX 9.x SMP boot primitive – the PA-RISC
+ *                        equivalent of an x86 INIT+SIPI.
+ *
+ *                        HP-UX monarch_init() calls this once per secondary CPU:
+ *                          ARG2 = result_buf   (u32 * output buffer; we write 0)
+ *                          ARG3 = target_hpa   (HPA of CPU to wake)
+ *                          ARG4 = os_entry     (physical address to jump to;
+ *                                               for HP-UX 9.x = 0x00024ff0)
+ *                          ARG5 = os_arg_r26   (placed in r26 on target CPU;
+ *                                               HP-UX passes target_hpa here)
+ *
+ *                        Implementation:
+ *                          1. Identify the target CPU by HPA.
+ *                          2. Write os_entry  to  target_hpa + HPUX_RENDEZ_ENTRY_OFF
+ *                          3. Write os_arg    to  target_hpa + HPUX_RENDEZ_ARG_OFF
+ *                          4. Write non-zero  to  target_hpa + HPUX_RENDEZ_VALID_OFF
+ *                             (this is the flag that the smp_exit_loop reads)
+ *                          5. Deliver an external interrupt to the secondary
+ *                             CPU so it exits smp_idle_loop and reads the block.
+ *                          6. Return PDC_OK.
+ *
+ *                        The secondary CPU's smp_exit_loop path in head.S:
+ *                          ldw  HPUX_RENDEZ_ENTRY_OFF(r25), r22  ; os_entry
+ *                          ldw  HPUX_RENDEZ_ARG_OFF(r25),   r26  ; os_arg
+ *                          bv,n 0(r22)                           ; jump to OS
+ *
+ *   PDC_PROC_INFO   (2): Return processor info (hversion, sversion).
+ *                        HP-UX does not call this during SMP boot, but it is
+ *                        part of the PA-RISC PDC_PROC specification.
+ */
+
 static int pdc_proc(unsigned long *arg)
 {
     extern void enter_smp_idle_loop(void);
     unsigned long option = ARG1;
 
+    printf("PDC_PROC %x\n", option);
     switch (option) {
-        case 0: /* STOP CPU */
-            ARG2 = 0;
-            /* fall through */
-        case 1: /* Rendevouz processor */
-            if (ARG2 != 0)
-                return PDC_BAD_PROC;
-            if (pdc_debug & DEBUG_PDC)
-                printf("\nSeaBIOS: CPU%d now offline (enters rendenzvous loop).\n",
-                        index_of_CPU_HPA(mfctl(CPU_HPA_CR_REG)));
-            /* wait until all outstanding timer irqs arrived. */
-            msleep(500);
-            /* let the current CPU sleep until rendenzvous. */
-            enter_smp_idle_loop();
-            return PDC_OK;
+
+    case PDC_PROC_STOP: /* Stop this CPU - return it to the firmware idle loop */
+        if (pdc_debug & DEBUG_PDC)
+            printf("\nSeaBIOS: PDC_PROC_STOP: CPU%d going offline.\n",
+                    index_of_CPU_HPA(mfctl(CPU_HPA_CR_REG)));
+        /* Wait for outstanding timer IRQs to drain before we vanish. */
+        msleep(500);
+        /* Park the calling CPU in the SeaBIOS SMP idle loop. */
+        enter_smp_idle_loop();
+        return PDC_OK; /* unreachable, but satisfies the compiler */
+
+    case PDC_PROC_RENDEZ: { /* Wake secondary CPU (HP-UX SMP boot) */
+        unsigned long target_hpa = ARG3;
+        unsigned long os_entry   = ARG4;
+        unsigned long os_arg     = ARG5;
+        volatile u32 *rendez_entry;
+        volatile u32 *rendez_arg;
+        volatile u32 *rendez_valid;
+        int cpu_idx;
+
+        cpu_idx = index_of_CPU_HPA(target_hpa);
+        if (cpu_idx < 0 || cpu_idx >= smp_cpus) {
+            dprintf(1, "SeaBIOS: PDC_PROC_RENDEZ: bad HPA 0x%lx\n",
+                    target_hpa);
+            return PDC_INVALID_ARG;
+        }
+
+        if (pdc_debug & DEBUG_PDC)
+            printf("\nSeaBIOS: PDC_PROC_RENDEZ: wake CPU%d (HPA=0x%lx)"
+                   " entry=0x%lx arg=0x%lx\n",
+                   cpu_idx, target_hpa, os_entry, os_arg);
+
+        /*
+         * Write the rendezvous block into the CPU's HPA MMIO area.
+         * These offsets are read by the secondary CPU's smp_exit_loop
+         * in head.S immediately after it receives the wake interrupt.
+         *
+         *   HP-UX PCM_find_other_HPAs writes a rendezvous pointer to
+         *   HPA + 0x30.  We embed the full block there so the secondary
+         *   can branch directly without an extra indirection.
+         */
+        rendez_entry = (volatile u32 *)(target_hpa + HPUX_RENDEZ_ENTRY_OFF);
+        rendez_arg   = (volatile u32 *)(target_hpa + HPUX_RENDEZ_ARG_OFF);
+        rendez_valid = (volatile u32 *)(target_hpa + HPUX_RENDEZ_VALID_OFF);
+
+        *rendez_entry = (u32)os_entry;
+        *rendez_arg   = (u32)os_arg;
+        /*
+         * Write rendez_valid LAST (memory-barrier ordering): the secondary
+         * CPU spins on this flag in smp_exit_loop.  Once it sees non-zero
+         * it reads entry+arg, so they must already be written.
+         */
+        asm volatile("" : : : "memory"); /* compiler barrier */
+        *rendez_valid = 1;
+
+        /*
+         * Deliver an external interrupt to the secondary CPU to kick it out
+         * of the SeaBIOS or/and PA-RISC OR-sleep idle loop.
+         * Writing any value to HPA+0x60 is the PA-RISC external interrupt
+         * register (confirmed from HP-UX kernel source: HT_HPA_loop writes
+         * to HPA+0x00 for processor control, 0x60 for external interrupt).
+         */
+        *(volatile u32 *)(target_hpa + 0x60) = 1;
+
+        /* Write PDC_OK to the caller's result buffer */
+        if (ARG2) {
+            ((unsigned long *)ARG2)[0] = PDC_OK;
+        }
+        return PDC_OK;
     }
+
+    case PDC_PROC_INFO: { /* Return own processor info */
+        unsigned long *result = (unsigned long *)ARG2;
+        unsigned long hpa = mfctl(CPU_HPA_CR_REG);
+
+        if (!result)
+            return PDC_INVALID_ARG;
+        result[0] = hpa;                            /* processor HPA      */
+        result[1] = current_machine->pdc_model.hversion; /* hversion       */
+        result[2] = current_machine->pdc_model.sversion; /* sversion       */
+        result[3] = smp_cpus;                       /* number of siblings */
+        return PDC_OK;
+     }
+    } /* end switch */
     return PDC_BAD_OPTION;
 }
 
@@ -4112,6 +4222,49 @@ extern void start_kernel(unsigned long mem_free, unsigned long cline,
                          unsigned long rdstart,  unsigned long rdend,
                          unsigned long kernel_start_address);
 
+/*
+ * hpux_smp_init() - Populate the HP-UX SMP firmware data block.
+ *
+ * HP-UX 9.x (S700) and 10.x read the number of processors from physical
+ * address 0x0180 as the very first step of SMP initialisation, inside
+ * mpmonarch_config():
+ *
+ *   ldi  384, r31          ; r31 = 0x0180
+ *   ldw  0(r31), r25       ; r25 = num_processors
+ *
+ * We must write smp_cpus to that location before the kernel runs.
+ *
+ * We also optionally write the CPU HPA array starting at 0x0184 (one
+ * u32 per CPU).  HP-UX 9.x does not read these - it discovers HPAs via
+ * PDC_HPA / PCM_find_other_HPAs - but writing them is harmless and may
+ * help later HP-UX versions or diagnostics tools.
+ *
+ * NOTE: The Crash Processor Table at physical 0x11000 does NOT need to be
+ * pre-populated.  rdb_init_monarch() builds it at runtime after reading
+ * the count from 0x0180.  SeaBIOS only needs to write 0x0180.
+ */
+static void hpux_smp_init(void)
+{
+    volatile u32 *proc_count = (volatile u32 *)HPUX_PDC_PROC_COUNT_ADDR;
+    volatile u32 *hpa_array  = (volatile u32 *)HPUX_PDC_PROC_HPA_BASE;
+    int i;
+
+    /* Clamp to reasonable range */
+    if (smp_cpus < 1 || smp_cpus > HPPA_MAX_CPUS)
+        return;
+
+    /* Write num_processors at physical 0x0180 */
+    *proc_count = (u32)smp_cpus;
+
+    /* Write HPA array at 0x0184 (optional but informative) */
+    for (i = 0; i < smp_cpus; i++)
+        hpa_array[i] = (u32)CPU_HPA_IDX(i);
+
+    if (pdc_debug & DEBUG_PDC)
+        printf("SeaBIOS: hpux_smp_init: wrote num_processors=%ld to phys 0x%x\n",
+               smp_cpus, HPUX_PDC_PROC_COUNT_ADDR);
+}
+
 void __VISIBLE start_parisc_firmware(void)
 {
     unsigned int i, cpu_hz;
@@ -4391,9 +4544,16 @@ void __VISIBLE start_parisc_firmware(void)
     if (powerswitch_supported())
         *powersw_ptr = 0x01; /* button not pressed, hw controlled. */
 
+    // Populate the HP-UX SMP firmware data block at physical 0x0180.
+    hpux_smp_init();
+
     /* PAGE0->imm_hpa - is set later (MEMORY_HPA) */
     PAGE0->imm_spa_size = ram_size_low;
     PAGE0->imm_max_mem = ram_size_low;
+
+    /* on 715 machine: */
+    *(int *)(0x180) = smp_cpus; // in PAGE0: PDC proc table with num_processors at 0x180
+    // MP config struct at 0x460 in PAGE0
 
     /* initialize graphics (if available) */
     if (artist_present()) {
