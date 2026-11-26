@@ -2090,9 +2090,19 @@ static int pdc_iodc(unsigned long *arg, unsigned long narrow_mode)
             iodc_p = dev->iodc;
 
             if (ARG4 == PDC_IODC_INDEX_DATA) {
-                if (ARG6 > sizeof(*iodc_p))
-                    ARG6 = sizeof(*iodc_p);
-                memcpy((void*) ARG5, iodc_p, ARG6);
+                /*
+                 * HP-UX 11 reaches a PCI disk through the IODC of its PCI
+                 * host bridge (type 0x0d), as PCI devices have no HPA.
+                 * Bit 0 of features says the IODC does block I/O. Without
+                 * it, HP-UX limits swap and dump to the first 4 GB of the
+                 * disk and lvlnboot fails on big disks.
+                 */
+                struct pdc_iodc iodc = *iodc_p;
+                if (iodc.type == 0x0d)
+                    iodc.features |= 0x01;
+                if (ARG6 > sizeof(iodc))
+                    ARG6 = sizeof(iodc);
+                memcpy((void*) ARG5, &iodc, ARG6);
                 c = (unsigned char *) ARG5;
                 // printf("SeaBIOS: PDC_IODC get: hpa = 0x%lx, HV: 0x%x 0x%x IODC_SPA=0x%x  type 0x%x, \n", hpa, c[0], c[1], c[2], c[3]);
                 result[0] = ARG6;
