@@ -1352,6 +1352,28 @@ static unsigned long tape_read(struct drive_s *drive, void *buf,
     return done;
 }
 
+/*
+ * The caller names the drive in the layers (ID_addr): SCSI target and
+ * LUN. It is not always the drive we booted from: HP-UX 11 finds how far
+ * IODC reaches on its swap and dump disk with test reads there, while it
+ * runs from the install CD. Use the boot drive if no other drive matches.
+ */
+extern int parisc_get_scsi_target(struct drive_s **boot_drive, int target);
+
+static struct drive_s *iodc_storage_drive(unsigned int *layers)
+{
+    struct drive_s *drive = NULL;
+
+    if (!layers || !boot_drive)
+        return boot_drive;
+    if (layers[0] == boot_drive->target && layers[1] == boot_drive->lun)
+        return boot_drive;
+    if (parisc_get_scsi_target(&drive, layers[0]) &&
+        drive->type == boot_drive->type && drive->lun == layers[1])
+        return drive;
+    return boot_drive;
+}
+
 int __VISIBLE parisc_iodc_ENTRY_IO(unsigned int *arg)
 {
     unsigned long hpa = COMPAT_VAL(ARG0);
@@ -1406,7 +1428,9 @@ int __VISIBLE parisc_iodc_ENTRY_IO(unsigned int *arg)
             case ENTRY_IO_BOOTIN: /* boot medium IN */
             case ENTRY_IO_BBLOCK_IN: /* boot block medium IN */
             case ENTRY_IO_BOOTOUT:
-                disk_op.drive_fl = boot_drive;
+                disk_op.drive_fl = iodc_storage_drive((unsigned int *)ARG3);
+                if (!disk_op.drive_fl)
+                    return PDC_ERROR;
                 disk_op.buf_fl = (void*)ARG6;
                 disk_op.command = option == ENTRY_IO_BOOTOUT ? CMD_WRITE : CMD_READ;
 
@@ -1421,10 +1445,10 @@ int __VISIBLE parisc_iodc_ENTRY_IO(unsigned int *arg)
                 unsigned long current_lba = ARG5 / disk_op.drive_fl->blksize;
 
                 /* a tape has no LBA, read it at the medium address ARG5 */
-                if (boot_drive->sequential && option == ENTRY_IO_BOOTIN) {
+                if (disk_op.drive_fl->sequential && option == ENTRY_IO_BOOTIN) {
                     if ((ARG5 | bytes_requested) & (FW_BLOCKSIZE-1))
                         return PDC_INVALID_ARG;
-                    result[0] = tape_read(boot_drive, (void *)ARG6, ARG5,
+                    result[0] = tape_read(disk_op.drive_fl, (void *)ARG6, ARG5,
                                           bytes_requested);
                     return result[0] == bytes_requested ? PDC_OK : PDC_ERROR;
                 }
