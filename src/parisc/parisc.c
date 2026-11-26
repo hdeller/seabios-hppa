@@ -1014,6 +1014,44 @@ static int compare_module_path(struct pdc_module_path *path,
     return 1;
 }
 
+/*
+ * HP-UX 11 puts each SuperIO serial port one level below the SuperIO
+ * PCI function: the SuperIO is 10/0/2/1, its serial ports 10/0/2/1/1
+ * and 10/0/2/1/2. The console and keyboard paths must name the port.
+ * With the path of the SuperIO itself HP-UX finds no tty there, and
+ * init cannot open /dev/console.
+ */
+#define SUPERIO_SERIAL_PORT1    1
+#define SUPERIO_SERIAL_PORT2    2
+
+static void superio_serial_path(struct pdc_module_path *sio,
+                                struct pdc_module_path *p, int port)
+{
+    int i;
+
+    BUG_ON(sio->path.bc[0] != -1);  /* no free bus converter slot */
+    memcpy(p, sio, sizeof(*p));
+    for (i = 0; i < ARRAY_SIZE(p->path.bc) - 1; i++)
+        p->path.bc[i] = sio->path.bc[i + 1];
+    p->path.bc[i] = sio->path.mod;
+    p->path.mod = port;
+}
+
+static int compare_superio_serial_path(hppa_device_t *dev,
+                                       struct pdc_module_path *search,
+                                       int check_layers)
+{
+    struct pdc_module_path p;
+
+    if (!PCI_is_HPPA_SUPERIO(dev->pci))
+        return 0;
+    if (search->path.mod != SUPERIO_SERIAL_PORT1 &&
+        search->path.mod != SUPERIO_SERIAL_PORT2)
+        return 0;
+    superio_serial_path(dev->mod_path, &p, search->path.mod);
+    return compare_module_path(&p, search, check_layers);
+}
+
 /* add index number to all devices */
 static hppa_device_t *add_index_all_devices(void)
 {
@@ -1098,7 +1136,8 @@ static hppa_device_t *find_hppa_device_by_path(struct pdc_module_path *search,
     /* search PCI devices */
     for (i = 0; i < curr_pci_devices; i++) {
         dev = hppa_pci_devices + i;
-        if (compare_module_path(dev->mod_path, search, check_layers)) {
+        if (compare_module_path(dev->mod_path, search, check_layers) ||
+            compare_superio_serial_path(dev, search, check_layers)) {
             if (index)
                 *index = nr;
             return dev;
@@ -4058,6 +4097,7 @@ static int prepare_boot_path(volatile struct pz_device *dest,
     hppa_device_t *dev;
     unsigned long hpa;
     struct pdc_module_path *mod_path;
+    struct pdc_module_path serial_path;
 
     hpa = source->hpa;
     dev = find_hpa_device(hpa);
@@ -4076,6 +4116,12 @@ static int prepare_boot_path(volatile struct pz_device *dest,
      * We save cell #0 there, so mask out the relevant bits. */
     if (!pat_disabled())
         mod_path->path.flags &= (PF_AUTOBOOT | PF_AUTOSEARCH);
+
+    /* the SuperIO console is its first serial port, not the SuperIO */
+    if (PCI_is_HPPA_SUPERIO(dev->pci)) {
+        superio_serial_path(mod_path, &serial_path, SUPERIO_SERIAL_PORT1);
+        mod_path = &serial_path;
+    }
 
     /* copy device path to entry in PAGE0 */
     memcpy((void*)dest, source, sizeof(*source));
