@@ -659,10 +659,18 @@ static int artist_present(void)
     return !!(*(u32 *)F_EXTEND(0xf8380004) == 0x6dc20006);
 }
 
+/* HPA of the PCI graphics card that is the STI console, or 0 */
+static unsigned long pci_sti_hpa;
+
 int HPA_is_LASI_graphics(unsigned long hpa)
 {
     /* return true if hpa is LASI graphics (artist graphics card) */
     return (hpa == LASI_GFX_HPA) && artist_present();
+}
+
+static int HPA_is_STI_console(unsigned long hpa)
+{
+    return HPA_is_LASI_graphics(hpa) || (pci_sti_hpa && (u32)hpa == (u32)pci_sti_hpa);
 }
 #define GFX_NUM_PAGES 0x2000
 int HPA_is_graphics_device(unsigned long hpa)
@@ -679,7 +687,7 @@ int HPA_is_graphics_device(unsigned long hpa)
 
 static const char *hpa_device_name(unsigned long hpa, int output)
 {
-    return HPA_is_LASI_graphics(hpa) ? "GRAPHICS(1)" :
+    return HPA_is_STI_console(hpa) ? "GRAPHICS(1)" :
             HPA_is_graphics_device(hpa) ? "VGA" :
             HPA_is_LASI_keyboard(hpa) ? "PS2" :
             HPA_is_pci_serial_device(hpa) ? "PCI_SERIAL_1" :
@@ -1211,6 +1219,8 @@ static unsigned long parisc_serial_in(char *c, unsigned long maxchars)
  * console costs a few dropped characters instead of a machine hang. */
 #define SERIAL_OUT_POLL_LIMIT 10000
 
+static struct pz_device mem_cons_boot;
+
 static void parisc_serial_out(char c)
 {
     portaddr_t addr = PAGE0->mem_cons.hpa;
@@ -1226,7 +1236,13 @@ static void parisc_serial_out(char c)
         print_mod_path(&PAGE0->mem_cons.dp, 1);
     }
     hppa_device_t *dev;
-    dev = find_hppa_device_by_path(&PAGE0->mem_cons.dp, NULL, 0);
+    if (pci_sti_hpa) {
+        /* the console is the PCI graphics card: copy to the serial port */
+        dev = find_hpa_device(mem_cons_boot.hpa);
+        if (!dev || !dev->pci_addr)
+            return;
+    } else
+        dev = find_hppa_device_by_path(&PAGE0->mem_cons.dp, NULL, 0);
     if (0) {
         dprintf(1,"parisc_serial_out  hpa %x\n", PAGE0->mem_cons.hpa);
         print_mod_path(dev->mod_path, 0);
@@ -1259,7 +1275,10 @@ static void parisc_putchar_internal(char c)
 {
     if (HPA_is_LASI_graphics(PAGE0->mem_cons.hpa))
         sti_putc(c);
-    else
+    else if (HPA_is_STI_console(PAGE0->mem_cons.hpa)) {
+        sti_putc(c);
+        parisc_serial_out(c);
+    } else
         parisc_serial_out(c);
 }
 
@@ -1407,7 +1426,7 @@ int __VISIBLE parisc_iodc_ENTRY_IO(unsigned int *arg)
         case ENTRY_IO_COUT: /* console output */
             c = (char*)ARG6;
             result[0] = len = ARG7;
-            if (DEV_is_serial_device(dev) || HPA_is_LASI_graphics(hpa)) {
+            if (DEV_is_serial_device(dev) || HPA_is_STI_console(hpa)) {
                 while (len--)
                     printf("%c", *c++);
             }
@@ -4103,6 +4122,42 @@ static void find_serial_pci_card(void)
     mem_kbd_sti_boot.hpa = pdev->hpa;
 }
 
+/*
+ * Find a PCI graphics card with an Artist (HP VISUALIZE-EG, QEMU artist-pci)
+ * and make it the STI console. The firmware's own STI code drives it, with
+ * the STI regions in BAR 0.
+ */
+static int find_sti_pci_card(void)
+{
+    struct pci_device *pci;
+    hppa_device_t *pdev;
+    unsigned long bar;
+
+    if (!has_astro)
+        return 0;
+    foreachpci(pci) {
+        if (pci->vendor == PCI_VENDOR_ID_HP && pci->device == 0x1005)
+            break;
+    }
+    if (!pci)
+        return 0;
+    bar = (uintptr_t) pci_enable_membar(pci, PCI_BASE_ADDRESS_0);
+    if (!bar)
+        return 0;
+    dprintf(1, "PCI: Enabling %pP for STI console at %lx\n", pci, bar);
+
+    pdev = &hppa_pci_devices[0];
+    while (pdev->pci != pci)
+        pdev++;
+
+    sti_rom_init();
+    sti_set_regions(F_EXTEND(bar));
+    sti_console_init(&sti_proc_rom);
+    pci_sti_hpa = pdev->hpa;
+    mem_cons_sti_boot.hpa = pdev->hpa;
+    return 1;
+}
+
 /* find SCSI PCI card (to be used as boot device) */
 static void find_scsi_pci_card(void)
 {
@@ -4563,10 +4618,16 @@ void __VISIBLE start_parisc_firmware(void)
     if (pdc_console != CONSOLE_SERIAL) {
 	if (artist_present())
             pdc_console = CONSOLE_GRAPHICS;
+	else if (pdc_console == CONSOLE_GRAPHICS && find_sti_pci_card())
+            pdc_console = CONSOLE_GRAPHICS;
 	else
             pdc_console = CONSOLE_SERIAL;
     }
-    if (pdc_console == CONSOLE_GRAPHICS) {
+    if (pdc_console == CONSOLE_GRAPHICS && pci_sti_hpa) {
+        /* no USB keyboard in the firmware: keep the serial port for input */
+        prepare_boot_path(&(PAGE0->mem_cons), &mem_cons_sti_boot, 0x60);
+        prepare_boot_path(&(PAGE0->mem_kbd),  &mem_kbd_boot, 0xa0);
+    } else if (pdc_console == CONSOLE_GRAPHICS) {
         prepare_boot_path(&(PAGE0->mem_cons), &mem_cons_sti_boot, 0x60);
         prepare_boot_path(&(PAGE0->mem_kbd),  &mem_kbd_sti_boot, 0xa0);
     } else {

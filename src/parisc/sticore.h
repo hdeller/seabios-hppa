@@ -323,6 +323,7 @@ struct setcm_outptr {
 
 void sti_rom_init(void);
 void sti_console_init(struct sti_rom *rom);
+void sti_set_regions(unsigned long base);
 void sti_putc(const char c);
 
 extern struct sti_rom sti_proc_rom;
