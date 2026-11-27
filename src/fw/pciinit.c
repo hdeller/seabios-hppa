@@ -647,14 +647,26 @@ static void parisc_mem_addr_setup(struct pci_device *dev, void *arg)
 unsigned long add_lmmio_directed_range(unsigned long size, int rope)
 {
 #ifdef CONFIG_PARISC
+    /*
+     * Big BARs (graphics cards) go up from SEABIOS_HPPA_GFX_START, each
+     * aligned to its size. The small BARs are at the top of the PCI
+     * window (pcimem_end), so keep the last 16 MB free for them.
+     */
+    static unsigned long next_addr;
+    unsigned long addr, end = (u32)pcimem_end; /* 32-bit, not F_EXTENDed */
+
     if (!has_astro)
         return -1;
 
-    if (size == 64 * 1024 * 1024)
-        return SEABIOS_HPPA_GFX_START;
-    if (size == 32 * 1024 * 1024)
-        return 0xfa000000;
-    return SEABIOS_HPPA_GFX_START;
+    if (!next_addr)
+        next_addr = SEABIOS_HPPA_GFX_START;
+    addr = ALIGN(next_addr, size);
+    if (addr + size > end - 16 * 1024 * 1024) {
+        dprintf(1, "PCI: no LMMIO space for a BAR of size %lx\n", size);
+        return -1;
+    }
+    next_addr = addr + size;
+    return addr;
 
 #endif /* CONFIG_PARISC */
     return -1UL;
@@ -984,6 +996,9 @@ static u64 pci_region_align(struct pci_region *r)
 {
     struct pci_region_entry *entry;
     hlist_for_each_entry(entry, &r->list, node) {
+        // parisc: big bars go to a directed range, as in pci_region_sum()
+        if (CONFIG_PARISC && entry->size > PARISC_MMIO_LIMIT)
+            continue;
         // The first entry in the sorted list has the largest alignment
         return entry->align;
     }

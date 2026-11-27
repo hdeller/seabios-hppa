@@ -659,10 +659,18 @@ static int artist_present(void)
     return !!(*(u32 *)F_EXTEND(0xf8380004) == 0x6dc20006);
 }
 
+/* HPA of the PCI graphics card that is the STI console, or 0 */
+static unsigned long pci_sti_hpa;
+
 int HPA_is_LASI_graphics(unsigned long hpa)
 {
     /* return true if hpa is LASI graphics (artist graphics card) */
     return (hpa == LASI_GFX_HPA) && artist_present();
+}
+
+static int HPA_is_STI_console(unsigned long hpa)
+{
+    return HPA_is_LASI_graphics(hpa) || (pci_sti_hpa && (u32)hpa == (u32)pci_sti_hpa);
 }
 #define GFX_NUM_PAGES 0x2000
 int HPA_is_graphics_device(unsigned long hpa)
@@ -679,7 +687,7 @@ int HPA_is_graphics_device(unsigned long hpa)
 
 static const char *hpa_device_name(unsigned long hpa, int output)
 {
-    return HPA_is_LASI_graphics(hpa) ? "GRAPHICS(1)" :
+    return HPA_is_STI_console(hpa) ? "GRAPHICS(1)" :
             HPA_is_graphics_device(hpa) ? "VGA" :
             HPA_is_LASI_keyboard(hpa) ? "PS2" :
             HPA_is_pci_serial_device(hpa) ? "PCI_SERIAL_1" :
@@ -1014,6 +1022,44 @@ static int compare_module_path(struct pdc_module_path *path,
     return 1;
 }
 
+/*
+ * HP-UX 11 puts each SuperIO serial port one level below the SuperIO
+ * PCI function: the SuperIO is 10/0/2/1, its serial ports 10/0/2/1/1
+ * and 10/0/2/1/2. The console and keyboard paths must name the port.
+ * With the path of the SuperIO itself HP-UX finds no tty there, and
+ * init cannot open /dev/console.
+ */
+#define SUPERIO_SERIAL_PORT1    1
+#define SUPERIO_SERIAL_PORT2    2
+
+static void superio_serial_path(struct pdc_module_path *sio,
+                                struct pdc_module_path *p, int port)
+{
+    int i;
+
+    BUG_ON(sio->path.bc[0] != -1);  /* no free bus converter slot */
+    memcpy(p, sio, sizeof(*p));
+    for (i = 0; i < ARRAY_SIZE(p->path.bc) - 1; i++)
+        p->path.bc[i] = sio->path.bc[i + 1];
+    p->path.bc[i] = sio->path.mod;
+    p->path.mod = port;
+}
+
+static int compare_superio_serial_path(hppa_device_t *dev,
+                                       struct pdc_module_path *search,
+                                       int check_layers)
+{
+    struct pdc_module_path p;
+
+    if (!PCI_is_HPPA_SUPERIO(dev->pci))
+        return 0;
+    if (search->path.mod != SUPERIO_SERIAL_PORT1 &&
+        search->path.mod != SUPERIO_SERIAL_PORT2)
+        return 0;
+    superio_serial_path(dev->mod_path, &p, search->path.mod);
+    return compare_module_path(&p, search, check_layers);
+}
+
 /* add index number to all devices */
 static hppa_device_t *add_index_all_devices(void)
 {
@@ -1098,7 +1144,8 @@ static hppa_device_t *find_hppa_device_by_path(struct pdc_module_path *search,
     /* search PCI devices */
     for (i = 0; i < curr_pci_devices; i++) {
         dev = hppa_pci_devices + i;
-        if (compare_module_path(dev->mod_path, search, check_layers)) {
+        if (compare_module_path(dev->mod_path, search, check_layers) ||
+            compare_superio_serial_path(dev, search, check_layers)) {
             if (index)
                 *index = nr;
             return dev;
@@ -1172,6 +1219,8 @@ static unsigned long parisc_serial_in(char *c, unsigned long maxchars)
  * console costs a few dropped characters instead of a machine hang. */
 #define SERIAL_OUT_POLL_LIMIT 10000
 
+static struct pz_device mem_cons_boot;
+
 static void parisc_serial_out(char c)
 {
     portaddr_t addr = PAGE0->mem_cons.hpa;
@@ -1187,7 +1236,13 @@ static void parisc_serial_out(char c)
         print_mod_path(&PAGE0->mem_cons.dp, 1);
     }
     hppa_device_t *dev;
-    dev = find_hppa_device_by_path(&PAGE0->mem_cons.dp, NULL, 0);
+    if (pci_sti_hpa) {
+        /* the console is the PCI graphics card: copy to the serial port */
+        dev = find_hpa_device(mem_cons_boot.hpa);
+        if (!dev || !dev->pci_addr)
+            return;
+    } else
+        dev = find_hppa_device_by_path(&PAGE0->mem_cons.dp, NULL, 0);
     if (0) {
         dprintf(1,"parisc_serial_out  hpa %x\n", PAGE0->mem_cons.hpa);
         print_mod_path(dev->mod_path, 0);
@@ -1220,7 +1275,10 @@ static void parisc_putchar_internal(char c)
 {
     if (HPA_is_LASI_graphics(PAGE0->mem_cons.hpa))
         sti_putc(c);
-    else
+    else if (HPA_is_STI_console(PAGE0->mem_cons.hpa)) {
+        sti_putc(c);
+        parisc_serial_out(c);
+    } else
         parisc_serial_out(c);
 }
 
@@ -1313,6 +1371,28 @@ static unsigned long tape_read(struct drive_s *drive, void *buf,
     return done;
 }
 
+/*
+ * The caller names the drive in the layers (ID_addr): SCSI target and
+ * LUN. It is not always the drive we booted from: HP-UX 11 finds how far
+ * IODC reaches on its swap and dump disk with test reads there, while it
+ * runs from the install CD. Use the boot drive if no other drive matches.
+ */
+extern int parisc_get_scsi_target(struct drive_s **boot_drive, int target);
+
+static struct drive_s *iodc_storage_drive(unsigned int *layers)
+{
+    struct drive_s *drive = NULL;
+
+    if (!layers || !boot_drive)
+        return boot_drive;
+    if (layers[0] == boot_drive->target && layers[1] == boot_drive->lun)
+        return boot_drive;
+    if (parisc_get_scsi_target(&drive, layers[0]) &&
+        drive->type == boot_drive->type && drive->lun == layers[1])
+        return drive;
+    return boot_drive;
+}
+
 int __VISIBLE parisc_iodc_ENTRY_IO(unsigned int *arg)
 {
     unsigned long hpa = COMPAT_VAL(ARG0);
@@ -1346,7 +1426,7 @@ int __VISIBLE parisc_iodc_ENTRY_IO(unsigned int *arg)
         case ENTRY_IO_COUT: /* console output */
             c = (char*)ARG6;
             result[0] = len = ARG7;
-            if (DEV_is_serial_device(dev) || HPA_is_LASI_graphics(hpa)) {
+            if (DEV_is_serial_device(dev) || HPA_is_STI_console(hpa)) {
                 while (len--)
                     printf("%c", *c++);
             }
@@ -1367,7 +1447,9 @@ int __VISIBLE parisc_iodc_ENTRY_IO(unsigned int *arg)
             case ENTRY_IO_BOOTIN: /* boot medium IN */
             case ENTRY_IO_BBLOCK_IN: /* boot block medium IN */
             case ENTRY_IO_BOOTOUT:
-                disk_op.drive_fl = boot_drive;
+                disk_op.drive_fl = iodc_storage_drive((unsigned int *)ARG3);
+                if (!disk_op.drive_fl)
+                    return PDC_ERROR;
                 disk_op.buf_fl = (void*)ARG6;
                 disk_op.command = option == ENTRY_IO_BOOTOUT ? CMD_WRITE : CMD_READ;
 
@@ -1382,10 +1464,10 @@ int __VISIBLE parisc_iodc_ENTRY_IO(unsigned int *arg)
                 unsigned long current_lba = ARG5 / disk_op.drive_fl->blksize;
 
                 /* a tape has no LBA, read it at the medium address ARG5 */
-                if (boot_drive->sequential && option == ENTRY_IO_BOOTIN) {
+                if (disk_op.drive_fl->sequential && option == ENTRY_IO_BOOTIN) {
                     if ((ARG5 | bytes_requested) & (FW_BLOCKSIZE-1))
                         return PDC_INVALID_ARG;
-                    result[0] = tape_read(boot_drive, (void *)ARG6, ARG5,
+                    result[0] = tape_read(disk_op.drive_fl, (void *)ARG6, ARG5,
                                           bytes_requested);
                     return result[0] == bytes_requested ? PDC_OK : PDC_ERROR;
                 }
@@ -2051,9 +2133,19 @@ static int pdc_iodc(unsigned long *arg, unsigned long narrow_mode)
             iodc_p = dev->iodc;
 
             if (ARG4 == PDC_IODC_INDEX_DATA) {
-                if (ARG6 > sizeof(*iodc_p))
-                    ARG6 = sizeof(*iodc_p);
-                memcpy((void*) ARG5, iodc_p, ARG6);
+                /*
+                 * HP-UX 11 reaches a PCI disk through the IODC of its PCI
+                 * host bridge (type 0x0d), as PCI devices have no HPA.
+                 * Bit 0 of features says the IODC does block I/O. Without
+                 * it, HP-UX limits swap and dump to the first 4 GB of the
+                 * disk and lvlnboot fails on big disks.
+                 */
+                struct pdc_iodc iodc = *iodc_p;
+                if (iodc.type == 0x0d)
+                    iodc.features |= 0x01;
+                if (ARG6 > sizeof(iodc))
+                    ARG6 = sizeof(iodc);
+                memcpy((void*) ARG5, &iodc, ARG6);
                 c = (unsigned char *) ARG5;
                 // printf("SeaBIOS: PDC_IODC get: hpa = 0x%lx, HV: 0x%x 0x%x IODC_SPA=0x%x  type 0x%x, \n", hpa, c[0], c[1], c[2], c[3]);
                 result[0] = ARG6;
@@ -3449,6 +3541,12 @@ int __VISIBLE parisc_pdc_entry(unsigned long *arg, unsigned long narrow_mode)
                 return PDC_BAD_PROC;
             break;
 
+        case PDC_RDR:
+            /* HP-UX 11.11 64-bit on C3700 calls option 0 (READ_BUFFER)
+               again and again while it runs. No RDRs here: PDC_BAD_PROC,
+               without a warning each time. */
+            return PDC_BAD_PROC;
+
         case PDC_PCI_INDEX:
             return pdc_pci_index(arg);
 
@@ -4024,6 +4122,42 @@ static void find_serial_pci_card(void)
     mem_kbd_sti_boot.hpa = pdev->hpa;
 }
 
+/*
+ * Find a PCI graphics card with an Artist (HP VISUALIZE-EG, QEMU artist-pci)
+ * and make it the STI console. The firmware's own STI code drives it, with
+ * the STI regions in BAR 0.
+ */
+static int find_sti_pci_card(void)
+{
+    struct pci_device *pci;
+    hppa_device_t *pdev;
+    unsigned long bar;
+
+    if (!has_astro)
+        return 0;
+    foreachpci(pci) {
+        if (pci->vendor == PCI_VENDOR_ID_HP && pci->device == 0x1005)
+            break;
+    }
+    if (!pci)
+        return 0;
+    bar = (uintptr_t) pci_enable_membar(pci, PCI_BASE_ADDRESS_0);
+    if (!bar)
+        return 0;
+    dprintf(1, "PCI: Enabling %pP for STI console at %lx\n", pci, bar);
+
+    pdev = &hppa_pci_devices[0];
+    while (pdev->pci != pci)
+        pdev++;
+
+    sti_rom_init();
+    sti_set_regions(F_EXTEND(bar));
+    sti_console_init(&sti_proc_rom);
+    pci_sti_hpa = pdev->hpa;
+    mem_cons_sti_boot.hpa = pdev->hpa;
+    return 1;
+}
+
 /* find SCSI PCI card (to be used as boot device) */
 static void find_scsi_pci_card(void)
 {
@@ -4058,6 +4192,7 @@ static int prepare_boot_path(volatile struct pz_device *dest,
     hppa_device_t *dev;
     unsigned long hpa;
     struct pdc_module_path *mod_path;
+    struct pdc_module_path serial_path;
 
     hpa = source->hpa;
     dev = find_hpa_device(hpa);
@@ -4076,6 +4211,12 @@ static int prepare_boot_path(volatile struct pz_device *dest,
      * We save cell #0 there, so mask out the relevant bits. */
     if (!pat_disabled())
         mod_path->path.flags &= (PF_AUTOBOOT | PF_AUTOSEARCH);
+
+    /* the SuperIO console is its first serial port, not the SuperIO */
+    if (PCI_is_HPPA_SUPERIO(dev->pci)) {
+        superio_serial_path(mod_path, &serial_path, SUPERIO_SERIAL_PORT1);
+        mod_path = &serial_path;
+    }
 
     /* copy device path to entry in PAGE0 */
     memcpy((void*)dest, source, sizeof(*source));
@@ -4477,10 +4618,16 @@ void __VISIBLE start_parisc_firmware(void)
     if (pdc_console != CONSOLE_SERIAL) {
 	if (artist_present())
             pdc_console = CONSOLE_GRAPHICS;
+	else if (pdc_console == CONSOLE_GRAPHICS && find_sti_pci_card())
+            pdc_console = CONSOLE_GRAPHICS;
 	else
             pdc_console = CONSOLE_SERIAL;
     }
-    if (pdc_console == CONSOLE_GRAPHICS) {
+    if (pdc_console == CONSOLE_GRAPHICS && pci_sti_hpa) {
+        /* no USB keyboard in the firmware: keep the serial port for input */
+        prepare_boot_path(&(PAGE0->mem_cons), &mem_cons_sti_boot, 0x60);
+        prepare_boot_path(&(PAGE0->mem_kbd),  &mem_kbd_boot, 0xa0);
+    } else if (pdc_console == CONSOLE_GRAPHICS) {
         prepare_boot_path(&(PAGE0->mem_cons), &mem_cons_sti_boot, 0x60);
         prepare_boot_path(&(PAGE0->mem_kbd),  &mem_kbd_sti_boot, 0xa0);
     } else {

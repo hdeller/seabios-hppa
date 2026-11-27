@@ -34,7 +34,16 @@
 
 #define __stifunc(_name) __attribute__((section(".sti.text." _name)))
 
-#define STI_F_EXTEND(x) ((void*)(long)(int)(x))
+/*
+ * A region pointer that has only 32 bits is an I/O address: sign extend
+ * it to the F-space. 64-bit callers may give the full 64-bit address.
+ */
+#ifdef __LP64__
+#define STI_F_EXTEND(x) ((void *)(((unsigned long)(x) >> 32) ? \
+                         (unsigned long)(x) : (unsigned long)(long)(int)(x)))
+#else
+#define STI_F_EXTEND(x) ((void *)(x))
+#endif
 
 static const __stidata char user_data[256] __aligned(32);
 
@@ -3282,8 +3291,12 @@ struct sti_rom __stiheader sti_proc_rom = {
     .graphics_id = { 0x2b4ded6d, 0x40a00499 },
 };
 
-static void __stitext write_artist(struct sti_glob_cfg *cfg,
-                                   int reg, u32 val)
+/*
+ * HP-UX copies each STI routine to RAM on its own, so a routine must not
+ * call code outside of it: inline the helpers.
+ */
+static __always_inline void write_artist(struct sti_glob_cfg *cfg,
+                                         int reg, u32 val)
 {
     gsc_writel(STI_F_EXTEND(cfg->region_ptrs[2] + reg), val);
 }
@@ -3328,20 +3341,22 @@ static u32 __stifunc("block_move") sti_bmove(struct sti_blkmv_flags *flags,
     return 0;
 }
 
-/* can not call millicode routines in STI ROM code */
+/*
+ * Can not call millicode routines in STI ROM code.  No switch either:
+ * its jump table would be in .rodata, outside the STI ROM, and a ROM
+ * that the OS copies (from a PCI card) must not point outside itself.
+ */
 static inline int inline_mul(int val, int mul)
 {
-    switch (mul) {
-    case 7:     return (val << 3) - val;
-    case 6:     return (val << 2) + (val << 1);
-    case 5:     return (val << 2) + val;
-    case 4:     return (val << 2);
-    case 3:     return (val << 1) + val;
-    case 2:     return (val << 1);
-    case 1:     return val;
-    case 0:     return 0;
-    default:    return 0;
-    }
+    int ret = 0;
+
+    if (mul & 1)
+        ret += val;
+    if (mul & 2)
+        ret += val << 1;
+    if (mul & 4)
+        ret += val << 2;
+    return ret;
 }
 
 static int __stifunc("font_unpmv") sti_font_unpmv(struct sti_font_flags *flags,
@@ -3349,7 +3364,7 @@ static int __stifunc("font_unpmv") sti_font_unpmv(struct sti_font_flags *flags,
                                                   struct sti_font_outptr *out,
                                                   struct sti_glob_cfg *cfg)
 {
-    struct font *font = (struct font *) ROM_EXTEND(in->font_start_addr);
+    struct font *font = (struct font *) in->font_start_addr;
     int bpc = font->hdr.bytes_per_char;
     int width = font->hdr.width;
     unsigned char *src;
@@ -3379,13 +3394,13 @@ static int __stifunc("font_unpmv") sti_font_unpmv(struct sti_font_flags *flags,
 
     pitch = (width + 7) / 8;
     for (y = 0; y < bpc; y += pitch) {
-        u32 val = 0;
-        switch (pitch) {
-            case 4:     val |= src[y+3] << 0;  /* fall through */
-            case 3:     val |= src[y+2] << 8;  /* fall through */
-            case 2:     val |= src[y+1] << 16; /* fall through */
-            default:    val |= src[y+0] << 24; /* fall through */
-        }
+        u32 val = src[y+0] << 24;
+        if (pitch >= 2 && pitch <= 4)
+            val |= src[y+1] << 16;
+        if (pitch >= 3 && pitch <= 4)
+            val |= src[y+2] << 8;
+        if (pitch == 4)
+            val |= src[y+3] << 0;
         write_artist(cfg, ARTIST_VRAM_BYTE_WRITE, val);
         barrier();
     }

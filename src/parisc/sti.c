@@ -16,6 +16,7 @@
 #include "hppa.h"
 
 static int sti_enabled;
+static struct sti_rom *sti_console_rom;
 
 static struct sti_init_flags sti_init_flags = {
         .wait = 1,
@@ -82,7 +83,7 @@ static void sti_putchar(struct sti_rom *rom, int row, int column, const char c)
     sti_font_inptr.dest_x = column * font->width;
     sti_font_inptr.dest_y = row * font->height;
     sti_font_inptr.index = c;
-    sti_font_inptr.font_start_addr = (u32) font;
+    sti_font_inptr.font_start_addr = (sti_ptr_t) font;
 
     sti_unpmv(&sti_font_flags, &sti_font_inptr,
         &sti_font_outptr, &sti_glob_cfg);
@@ -111,6 +112,18 @@ static void sti_block_move(struct sti_rom *rom, int src_x, int src_y,
                    &sti_blkmv_outptr, &sti_glob_cfg);
 }
 
+/*
+ * Put the STI regions of an Artist at base, in the same places as on the
+ * Artist at LASI_GFX_HPA. A PCI card has them in its BAR 0.
+ */
+void sti_set_regions(unsigned long base)
+{
+    sti_glob_cfg.region_ptrs[0] = base;
+    sti_glob_cfg.region_ptrs[1] = base + (ARTIST_FB_ADDR - LASI_GFX_HPA);
+    sti_glob_cfg.region_ptrs[2] = base + (0xf8100000 - LASI_GFX_HPA);
+    sti_glob_cfg.region_ptrs[3] = base + (0xf8380000 - LASI_GFX_HPA);
+}
+
 void sti_console_init(struct sti_rom *rom)
 {
     int (*sti_init)(struct sti_init_flags *,
@@ -119,23 +132,25 @@ void sti_console_init(struct sti_rom *rom)
                     struct sti_glob_cfg *);
 
     sti_init = (void *)rom + rom->init_graph;
-    sti_glob_cfg.ext_ptr = (u32)&sti_glob_ext_cfg;
-    sti_init_inptr.ext_ptr = (u32)&sti_init_inptr_ext;
+    sti_glob_cfg.ext_ptr = (sti_ptr_t)&sti_glob_ext_cfg;
+    sti_init_inptr.ext_ptr = (sti_ptr_t)&sti_init_inptr_ext;
 
     sti_init(&sti_init_flags, &sti_init_inptr,
              &sti_init_outptr, &sti_glob_cfg);
 
+    sti_console_rom = rom;
     sti_enabled = 1;
 }
 
 void sti_putc(const char c)
 {
-    struct sti_rom *rom = (struct sti_rom *) ROM_EXTEND(PAGE0->proc_sti);
-    struct sti_rom_font *font = (void *)rom + rom->font_start;
+    struct sti_rom *rom = sti_console_rom;
+    struct sti_rom_font *font;
     static int row, col;
 
     if (!sti_enabled)
         return;
+    font = (void *)rom + rom->font_start;
 
     if (c == '\r') {
         col = 0;
