@@ -3328,20 +3328,22 @@ static u32 __stifunc("block_move") sti_bmove(struct sti_blkmv_flags *flags,
     return 0;
 }
 
-/* can not call millicode routines in STI ROM code */
+/*
+ * Can not call millicode routines in STI ROM code.  No switch either:
+ * its jump table would be in .rodata, outside the STI ROM, and a ROM
+ * that the OS copies (from a PCI card) must not point outside itself.
+ */
 static inline int inline_mul(int val, int mul)
 {
-    switch (mul) {
-    case 7:     return (val << 3) - val;
-    case 6:     return (val << 2) + (val << 1);
-    case 5:     return (val << 2) + val;
-    case 4:     return (val << 2);
-    case 3:     return (val << 1) + val;
-    case 2:     return (val << 1);
-    case 1:     return val;
-    case 0:     return 0;
-    default:    return 0;
-    }
+    int ret = 0;
+
+    if (mul & 1)
+        ret += val;
+    if (mul & 2)
+        ret += val << 1;
+    if (mul & 4)
+        ret += val << 2;
+    return ret;
 }
 
 static int __stifunc("font_unpmv") sti_font_unpmv(struct sti_font_flags *flags,
@@ -3379,13 +3381,13 @@ static int __stifunc("font_unpmv") sti_font_unpmv(struct sti_font_flags *flags,
 
     pitch = (width + 7) / 8;
     for (y = 0; y < bpc; y += pitch) {
-        u32 val = 0;
-        switch (pitch) {
-            case 4:     val |= src[y+3] << 0;  /* fall through */
-            case 3:     val |= src[y+2] << 8;  /* fall through */
-            case 2:     val |= src[y+1] << 16; /* fall through */
-            default:    val |= src[y+0] << 24; /* fall through */
-        }
+        u32 val = src[y+0] << 24;
+        if (pitch >= 2 && pitch <= 4)
+            val |= src[y+1] << 16;
+        if (pitch >= 3 && pitch <= 4)
+            val |= src[y+2] << 8;
+        if (pitch == 4)
+            val |= src[y+3] << 0;
         write_artist(cfg, ARTIST_VRAM_BYTE_WRITE, val);
         barrier();
     }
