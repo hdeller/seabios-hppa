@@ -270,6 +270,7 @@ $smp_exit_loop:
 	/* provide PDCE_PROC entry in arg0 (required on 64-bit) */
 	load32	MEM_PDC_ENTRY, %arg0
 
+#if 0
 	/*
 	 * HP-UX 9.x SMP rendezvous check.
 	 *
@@ -306,18 +307,27 @@ $smp_exit_loop:
 	/* Load return pointer to firmware startup in case the OS returns. */
 	load32_firmware	startup, %rp
 	bv,n	%r0(%r22)		/* jump to OS */
+#endif
+1:	ldw	0x08(%r0),%r1
+	cmpb,=,n  %r0,%r1,1b
 
+	ldw	0x10(%r0),%r26
+	ldw	0x14(%r0),%r3
+
+#if 0
 $hpux_rendez_skip:
 	/* jump to rendevouz (Linux-style: MEM_RENDEZ in PAGE0) */
 	ldw	0x10(%r0),%r3	/* MEM_RENDEZ */
-#ifdef CONFIG_64BIT
+#ifdef CONFIG_64BIT // cpu_version == 0x214
 	addb,*>,n %r0,%r0,1f	/* branch if narrow addressing */
 	ldw	0x28(%r0),%r1	/* MEM_RENDEZ_HI */
 	depd    %r1, 31, 32, %r3
 1:
 #endif
+2:
 	cmpb,=,n  %r0,%r3,enter_smp_idle_loop
 	nop			/* failed backward branch is nullified */
+#endif
 	load32_firmware	startup, %rp
 	bv,n	0(%r3)
 

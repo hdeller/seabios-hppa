@@ -2349,12 +2349,13 @@ static int pdc_proc(unsigned long *arg)
 {
     extern void enter_smp_idle_loop(void);
     unsigned long option = ARG1;
+    unsigned long *result = (unsigned long *)ARG2;
 
-    printf("PDC_PROC %x\n", option);
+    printf("PDC_PROC %lx\n", option);
     switch (option) {
 
     case PDC_PROC_STOP: /* Stop this CPU - return it to the firmware idle loop */
-        if (pdc_debug & DEBUG_PDC)
+        if (1 || pdc_debug & DEBUG_PDC)
             printf("\nSeaBIOS: PDC_PROC_STOP: CPU%d going offline.\n",
                     index_of_CPU_HPA(mfctl(CPU_HPA_CR_REG)));
         /* Wait for outstanding timer IRQs to drain before we vanish. */
@@ -2365,11 +2366,7 @@ static int pdc_proc(unsigned long *arg)
 
     case PDC_PROC_RENDEZ: { /* Wake secondary CPU (HP-UX SMP boot) */
         unsigned long target_hpa = ARG3;
-        unsigned long os_entry   = ARG4;
         unsigned long os_arg     = ARG5;
-        volatile u32 *rendez_entry;
-        volatile u32 *rendez_arg;
-        volatile u32 *rendez_valid;
         int cpu_idx;
 
         cpu_idx = index_of_CPU_HPA(target_hpa);
@@ -2379,10 +2376,10 @@ static int pdc_proc(unsigned long *arg)
             return PDC_INVALID_ARG;
         }
 
-        if (pdc_debug & DEBUG_PDC)
+        if (1 || pdc_debug & DEBUG_PDC)
             printf("\nSeaBIOS: PDC_PROC_RENDEZ: wake CPU%d (HPA=0x%lx)"
                    " entry=0x%lx arg=0x%lx\n",
-                   cpu_idx, target_hpa, os_entry, os_arg);
+                   cpu_idx, target_hpa, ARG4, os_arg);
 
         /*
          * Write the rendezvous block into the CPU's HPA MMIO area.
@@ -2393,6 +2390,10 @@ static int pdc_proc(unsigned long *arg)
          *   HPA + 0x30.  We embed the full block there so the secondary
          *   can branch directly without an extra indirection.
          */
+#if 0
+        volatile u32 *rendez_entry;
+        volatile u32 *rendez_arg;
+        volatile u32 *rendez_valid;
         rendez_entry = (volatile u32 *)(target_hpa + HPUX_RENDEZ_ENTRY_OFF);
         rendez_arg   = (volatile u32 *)(target_hpa + HPUX_RENDEZ_ARG_OFF);
         rendez_valid = (volatile u32 *)(target_hpa + HPUX_RENDEZ_VALID_OFF);
@@ -2406,6 +2407,9 @@ static int pdc_proc(unsigned long *arg)
          */
         asm volatile("" : : : "memory"); /* compiler barrier */
         *rendez_valid = 1;
+#else
+         *(volatile u32 *)0x10 = ARG4;
+#endif
 
         /*
          * Deliver an external interrupt to the secondary CPU to kick it out
@@ -2414,17 +2418,17 @@ static int pdc_proc(unsigned long *arg)
          * register (confirmed from HP-UX kernel source: HT_HPA_loop writes
          * to HPA+0x00 for processor control, 0x60 for external interrupt).
          */
-        *(volatile u32 *)(target_hpa + 0x60) = 1;
+     //   *(volatile u32 *)(target_hpa + 0x60) = 1;
+        *(volatile u32 *)(target_hpa + 0) = 1;
 
         /* Write PDC_OK to the caller's result buffer */
-        if (ARG2) {
-            ((unsigned long *)ARG2)[0] = PDC_OK;
-        }
+        if (result)
+            result[0] = PDC_OK;
+
         return PDC_OK;
     }
 
     case PDC_PROC_INFO: { /* Return own processor info */
-        unsigned long *result = (unsigned long *)ARG2;
         unsigned long hpa = mfctl(CPU_HPA_CR_REG);
 
         if (!result)
@@ -4260,7 +4264,7 @@ static void hpux_smp_init(void)
     for (i = 0; i < smp_cpus; i++)
         hpa_array[i] = (u32)CPU_HPA_IDX(i);
 
-    if (pdc_debug & DEBUG_PDC)
+    if (1 || pdc_debug & DEBUG_PDC)
         printf("SeaBIOS: hpux_smp_init: wrote num_processors=%ld to phys 0x%x\n",
                smp_cpus, HPUX_PDC_PROC_COUNT_ADDR);
 }
@@ -4550,10 +4554,6 @@ void __VISIBLE start_parisc_firmware(void)
     /* PAGE0->imm_hpa - is set later (MEMORY_HPA) */
     PAGE0->imm_spa_size = ram_size_low;
     PAGE0->imm_max_mem = ram_size_low;
-
-    /* on 715 machine: */
-    *(int *)(0x180) = smp_cpus; // in PAGE0: PDC proc table with num_processors at 0x180
-    // MP config struct at 0x460 in PAGE0
 
     /* initialize graphics (if available) */
     if (artist_present()) {
