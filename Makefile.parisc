@@ -103,6 +103,7 @@ endif
 
 target-y :=
 target-$(CONFIG_PARISC) += $(OUT)hppa-firmware$(BIT_SUFFIX).img
+target-$(CONFIG_PARISC) += $(OUT)sti$(BITS).bin
 
 all: $(target-y)
 
@@ -171,6 +172,19 @@ $(OUT)hppa-firmware$(BIT_SUFFIX).img: $(OUT)autoconf.h $(OUT)head.o $(OUT)ccode3
 	$(Q)$(CC) $(CFLAGS32FLAT) -c src/version.c -o $(OUT)version.o
 	$(Q)$(LD) -N -T $(OUT)pafirmware.lds $(OUT)head.o $(OUT)version.o -X -o $@ -e startup --as-needed $(OUT)ccode32flat.o $(LIBGCC)
 	$(Q)chmod -x $@
+
+# The STI code for the PCI graphics ROM: stirom.c on its own, at address 0.
+# It must not need relocations, as HP-UX copies the routines to RAM.
+# The 64-bit ld fails a final link with this script, so link it with -r.
+STILDFLAGS-64 = -r
+$(OUT)sti$(BITS).bin: src/parisc/stirom.c src/parisc/stirom.lds $(OUT)autoconf.h
+	@echo "  Building STI ROM code $@"
+	$(Q)$(CC) $(CFLAGS32FLAT) -c $< -o $(OUT)sti$(BITS).o
+	$(Q)if $(OBJDUMP) -r $(OUT)sti$(BITS).o | grep -q 'RECORDS FOR \[\.sti'; then \
+		echo "STI ROM code has relocations"; exit 1; fi
+	$(Q)$(LD) $(STILDFLAGS-$(BITS)) -T src/parisc/stirom.lds $(OUT)sti$(BITS).o -o $(OUT)sti$(BITS).elf
+	$(Q)$(CROSS_PREFIX)nm -n $(OUT)sti$(BITS).elf | grep -v ' [aN] ' > $(OUT)sti$(BITS).nm
+	$(Q)$(OBJCOPY) -O binary -j .sti $(OUT)sti$(BITS).elf $@
 
 ################ Kconfig rules
 
