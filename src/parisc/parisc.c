@@ -3522,6 +3522,12 @@ int __VISIBLE parisc_pdc_entry(unsigned long *arg, unsigned long narrow_mode)
                 return PDC_BAD_PROC;
             break;
 
+        case PDC_RDR:
+            /* HP-UX 11.11 64-bit on C3700 calls option 0 (READ_BUFFER)
+               again and again while it runs. No RDRs here: PDC_BAD_PROC,
+               without a warning each time. */
+            return PDC_BAD_PROC;
+
         case PDC_PCI_INDEX:
             return pdc_pci_index(arg);
 
