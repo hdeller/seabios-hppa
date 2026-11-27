@@ -34,7 +34,16 @@
 
 #define __stifunc(_name) __attribute__((section(".sti.text." _name)))
 
-#define STI_F_EXTEND(x) ((void*)(long)(int)(x))
+/*
+ * A region pointer that has only 32 bits is an I/O address: sign extend
+ * it to the F-space. 64-bit callers may give the full 64-bit address.
+ */
+#ifdef __LP64__
+#define STI_F_EXTEND(x) ((void *)(((unsigned long)(x) >> 32) ? \
+                         (unsigned long)(x) : (unsigned long)(long)(int)(x)))
+#else
+#define STI_F_EXTEND(x) ((void *)(x))
+#endif
 
 static const __stidata char user_data[256] __aligned(32);
 
@@ -3282,8 +3291,12 @@ struct sti_rom __stiheader sti_proc_rom = {
     .graphics_id = { 0x2b4ded6d, 0x40a00499 },
 };
 
-static void __stitext write_artist(struct sti_glob_cfg *cfg,
-                                   int reg, u32 val)
+/*
+ * HP-UX copies each STI routine to RAM on its own, so a routine must not
+ * call code outside of it: inline the helpers.
+ */
+static __always_inline void write_artist(struct sti_glob_cfg *cfg,
+                                         int reg, u32 val)
 {
     gsc_writel(STI_F_EXTEND(cfg->region_ptrs[2] + reg), val);
 }
@@ -3351,7 +3364,7 @@ static int __stifunc("font_unpmv") sti_font_unpmv(struct sti_font_flags *flags,
                                                   struct sti_font_outptr *out,
                                                   struct sti_glob_cfg *cfg)
 {
-    struct font *font = (struct font *) ROM_EXTEND(in->font_start_addr);
+    struct font *font = (struct font *) in->font_start_addr;
     int bpc = font->hdr.bytes_per_char;
     int width = font->hdr.width;
     unsigned char *src;

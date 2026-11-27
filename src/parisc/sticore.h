@@ -18,6 +18,13 @@
 #define ALT_CODE_TYPE_UNKNOWN 0x00      /* alt code type values */
 #define ALT_CODE_TYPE_PA_RISC_64 0x01
 
+/*
+ * Pointers in the structs that callers pass to the STI routines. They are
+ * 32 bits wide for 32-bit STI code and 64 bits wide for 64-bit STI code
+ * (ALT_CODE_TYPE_PA_RISC_64), as 64-bit HP-UX and Linux pass them.
+ */
+typedef unsigned long sti_ptr_t;
+
 #define STI_WAIT 1
 
 /* STI function configuration structs */
@@ -40,8 +47,8 @@ struct sti_glob_cfg_ext {
     u8 friendly_boot;           /* in friendly boot mode */
     s16 power;                  /* power calculation (in Watts) */
     s32 freq_ref;               /* frequency reference */
-    u32 sti_mem_addr;           /* pointer to global sti memory (size=sti_mem_request) */
-    u32 future_ptr;             /* pointer to future data */
+    sti_ptr_t sti_mem_addr;     /* pointer to global sti memory (size=sti_mem_request) */
+    sti_ptr_t future_ptr;       /* pointer to future data */
 };
 
 struct sti_glob_cfg {
@@ -52,10 +59,10 @@ struct sti_glob_cfg {
     s16 offscreen_y;            /* offset height in pixels */
     s16 total_x;                /* frame buffer width in pixels */
     s16 total_y;                /* frame buffer height in pixels */
-    u32 region_ptrs[STI_REGION_MAX]; /* region pointers */
+    sti_ptr_t region_ptrs[STI_REGION_MAX]; /* region pointers */
     s32 reent_lvl;              /* storage for reentry level value */
-    u32 save_addr;              /* where to save or restore reentrant state */
-    u32 ext_ptr;                /* pointer to extended glob_cfg data structure */
+    sti_ptr_t save_addr;        /* where to save or restore reentrant state */
+    sti_ptr_t ext_ptr;          /* pointer to extended glob_cfg data structure */
 };
 
 
@@ -81,26 +88,26 @@ struct sti_init_flags {
     u32 caller_kernel:1;        /* set only by kernel for each call */
     u32 caller_other:1;         /* set only by non-[BR/K] caller */
     u32 pad:14;                 /* pad to word boundary */
-    u32 future_ptr;             /* pointer to future data */
+    sti_ptr_t future_ptr;       /* pointer to future data */
 };
 
 struct sti_init_inptr_ext {
     u8  config_mon_type;        /* configure to monitor type */
     u8  pad[1];                 /* pad to word boundary */
     u16 inflight_data;          /* inflight data possible on PCI */
-    u32 future_ptr;             /* pointer to future data */
+    sti_ptr_t future_ptr;       /* pointer to future data */
 };
 
 struct sti_init_inptr {
     s32 text_planes;            /* number of planes to use for text */
-    u32 ext_ptr;                /* pointer to extended init_graph inptr data structure*/
+    sti_ptr_t ext_ptr;          /* pointer to extended init_graph inptr data structure*/
 };
 
 
 struct sti_init_outptr {
     s32 errno;                  /* error number on failure */
     s32 text_planes;            /* number of planes used for text */
-    u32 future_ptr;             /* pointer to future data */
+    sti_ptr_t future_ptr;       /* pointer to future data */
 };
 
 /* STI configuration function structs */
@@ -108,17 +115,17 @@ struct sti_init_outptr {
 struct sti_conf_flags {
     u32 wait:1;                 /* should routine idle wait or not */
     u32 pad:31;                 /* pad to word boundary */
-    u32 future_ptr;             /* pointer to future data */
+    sti_ptr_t future_ptr;       /* pointer to future data */
 };
 
 struct sti_conf_inptr {
-    u32 future_ptr;             /* pointer to future data */
+    sti_ptr_t future_ptr;       /* pointer to future data */
 };
 
 struct sti_conf_outptr_ext {
     u32 crt_config[3];          /* hardware specific X11/OGL information */
     u32 crt_hdw[3];
-    u32 future_ptr;
+    sti_ptr_t future_ptr;
 };
 
 struct sti_conf_outptr {
@@ -134,7 +141,7 @@ struct sti_conf_outptr {
     s32 planes;                 /* number of fb planes in system */
     u8 dev_name[STI_DEV_NAME_LENGTH]; /* null terminated product name */
     u32 attributes;             /* flags denoting attributes */
-    u32 ext_ptr;                /* pointer to future data */
+    sti_ptr_t ext_ptr;          /* pointer to future data */
 };
 
 typedef struct {
@@ -230,25 +237,25 @@ struct font {
 /* STI font printing function structs */
 
 struct sti_font_inptr {
-    u32 font_start_addr;        /* address of font start */
+    sti_ptr_t font_start_addr;  /* address of font start */
     s16 index;                  /* index into font table of character */
     u8 fg_color;                /* foreground color of character */
     u8 bg_color;                /* background color of character */
     s16 dest_x;                 /* X location of character upper left */
     s16 dest_y;                 /* Y location of character upper left */
-    u32 future_ptr;             /* pointer to future data */
+    sti_ptr_t future_ptr;       /* pointer to future data */
 };
 
 struct sti_font_flags {
     u32 wait:1;                 /* should routine idle wait or not */
     u32 non_text:1;             /* font unpack/move in non_text planes =1, text =0 */
     u32 pad:30;                 /* pad to word boundary */
-    u32 future_ptr;             /* pointer to future data */
+    sti_ptr_t future_ptr;       /* pointer to future data */
 };
 
 struct sti_font_outptr {
     s32 errno;                  /* error number on failure */
-    u32 future_ptr;             /* pointer to future data */
+    sti_ptr_t future_ptr;       /* pointer to future data */
 };
 
 /* STI blockmove structs */
@@ -259,7 +266,7 @@ struct sti_blkmv_flags {
     u32 clear:1;                /* clear during move? */
     u32 non_text:1;             /* block move in non_text planes =1, text =0 */
     u32 pad:28;                 /* pad to word boundary */
-    u32 future_ptr;             /* pointer to future data */
+    sti_ptr_t future_ptr;       /* pointer to future data */
 };
 
 struct sti_blkmv_inptr {
@@ -271,12 +278,12 @@ struct sti_blkmv_inptr {
     s16 dest_y;                 /* dest upper left pixel y location */
     s16 width;                  /* block width in pixels */
     s16 height;                 /* block height in pixels */
-    u32 future_ptr;             /* pointer to future data */
+    sti_ptr_t future_ptr;       /* pointer to future data */
 };
 
 struct sti_blkmv_outptr {
         s32 errno;              /* error number on failure */
-        u32 future_ptr;         /* pointer to future data */
+        sti_ptr_t future_ptr;         /* pointer to future data */
 };
 
 struct sti_state_flags {

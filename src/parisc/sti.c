@@ -82,7 +82,7 @@ static void sti_putchar(struct sti_rom *rom, int row, int column, const char c)
     sti_font_inptr.dest_x = column * font->width;
     sti_font_inptr.dest_y = row * font->height;
     sti_font_inptr.index = c;
-    sti_font_inptr.font_start_addr = (u32) font;
+    sti_font_inptr.font_start_addr = (sti_ptr_t) font;
 
     sti_unpmv(&sti_font_flags, &sti_font_inptr,
         &sti_font_outptr, &sti_glob_cfg);
@@ -119,8 +119,8 @@ void sti_console_init(struct sti_rom *rom)
                     struct sti_glob_cfg *);
 
     sti_init = (void *)rom + rom->init_graph;
-    sti_glob_cfg.ext_ptr = (u32)&sti_glob_ext_cfg;
-    sti_init_inptr.ext_ptr = (u32)&sti_init_inptr_ext;
+    sti_glob_cfg.ext_ptr = (sti_ptr_t)&sti_glob_ext_cfg;
+    sti_init_inptr.ext_ptr = (sti_ptr_t)&sti_init_inptr_ext;
 
     sti_init(&sti_init_flags, &sti_init_inptr,
              &sti_init_outptr, &sti_glob_cfg);
